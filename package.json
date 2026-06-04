@@ -1,0 +1,16 @@
+{
+  "name": "poultry-free-hosting-app",
+  "version": "1.0.0",
+  "description": "نظام متابعة الوجبات - نسخة رفع مجاني مؤقتة بدون SQL Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "cors": "^2.8.5"
+  }
+}
