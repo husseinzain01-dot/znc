@@ -391,6 +391,11 @@ tbody tr:hover td{background:#f8fafc}
           <button class="btn btn-secondary" onclick="fillTransferPreview()">جلب بيانات الوجبة</button>
         </div>
         <div id="transferPreview" style="margin-top:16px"></div>
+        <div style="margin-top:18px">
+          <div class="cardTitle" style="margin-bottom:10px">📦 الوجبات المنقولة</div>
+          <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">اضغط على أي وجبة منقولة لتعديل بيانات النقل. التعديل للمدير فقط.</p>
+          <div class="tableWrap"><table id="transferredTable"></table></div>
+        </div>
       </div>
     </section>
 
@@ -806,6 +811,7 @@ function show(id,btn){
     let ov=$('sideOverlay');if(ov)ov.classList.remove('show');
   }
   renderAll();
+  if(id==='transfer'){clearTransferForm();renderTransferredBatches();}
 }
 
 // ── CALC ──
@@ -864,7 +870,7 @@ function visibleBatches(){
 function renderAll(){
   renderSelectors();renderStats();renderBatches();
   renderMort();renderMarket();renderReports();
-  renderArchive();renderCalendar();renderFields();
+  renderArchive();renderCalendar();renderTransferredBatches();renderFields();
   renderUsers();renderUserFieldsList();
   fillTransferPreview(false);
   // hide backup/restore for non-admin
@@ -977,6 +983,47 @@ function saveBatch(){if(!isAdmin())return;let b=formBatch();if(!b.name||!b.hatch
 function editBatch(id){if(!isAdmin())return;let b=data.batches.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;$('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;$('candle').value=b.candle||90;$('alertAge').value=b.alertAge||35;$('marketAge').value=b.marketAge||35;$('note').value=b.note||'';show('batch',null)}
 function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=data.morts.filter(m=>m.batchId!==id);data.markets=data.markets.filter(m=>m.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll()}}
 
+
+function clearTransferForm(keepBatch=false){
+  if(!keepBatch&&$('transferBatch')) $('transferBatch').selectedIndex=0;
+  ['transferDate','transferHatched','vaccineDeaths','isolatedBirds','fieldBirds'].forEach(id=>{if($(id))$(id).value=''});
+  if($('transferField')) $('transferField').selectedIndex=0;
+  if($('fieldWarn')) {$('fieldWarn').className='warnBox';$('fieldWarn').textContent=''}
+  if($('transferPreview')) $('transferPreview').innerHTML='';
+}
+function editTransferBatch(id){
+  if(!isAdmin())return alert('تعديل النقل بصلاحية المدير فقط');
+  let b=data.batches.find(x=>x.id===id);
+  if(!b)return;
+  $('transferBatch').value=b.id;
+  $('transferDate').value=b.fieldEntryDate||b.transferDate||today();
+  if($('transferField').querySelector('option[value="'+(b.field||'')+'"]')) $('transferField').value=b.field;
+  $('transferHatched').value=b.hatched||'';
+  $('vaccineDeaths').value=b.vaccineDeaths||0;
+  $('isolatedBirds').value=b.isolatedBirds||0;
+  $('fieldBirds').value=b.fieldBirds||'';
+  fillTransferPreview(false);
+  msg('تم جلب بيانات النقل للتعديل');
+}
+function renderTransferredBatches(){
+  let el=$('transferredTable');if(!el)return;
+  let rows=data.batches.filter(b=>b.transferDate).map(b=>{
+    let c=calc(b);
+    return `<tr class="selectable" onclick="editTransferBatch(${b.id})">
+      <td><b>${b.name}</b></td>
+      <td>${fmt(c.entryDate)}</td>
+      <td>${b.field||'—'}</td>
+      <td>${(b.hatched||0).toLocaleString()}</td>
+      <td>${(+b.vaccineDeaths||0).toLocaleString()}</td>
+      <td>${(+b.isolatedBirds||0).toLocaleString()}</td>
+      <td><b>${(+b.fieldBirds||0).toLocaleString()}</b></td>
+      <td>${hatchRate(b)}%</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editTransferBatch(${b.id})">تعديل</button></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>الحقل</th><th>الفاقس</th><th>هلاك اللقاح</th><th>العزل</th><th>الصافي المنقول</th><th>نسبة الفقس</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
 // ── TRANSFER ──
 function fillTransferPreview(showMsg=true){
   if(!$('transferBatch'))return;
@@ -1004,7 +1051,7 @@ function saveTransfer(){
   b.transferDate=val('transferDate');b.fieldEntryDate=val('transferDate');b.field=fieldName;
   b.hatched=hat;b.vaccineDeaths=vac;b.isolatedBirds=iso;b.netHatch=net;b.fieldBirds=field;
   b.fixedHatchRate=eggs?+((field/eggs)*100).toFixed(2):0;b.status='نشطة';
-  selectedBatchId=b.id;save();renderAll();msg('تم تأكيد النقل');
+  selectedBatchId=b.id;save();renderAll();clearTransferForm();msg('تم تأكيد النقل');
 }
 
 // ── MORTALITY ──
