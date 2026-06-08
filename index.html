@@ -575,7 +575,7 @@ async function pullCloud(){
       data.subUsers=data.subUsers||[];
       localStorage.setItem(STORE,JSON.stringify(data));
       if($('dbState')) $('dbState').textContent='متصل بسوبابيس ✅';
-      renderAll();
+      if(currentUser) renderAll();
       return true;
     }
     return false;
@@ -676,8 +676,35 @@ function migrateBatch(b){
   return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate};
 }
 
+
+function loadUsersBeforeLogin(){
+  try{
+    let raw=localStorage.getItem(STORE);
+    if(!raw){
+      for(const s of OLD_STORES){
+        let old=localStorage.getItem(s);
+        if(old){raw=old;break}
+      }
+    }
+    if(raw){
+      let parsed=JSON.parse(raw);
+      data={...data,...parsed};
+      data.batches=(data.batches||[]).map(migrateBatch);
+      data.fields=data.fields||[];
+      data.subUsers=data.subUsers||[];
+    }
+  }catch(e){
+    console.warn('تعذر تحميل المستخدمين قبل الدخول:',e);
+  }
+}
+
 // ── LOGIN / LOGOUT ──
-function loginNow(){
+async function loginNow(){
+  if(typeof pullCloud==='function'){
+    await pullCloud();
+  }else if(typeof loadUsersBeforeLogin==='function'){
+    loadUsersBeforeLogin();
+  }
   let u=$('loginUser').value.trim();
   let p=$('loginPass').value;
   // تحقق المدير الرئيسي
@@ -686,7 +713,7 @@ function loginNow(){
     startSession();return;
   }
   // تحقق المستخدمين الفرعيين
-  let su=data.subUsers.find(x=>x.name===u&&x.pass===p);
+  data.subUsers=data.subUsers||[];let su=data.subUsers.find(x=>String(x.name||'').trim()===u&&String(x.pass||'')===p);
   if(su){
     currentUser={name:su.name,role:su.role||'user',fields:su.fields||[]};
     startSession();return;
