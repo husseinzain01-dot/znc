@@ -812,6 +812,11 @@ function show(id,btn){
   }
   renderAll();
   if(id==='transfer'){clearTransferForm();renderTransferredBatches();}
+  if(id==='mort'){clearMortForm();}
+  if(id==='market'){clearMarketForm();}
+  if(id==='batch'){clearForm();}
+  if(id==='fields'&&typeof clearFieldForm==='function'){clearFieldForm();}
+  if(id==='users'&&typeof clearUserForm==='function'){clearUserForm();}
 }
 
 // ── CALC ──
@@ -1054,13 +1059,28 @@ function saveTransfer(){
   selectedBatchId=b.id;save();renderAll();clearTransferForm();msg('تم تأكيد النقل');
 }
 
+
+function clearMortForm(){
+  if($('mortBatch')) $('mortBatch').selectedIndex=0;
+  if($('mortDate')) $('mortDate').value=today();
+  if($('mortCount')) $('mortCount').value='';
+  if($('mortReason')) $('mortReason').value='';
+}
+function clearMarketForm(){
+  if($('marketBatch')) $('marketBatch').selectedIndex=0;
+  if($('marketDate')) $('marketDate').value=today();
+  if($('marketCount')) $('marketCount').value='';
+  if($('marketStatus')) $('marketStatus').selectedIndex=0;
+  if($('marketNote')) $('marketNote').value='';
+}
+
 // ── MORTALITY ──
 function addMort(){
   let id=+$('mortBatch').value;if(!id||!num('mortCount'))return alert('اختر وجبة وأدخل عدد الهلاك');
   let b=data.batches.find(x=>x.id===id);
   if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
   data.morts.push({id:Date.now(),batchId:id,date:val('mortDate')||today(),count:num('mortCount'),reason:val('mortReason')});
-  $('mortCount').value='';$('mortReason').value='';save();renderAll();
+  save();renderAll();clearMortForm();
 }
 function renderMort(){
   let mf=myFields();
@@ -1080,7 +1100,7 @@ function addMarket(){
   if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
   data.markets.push({id:Date.now(),batchId:id,date:val('marketDate')||today(),count:num('marketCount'),status:val('marketStatus'),note:val('marketNote')});
   if(b){let c=calc(b);b.status=c.completed?'منتهية':'نشطة'}
-  $('marketCount').value='';$('marketNote').value='';save();renderAll();
+  save();renderAll();clearMarketForm();
 }
 function renderMarket(){
   function mktBadge(s){
@@ -1157,7 +1177,7 @@ function saveField(){
   let eid=val('fEditId');
   if(eid){let f=data.fields.find(x=>x.id===+eid);if(f){f.name=nm;f.type=$('fType').value;f.capacity=num('fCapacity')||0}}
   else{if(data.fields.find(f=>f.name===nm))return alert('يوجد حقل بهذا الاسم');data.fields.push({id:Date.now(),name:nm,type:$('fType').value,capacity:num('fCapacity')||0})}
-  clearFieldForm();save();renderAll();msg('تم حفظ الحقل');
+  clearFieldForm();save();renderAll();clearFieldForm();msg('تم حفظ الحقل');
 }
 function clearFieldForm(){if($('fName'))$('fName').value='';if($('fType'))$('fType').value='لحم';if($('fCapacity'))$('fCapacity').value='';if($('fEditId'))$('fEditId').value=''}
 function editField(id){if(!isAdmin())return;let f=data.fields.find(x=>x.id===id);if(!f)return;$('fName').value=f.name;$('fType').value=f.type;$('fCapacity').value=f.capacity||'';$('fEditId').value=f.id;show('fields',null)}
@@ -1218,7 +1238,7 @@ function saveUser(){
     if(!pw)return alert('أدخل كلمة المرور');
     data.subUsers.push({id:Date.now(),name:nm,pass:pw,role,fields});
   }
-  clearUserForm();save();renderAll();msg('تم حفظ المستخدم');
+  clearUserForm();save();renderAll();clearUserForm();msg('تم حفظ المستخدم');
 }
 function clearUserForm(){if($('uName'))$('uName').value='';if($('uPass'))$('uPass').value='';if($('uRole'))$('uRole').value='user';if($('uEditId'))$('uEditId').value='';renderUserFieldsList()}
 function editUser(id){
