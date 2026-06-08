@@ -636,7 +636,14 @@ let currentUser=null; // {name, role, fields} — set on login
 
 // ── UTILS ──
 function $(id){return document.getElementById(id)}
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){
+  // تاريخ اليوم حسب الجهاز محلياً، وليس UTC، حتى لا يختلف العمر بسبب فرق التوقيت
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function num(id){return +($(id).value||0)}
 function val(id){return ($(id).value||'').trim()}
 function isAdmin(){return currentUser&&currentUser.role==='admin'}
@@ -821,7 +828,14 @@ function show(id,btn){
 
 // ── CALC ──
 function addDays(ds,n){let d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
-function diffDays(a,b=today()){let A=new Date(a+'T00:00:00'),B=new Date(b+'T00:00:00');return Math.max(0,Math.floor((B-A)/86400000))}
+function diffDays(a,b=today()){
+  // الفرق بين تاريخين بدون إضافة يوم زائد:
+  // نفس يوم دخول الحقل = 0، اليوم التالي = 1
+  if(!a)return 0;
+  let A=new Date(a+'T00:00:00');
+  let B=new Date(b+'T00:00:00');
+  return Math.max(0,Math.floor((B-A)/86400000));
+}
 function fmt(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('ar-IQ')}
 
 function calc(b,on=today()){
@@ -832,6 +846,7 @@ function calc(b,on=today()){
   let expectedTransfer=addDays(b.hatchDate,21);
   let transferred=!!b.transferDate;
   let entryDate=b.fieldEntryDate||b.transferDate||'';
+  // عمر الطير يبدأ من صفر في يوم دخول الحقل، ولا يُحتسب يوم النقل ضمن العمر
   let rawFlockAge=transferred&&entryDate?diffDays(entryDate,on):0;
   let flockAge=Math.min(40,rawFlockAge);
   let eggs=+b.eggs||0,badEggs=+b.badEggs||0,candleRate=+b.candle||0;
