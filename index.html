@@ -306,7 +306,7 @@ tbody tr:hover td{background:#f8fafc}
       <button class="hamburger" onclick="toggleSide()" title="إخفاء/إظهار القائمة">
         <span></span><span></span><span></span>
       </button>
-      <div class="sideVer">v25.3 Cloud</div>
+      <div class="sideVer">v25.5 Age-0 FIX</div>
     </div>
     <nav class="sideNav" id="sideNav">
       <!-- rendered by buildNav() -->
@@ -637,7 +637,6 @@ let currentUser=null; // {name, role, fields} — set on login
 // ── UTILS ──
 function $(id){return document.getElementById(id)}
 function today(){
-  // تاريخ اليوم حسب الجهاز محلياً، وليس UTC، حتى لا يختلف العمر بسبب فرق التوقيت
   const d=new Date();
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,'0');
@@ -827,13 +826,23 @@ function show(id,btn){
 }
 
 // ── CALC ──
-function addDays(ds,n){let d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function addDays(ds,n){
+  let d=dateOnly(ds);
+  if(!d)return '';
+  d.setDate(d.getDate()+n);
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function dateOnly(ds){
+  if(!ds)return null;
+  const [y,m,d]=String(ds).slice(0,10).split('-').map(Number);
+  return new Date(y,(m||1)-1,d||1,12,0,0,0);
+}
 function diffDays(a,b=today()){
-  // الفرق بين تاريخين بدون إضافة يوم زائد:
-  // نفس يوم دخول الحقل = 0، اليوم التالي = 1
-  if(!a)return 0;
-  let A=new Date(a+'T00:00:00');
-  let B=new Date(b+'T00:00:00');
+  let A=dateOnly(a),B=dateOnly(b);
+  if(!A||!B)return 0;
   return Math.max(0,Math.floor((B-A)/86400000));
 }
 function fmt(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('ar-IQ')}
@@ -846,7 +855,8 @@ function calc(b,on=today()){
   let expectedTransfer=addDays(b.hatchDate,21);
   let transferred=!!b.transferDate;
   let entryDate=b.fieldEntryDate||b.transferDate||'';
-  // عمر الطير يبدأ من صفر في يوم دخول الحقل، ولا يُحتسب يوم النقل ضمن العمر
+  // عمر الطير الحقيقي: يوم دخول الحقل = 0، اليوم التالي = 1
+  // لا توجد أي +1 هنا، حتى لا يكبر الطير قبل أوانه.
   let rawFlockAge=transferred&&entryDate?diffDays(entryDate,on):0;
   let flockAge=Math.min(40,rawFlockAge);
   let eggs=+b.eggs||0,badEggs=+b.badEggs||0,candleRate=+b.candle||0;
@@ -1176,7 +1186,7 @@ function renderCalendar(){
       if(!c.transferred&&c.rawHatchAge===21){txt='جاهزة للنقل';cls='ev-amber'}
       if(!c.transferred&&c.rawHatchAge>21){txt='متأخرة عن النقل';cls='ev-red'}
       if(c.entryDate&&iso===c.entryDate){txt='دخول الحقل';cls='ev-teal'}
-      else if(c.transferred&&c.entryDate&&iso>c.entryDate&&c.rawFlockAge<=40){txt='عمر '+c.flockAge+' يوم';cls='ev-green'}
+      else if(c.transferred&&c.entryDate&&iso>=c.entryDate&&c.rawFlockAge<=40){txt='عمر '+c.flockAge+' يوم';cls='ev-green'}
       return txt?`<div class="ev ${cls}">${b.name}: ${txt}</div>`:'';
     }).join('');
     html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:8px;min-height:90px"><div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">${d}</div>${ev}</div>`;
