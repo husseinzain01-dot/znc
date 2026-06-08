@@ -3,55 +3,1117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>شركة زهور الوطن - نظام متابعة الوجبات V25.1.1</title>
+<title>زهور الوطن — نظام إدارة الوجبات</title>
 <style>
-:root{--p:#0f766e;--p2:#14b8a6;--d:#0f172a;--b:#dbe7ea;--bg:#eef4f6;--ok:#16a34a;--bad:#dc2626;--w:#f59e0b;--blue:#2563eb;--g:#64748b;--shadow:0 12px 30px rgba(15,23,42,.10);--soft:0 4px 14px rgba(15,23,42,.08)}
-*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial;background:linear-gradient(180deg,#e8f5f3,#f8fafc 45%,#eef4f6);color:#102027}.hidden{display:none!important}.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f766e,#0f172a);padding:20px}.panel,.card{background:#fff;border:1px solid var(--b);border-radius:22px;padding:20px;box-shadow:var(--shadow)}.panel{width:100%;max-width:455px}.companyMark{text-align:center}.logo{width:70px;height:70px;margin:0 auto 10px;border-radius:22px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;color:white;font-size:34px}.layout{display:grid;grid-template-columns:280px 1fr;min-height:100vh}.side{background:linear-gradient(180deg,#0f172a,#12343b 55%,#0f766e);color:#fff;padding:18px;position:sticky;top:0;height:100vh}.brand{padding-bottom:16px;border-bottom:1px solid #ffffff22;margin-bottom:12px}.brand .name{font-size:18px;font-weight:bold}.brand .sub{font-size:12px;color:#cbd5e1;margin-top:4px}.chip{display:inline-block;margin-top:9px;background:#14b8a622;border:1px solid #2dd4bf55;padding:4px 9px;border-radius:999px;font-size:12px;color:#dffcf7}.side button{width:100%;padding:12px;border-radius:14px;border:1px solid transparent;background:transparent;color:#e2e8f0;margin:5px 0;text-align:right;cursor:pointer}.side button.active,.side button:hover{background:#ffffff1f}main{padding:22px}.top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.top h1{margin:0}.muted{color:#64748b;font-size:13px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin-bottom:10px}.forms{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}label{font-size:13px;color:#334155;display:block;margin:9px 0 6px;font-weight:bold}input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--b);border-radius:13px;font-family:inherit;background:#fff}button{font-family:inherit;border:0;border-radius:13px;padding:11px 15px;cursor:pointer;font-weight:bold}.primary{background:linear-gradient(135deg,var(--p),var(--p2));color:white}.secondary{background:#e8eef2;color:#0f172a}.danger{background:var(--bad);color:white}.ok{background:var(--ok);color:white}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--b);border-radius:16px;overflow:hidden;box-shadow:var(--soft)}th,td{border-bottom:1px solid var(--b);padding:9px;text-align:right;font-size:13px}tr:last-child td{border-bottom:0}th{background:#f1f7f8}.selectable{cursor:pointer}.selectedRow td{background:#ecfeff!important}.badge{padding:5px 9px;border-radius:999px;color:white;font-size:12px;display:inline-block}.inc{background:var(--blue)}.activeB{background:var(--ok)}.done{background:var(--g)}.part{background:#7c3aed}.move{background:#0891b2}.alertB{background:var(--w);color:#111}.dashWrap{grid-column:1/-1;display:grid;grid-template-columns:1.4fr .9fr;gap:10px;margin-bottom:4px}.dashHero{background:linear-gradient(135deg,#0f766e,#0f172a);color:#fff;border-radius:16px;padding:12px 14px}.dashHero h2{margin:0 0 4px;font-size:18px}.dashHero p{margin:0;color:#d9fff8;font-size:12px}.saveBox{background:#fff;border:1px solid var(--b);border-radius:16px;padding:10px 12px}.stat,.mini{background:#fff;border:1px solid var(--b);border-radius:14px;padding:8px 10px;box-shadow:var(--soft)}.stat b{font-size:20px;display:block;color:var(--p);margin-top:2px}.stat span,.mini span{font-size:11px;color:#64748b}.stat small{font-size:10px;color:#64748b;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.selectedPanel{grid-column:1/-1;margin-top:8px;padding:12px;border-radius:18px;border:1px solid #bae6fd;background:linear-gradient(180deg,#fff,#f0fdfa)}.selectedPanel h3{font-size:16px;margin:0 0 8px}.selectedGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.mini b{display:block;font-size:16px;color:var(--p);margin-top:3px}.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.day,.dayname{background:#fff;border:1px solid var(--b);border-radius:14px;padding:8px;min-height:95px}.dayname{min-height:auto;text-align:center;font-weight:bold;background:var(--p);color:white}.ev{font-size:11px;border-radius:8px;padding:4px 6px;margin-top:4px;color:white;background:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.msg{position:fixed;bottom:17px;left:17px;background:#0f172a;color:#fff;padding:11px 16px;border-radius:999px;box-shadow:0 10px 24px #0004;z-index:10}
-@media(max-width:900px){.layout{display:block}.side{height:auto;position:relative}.forms{grid-template-columns:1fr}.dashWrap{grid-template-columns:1fr}.selectedGrid{grid-template-columns:repeat(2,1fr)}.calendar{grid-template-columns:repeat(2,1fr)}}@media print{.side,.top,.actions,.noPrint{display:none!important}.layout{display:block}main{padding:0}.card{box-shadow:none}}
-</style></head><body>
-<div id="loginBox" class="login"><div class="panel"><div class="companyMark"><div class="logo">🐔</div><h2>شركة زهور الوطن</h2><p class="muted">نظام متابعة الوجبات V25.1.1 - انتقال يدوي</p></div><label>اسم المستخدم</label><input id="loginUser" value="admin"><label>كلمة المرور</label><input id="loginPass" type="password" value="1234"><div class="actions"><button class="primary" onclick="loginNow()">دخول</button></div><p id="loginMsg" style="color:#dc2626"></p></div></div>
-<div id="app" class="layout hidden"><aside class="side"><div class="brand"><div class="name">شركة زهور الوطن</div><div class="sub">للإنتاج الزراعي والحيواني</div><span class="chip">الوجبات V25.1</span></div><button class="nav active" onclick="show('dash',this)">لوحة المعلومات</button><button class="nav" onclick="show('batch',this)">إضافة وجبة</button><button class="nav" onclick="show('transfer',this)">نقل الفقسة</button><button class="nav" onclick="show('mort',this)">الهلاكات</button><button class="nav" onclick="show('market',this)">التسويق / الانتهاء</button><button class="nav" onclick="show('cal',this)">الروزنامة</button><button class="nav" onclick="show('reports',this)">التقارير والنسخ</button><button class="nav" onclick="show('archive',this)">الأرشيف</button><button class="nav" onclick="show('settings',this)">الإعدادات</button><button onclick="logout()">خروج</button></aside><main><div class="top"><h1 id="title">لوحة المعلومات</h1><div id="dbState" class="muted"></div></div>
-<section id="dash" class="page"><div id="stats" class="grid"></div><div class="card"><h3>الوجبات المسجلة</h3><div style="overflow:auto"><table id="batchTable"></table></div></div></section>
-<section id="batch" class="page hidden"><div class="card"><h3>إضافة / تعديل وجبة</h3><p class="muted">الانتقال صار يدوي من صفحة نقل الفقسة، حتى لا يتحول البرنامج إلى عرّاف يقرر بدالك.</p><input type="hidden" id="editId"><div class="forms"><div><label>اسم / رقم الوجبة *</label><input id="bName" placeholder="مثال: وجبة 1"></div><div><label>تاريخ دخول البيض *</label><input id="hatchDate" type="date"></div><div><label>النوع بعد التفقيس</label><select id="bType"><option>لحم</option><option>بياض / تربية</option></select></div><div><label>عدد البيض الداخل</label><input id="eggs" type="number" min="0"></div><div><label>عدد التالف</label><input id="badEggs" type="number" min="0" value="0"></div><div><label>نسبة الفحص الضوئي %</label><input id="candle" type="number" min="0" max="100" value="90"></div><div><label>عمر التنبيه بعد النقل</label><input id="alertAge" type="number" min="1" value="35"></div><div><label>عمر التسويق المتوقع</label><input id="marketAge" type="number" min="1" value="35"></div><div><label>ملاحظة</label><input id="note"></div></div><div class="actions"><button class="primary" onclick="saveBatch()">حفظ الوجبة</button><button class="secondary" onclick="clearForm()">تفريغ</button><button class="ok" onclick="testSave()">اختبار الحفظ</button></div></div></section>
-<section id="transfer" class="page hidden"><div class="card"><h3>نقل الفقسة من المفقس إلى حقل اللحم</h3><p class="muted">هنا تثبت النقل يدوياً. عمر الطير يبدأ من اليوم التالي لتاريخ دخول الحقل، ويوم الدخول نفسه لا ينحسب.</p><div class="forms"><div><label>اختر الوجبة</label><select id="transferBatch" onchange="fillTransferPreview()"></select></div><div><label>تاريخ دخول الحقل</label><input id="transferDate" type="date"></div><div><label>الحقل المنقول إليه</label><input id="transferField" placeholder="مثال: حقل اللحم 1"></div><div><label>عدد الطير الفاقس</label><input id="transferHatched" type="number" min="0"></div><div><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0"></div><div><label>الطير العزل</label><input id="isolatedBirds" type="number" min="0" value="0"></div><div><label>الصافي المنقول للحقل</label><input id="fieldBirds" type="number" min="0"></div></div><div class="actions"><button class="primary" onclick="saveTransfer()">حفظ النقل</button><button class="secondary" onclick="fillTransferPreview()">جلب بيانات الوجبة</button></div><div id="transferPreview" class="selectedPanel"></div></div></section>
-<section id="mort" class="page hidden"><div class="card"><h3>إضافة هلاك</h3><div class="forms"><div><label>اختر الوجبة</label><select id="mortBatch"></select></div><div><label>التاريخ</label><input id="mortDate" type="date"></div><div><label>عدد الهلاك</label><input id="mortCount" type="number" min="1"></div><div><label>السبب</label><input id="mortReason"></div></div><div class="actions"><button class="danger" onclick="addMort()">حفظ الهلاك</button></div></div><div class="card"><h3>سجل الهلاكات</h3><table id="mortTable"></table></div></section>
-<section id="market" class="page hidden"><div class="card"><h3>تسويق / انتهاء اختياري</h3><div class="forms"><div><label>اختر الوجبة</label><select id="marketBatch"></select></div><div><label>التاريخ</label><input id="marketDate" type="date"></div><div><label>عدد المسوق</label><input id="marketCount" type="number" min="0"></div><div><label>نوع العملية</label><select id="marketStatus"><option>بيعت جزئياً</option><option>منتهية</option><option>منقولة</option></select></div><div><label>ملاحظة</label><input id="marketNote"></div></div><div class="actions"><button class="ok" onclick="addMarket()">حفظ العملية</button></div></div><div class="card"><h3>سجل التسويق</h3><table id="marketTable"></table></div></section>
-<section id="cal" class="page hidden"><div class="card"><div class="actions"><button class="secondary" onclick="moveMonth(-1)">الشهر السابق</button><h3 id="monthTitle"></h3><button class="secondary" onclick="moveMonth(1)">الشهر التالي</button></div><label>فلترة حسب الوجبة</label><select id="calFilter" onchange="renderCalendar()"></select><div id="calendar" class="calendar"></div></div></section>
-<section id="reports" class="page hidden"><div class="card"><h3>التقارير والنسخ الاحتياطي</h3><div class="actions"><button class="secondary" onclick="window.print()">طباعة</button><button class="primary" onclick="exportCSV()">تصدير CSV</button><button class="ok" onclick="backup()">نسخ احتياطي JSON</button><label class="secondary" style="padding:10px 14px;border-radius:10px;cursor:pointer">استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label></div></div><div class="card"><table id="reportTable"></table></div></section>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+:root{
+  --p:#0d9488;--p2:#14b8a6;--p3:#ccfbf1;
+  --ink:#0f172a;--ink2:#334155;--ink3:#64748b;
+  --border:#e2e8f0;--bg:#f8fafc;--surface:#ffffff;
+  --red:#ef4444;--red2:#fee2e2;
+  --amber:#f59e0b;--amber2:#fef3c7;
+  --green:#10b981;--green2:#d1fae5;
+  --blue:#3b82f6;--blue2:#dbeafe;
+  --violet:#8b5cf6;--violet2:#ede9fe;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06);
+  --shadow2:0 2px 8px rgba(0,0,0,.10),0 8px 32px rgba(0,0,0,.08);
+  --r:14px;--r2:10px;--r3:999px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+.hidden{display:none!important}
 
-<section id="archive" class="page hidden"><div class="card"><h3>أرشيف الوجبات المنتهية</h3><p class="muted">تظهر هنا الوجبات التي صار الحي المتبقي فيها صفر فقط.</p><div style="overflow:auto"><table id="archiveTable"></table></div></div></section>
-<section id="settings" class="page hidden"><div class="card"><h3>الإعدادات</h3><p>V25: نسخة مستقرة بمنطق الأرشيف وصافي الفقس والصافي المنقول للحقل.</p><div class="forms"><div><label>يوزر جديد</label><input id="newUser"></div><div><label>باسورد جديد</label><input id="newPass" type="password"></div></div><div class="actions"><button class="primary" onclick="saveCreds()">حفظ بيانات الدخول</button><button class="danger" onclick="wipeAll()">مسح كل البيانات</button></div><p class="muted">الحفظ داخل المتصفح. خذ نسخة احتياطية قبل رفع نسخة جديدة أو مسح بيانات المتصفح.</p></div></section>
-</main></div><div id="toast" class="msg hidden">تم الحفظ</div>
+/* LOGIN */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a 0%,#134e4a 60%,#0d9488 100%);padding:20px}
+.loginCard{background:var(--surface);border-radius:24px;padding:36px 32px;width:100%;max-width:400px;box-shadow:var(--shadow2)}
+.loginLogo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px}
+.loginCard h2{text-align:center;font-size:20px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.loginCard p{text-align:center;color:var(--ink3);font-size:13px;margin-bottom:24px}
+.fld{margin-bottom:16px}
+.fld label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.fld input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--r2);font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);transition:border .15s}
+.fld input:focus{outline:none;border-color:var(--p);background:#fff}
+.btnPrimary{width:100%;padding:12px;border:0;border-radius:var(--r2);background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btnPrimary:hover{opacity:.9}
+#loginMsg{text-align:center;color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:100vh;transition:grid-template-columns .28s cubic-bezier(.4,0,.2,1)}
+.layout.collapsed{grid-template-columns:60px 1fr}
+
+/* ── SIDEBAR ── */
+.side{background:#0f172a;color:#fff;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:100;transition:width .28s cubic-bezier(.4,0,.2,1);width:240px;flex-shrink:0}
+.layout.collapsed .side{width:60px}
+
+/* sideTop */
+.sideTop{padding:14px 12px;border-bottom:1px solid #ffffff12;flex-shrink:0;display:flex;align-items:center;gap:8px;min-height:58px}
+.brand{display:flex;align-items:center;gap:9px;flex:1;min-width:0;overflow:hidden}
+.brandIcon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.brandTexts{overflow:hidden;white-space:nowrap;transition:opacity .2s ease,max-width .28s ease;max-width:160px}
+.brandName{font-size:12.5px;font-weight:700;line-height:1.3}
+.brandSub{font-size:10px;color:#94a3b8}
+.sideVer{font-size:9px;color:#475569;padding:2px 6px;background:#1e293b;border-radius:5px;white-space:nowrap;flex-shrink:0;transition:opacity .2s ease,max-width .28s ease;max-width:80px;overflow:hidden}
+
+/* hamburger */
+.hamburger{background:transparent;border:0;cursor:pointer;padding:5px;border-radius:7px;color:#64748b;display:flex;flex-direction:column;gap:4px;transition:all .15s;flex-shrink:0}
+.hamburger:hover{background:#1e293b;color:#94a3b8}
+.hamburger span{display:block;width:16px;height:2px;background:currentColor;border-radius:2px}
+
+/* overlay */
+.sideOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;backdrop-filter:blur(2px)}
+.sideOverlay.show{display:block}
+
+/* sideNav — scrollbar رفيع على اليسار */
+.sideNav{padding:10px 8px;flex:1;overflow-y:auto;overflow-x:hidden;direction:ltr;scrollbar-width:thin;scrollbar-color:#1e293b transparent}
+.sideNav>*{direction:rtl}
+.sideNav::-webkit-scrollbar{width:3px}
+.sideNav::-webkit-scrollbar-track{background:transparent}
+.sideNav::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}
+
+.navLabel{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1px;padding:8px 10px 3px;white-space:nowrap;overflow:hidden;transition:opacity .2s ease,max-height .2s ease,padding .2s ease;max-height:30px}
+.nav{width:100%;padding:8px 10px;border-radius:9px;border:0;background:transparent;color:#94a3b8;text-align:right;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s,color .15s;margin-bottom:1px;white-space:nowrap;overflow:hidden}
+.nav:hover{background:#1e293b;color:#e2e8f0}
+.nav.active{background:linear-gradient(135deg,rgba(13,148,136,.3),rgba(20,184,166,.15));color:#5eead4;border:1px solid rgba(20,184,166,.25)}
+.navIcon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.navText{transition:opacity .2s ease,max-width .28s ease;max-width:160px;overflow:hidden}
+
+.sideBottom{padding:10px 8px;border-top:1px solid #ffffff12;flex-shrink:0}
+.userChip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:#1e293b;margin-bottom:6px;overflow:hidden}
+.userAvatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.userInfo{flex:1;min-width:0;overflow:hidden;transition:opacity .2s ease,max-width .28s ease;max-width:160px}
+.userName{font-size:11.5px;font-weight:600;color:#e2e8f0;white-space:nowrap}
+.userRole{font-size:9.5px;color:#64748b;white-space:nowrap}
+.navOut{width:100%;padding:8px 10px;border-radius:9px;border:0;background:transparent;color:#64748b;text-align:right;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s;white-space:nowrap;overflow:hidden}
+.navOut:hover{background:#1e293b;color:#f87171}
+.navOutText{transition:opacity .2s ease,max-width .28s ease;max-width:160px;overflow:hidden}
+
+/* collapsed states */
+.layout.collapsed .brandTexts{opacity:0;max-width:0}
+.layout.collapsed .sideVer{opacity:0;max-width:0;padding:0}
+.layout.collapsed .brand{flex:0}
+.layout.collapsed .sideTop{justify-content:space-between}
+.layout.collapsed .navLabel{opacity:0;max-height:0;padding:0}
+.layout.collapsed .navText{opacity:0;max-width:0}
+.layout.collapsed .nav{justify-content:center;padding:10px 0}
+.layout.collapsed .navIcon{font-size:17px}
+.layout.collapsed .sideNav{padding:8px 4px}
+.layout.collapsed .userInfo{opacity:0;max-width:0}
+.layout.collapsed .userChip{justify-content:center;padding:8px 4px}
+.layout.collapsed .navOutText{opacity:0;max-width:0}
+.layout.collapsed .navOut{justify-content:center;padding:10px 0}
+.layout.collapsed .sideBottom{padding:8px 4px}
+
+/* ── MAIN ── */
+main{padding:20px;overflow-x:hidden;min-width:0}
+.pageHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.pageHeader h1{font-size:18px;font-weight:700;color:var(--ink)}
+#dbState{font-size:11px;color:var(--ink3)}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.cardTitle{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* STATS */
+.statsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin-bottom:12px;align-items:start}
+.statCard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;box-shadow:var(--shadow);height:fit-content}
+.statCard .sc-label{font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+.statCard .sc-val{font-size:20px;font-weight:700;color:var(--p);line-height:1.1;white-space:nowrap}
+.statCard .sc-sub{font-size:10px;color:var(--ink3);margin-top:2px}
+.heroBanner{grid-column:1/-1;background:linear-gradient(135deg,#0f172a,#134e4a);color:#fff;border-radius:var(--r);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.heroBanner h2{font-size:15px;font-weight:700;margin-bottom:2px}
+.heroBanner p{font-size:11px;color:#99f6e4;margin:0}
+.heroBanner .hb-right{font-size:10px;color:#5eead4;white-space:nowrap}
+
+/* DETAIL PANEL — أفقي دائماً */
+.detailPanel{background:linear-gradient(135deg,#f0fdfa,#fff);border:1px solid #99f6e4;border-radius:var(--r);padding:12px 14px;margin-top:10px}
+.detailPanel .dp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.detailPanel .dp-title{font-size:13px;font-weight:700;color:var(--p)}
+.detailPanel .dp-sub{font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 5px}
+/* الشبكة: دائماً أفقية — 5 أعمدة على desktop، 3 على موبايل */
+.detailGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.dCell{background:#fff;border:1px solid var(--border);border-radius:7px;padding:7px 9px;min-width:0}
+.dCell .dc-label{font-size:9px;color:var(--ink3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dCell .dc-val{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.2;word-break:break-word}
+.dCell.dc-accent .dc-val{color:var(--p)}
+
+/* FORMS */
+.formGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.formGroup{display:flex;flex-direction:column;gap:5px}
+.formGroup label{font-size:12px;font-weight:600;color:var(--ink2);letter-spacing:.2px}
+.formGroup input,.formGroup select,.formGroup textarea{padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--r2);font-family:inherit;font-size:13px;background:#fff;color:var(--ink);transition:border .15s}
+.formGroup input:focus,.formGroup select:focus{outline:none;border-color:var(--p)}
+.formActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+
+/* BUTTONS */
+.btn{font-family:inherit;border:0;border-radius:var(--r2);padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,var(--p),var(--p2));color:#fff}
+.btn-primary:hover{opacity:.88}
+.btn-secondary{background:var(--bg);border:1.5px solid var(--border);color:var(--ink2)}
+.btn-secondary:hover{background:var(--border)}
+.btn-danger{background:var(--red2);color:var(--red);border:1px solid #fecaca}
+.btn-danger:hover{background:#fecaca}
+.btn-success{background:var(--green2);color:#065f46;border:1px solid #a7f3d0}
+.btn-success:hover{background:#a7f3d0}
+.btn-sm{padding:6px 11px;font-size:12px;border-radius:8px}
+
+/* TABLE */
+.tableWrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--bg);border-bottom:2px solid var(--border);padding:10px;text-align:right;font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+tbody td{padding:10px;border-bottom:1px solid var(--border);color:var(--ink);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#f8fafc}
+.selectable{cursor:pointer}
+.selectedRow td{background:#f0fdfa!important}
+
+/* BADGES */
+.badge{padding:3px 10px;border-radius:var(--r3);font-size:11px;font-weight:600;display:inline-block;white-space:nowrap}
+.b-blue{background:var(--blue2);color:#1d4ed8}
+.b-green{background:var(--green2);color:#065f46}
+.b-gray{background:#f1f5f9;color:#475569}
+.b-amber{background:var(--amber2);color:#92400e}
+.b-red{background:var(--red2);color:#991b1b}
+.b-violet{background:var(--violet2);color:#5b21b6}
+.b-teal{background:var(--p3);color:#0f766e}
+.b-indigo{background:#e0e7ff;color:#3730a3}
+
+/* USER PERMISSIONS checkboxes */
+.fieldCheckList{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.fieldCheckItem{display:flex;align-items:center;gap:5px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;transition:all .15s}
+.fieldCheckItem:hover{border-color:var(--p);background:var(--p3)}
+.fieldCheckItem input{accent-color:var(--p);width:14px;height:14px}
+
+/* CALENDAR */
+.calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.calDayName{text-align:center;font-size:11px;font-weight:700;background:var(--p);color:#fff;padding:8px 4px;border-radius:var(--r2)}
+.ev{font-size:10px;border-radius:6px;padding:3px 6px;margin-top:3px;color:#fff;background:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-green{background:var(--green)}
+.ev-amber{background:var(--amber);color:#1c1917}
+.ev-red{background:var(--red)}
+.ev-teal{background:var(--p)}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:20px;background:#0f172a;color:#fff;padding:10px 18px;border-radius:var(--r3);font-size:13px;font-weight:500;box-shadow:var(--shadow2);z-index:1000;display:flex;align-items:center;gap:8px;animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* WARN BOX */
+.warnBox{border-radius:var(--r2);padding:10px 14px;font-size:12px;font-weight:500;margin-top:8px;display:none}
+.warnBox.busy{background:var(--amber2);border:1px solid #fcd34d;color:#78350f;display:block}
+.warnBox.free{background:var(--green2);border:1px solid #6ee7b7;color:#064e3b;display:block}
+
+/* ACCESS DENIED */
+.accessDenied{text-align:center;padding:60px 20px;color:var(--ink3)}
+.accessDenied .icon{font-size:48px;margin-bottom:12px}
+.accessDenied h3{font-size:16px;font-weight:700;color:var(--ink);margin-bottom:6px}
+
+/* ═══ TABLET ═══ */
+@media(max-width:1100px){
+  .layout{grid-template-columns:200px 1fr}
+  .layout.collapsed{grid-template-columns:60px 1fr}
+  .side{width:200px}
+  .layout.collapsed .side{width:60px}
+  .brandSub{display:none}
+  .navLabel{font-size:8.5px}
+  .nav{font-size:12px;padding:7px 9px}
+}
+
+/* ═══ MOBILE — Drawer ═══ */
+@media(max-width:768px){
+  .layout,.layout.collapsed{display:block;grid-template-columns:unset}
+  /* Sidebar = drawer يفتح من اليمين */
+  .side{
+    position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:auto!important;
+    width:260px!important;height:100vh!important;
+    transform:translateX(110%)!important;
+    transition:transform .28s cubic-bezier(.4,0,.2,1)!important;
+    z-index:300!important;overflow-y:auto!important;
+    direction:rtl!important;
+  }
+  .layout.sideOpen .side{transform:translateX(0)!important}
+  /* إلغاء collapsed على الموبايل — كل شيء يظهر */
+  .layout.collapsed .brandTexts,
+  .layout.collapsed .sideVer,
+  .layout.collapsed .navLabel,
+  .layout.collapsed .navText,
+  .layout.collapsed .userInfo,
+  .layout.collapsed .navOutText{opacity:1!important;max-width:200px!important;max-height:none!important;padding:revert}
+  .layout.collapsed .brand{flex:1!important;justify-content:flex-start!important}
+  .layout.collapsed .sideTop{justify-content:flex-start!important;gap:8px!important}
+  .layout.collapsed .nav{justify-content:flex-start!important;padding:8px 10px!important}
+  .layout.collapsed .navIcon{font-size:14px!important}
+  .layout.collapsed .sideNav{padding:10px 8px!important}
+  .layout.collapsed .userChip{justify-content:flex-start!important;padding:8px 10px!important}
+  .layout.collapsed .navOut{justify-content:flex-start!important;padding:8px 10px!important}
+  .layout.collapsed .sideBottom{padding:10px 8px!important}
+  main{padding:12px}
+  .pageHeader h1{font-size:16px}
+  .formGrid{grid-template-columns:1fr 1fr}
+  .statsGrid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .statCard{padding:9px 10px}
+  .statCard .sc-val{font-size:16px}
+  .detailGrid{grid-template-columns:repeat(3,1fr)}
+  .calGrid{grid-template-columns:repeat(3,1fr)}
+  .heroBanner{padding:10px 12px;border-radius:10px}
+  .heroBanner h2{font-size:13px}
+  .card{padding:14px;border-radius:12px}
+}
+
+@media(max-width:400px){
+  .detailGrid{grid-template-columns:repeat(2,1fr)}
+  .formGrid{grid-template-columns:1fr}
+}
+
+@media print{
+  .side,.sideOverlay,.pageHeader,.formActions,.noPrint{display:none!important}
+  .layout{display:block}
+  main{padding:0}
+  .card{box-shadow:none;border:1px solid #ddd}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox" class="login">
+  <div class="loginCard">
+    <div class="loginLogo">🐔</div>
+    <h2>زهور الوطن</h2>
+    <p>نظام إدارة الوجبات والحقول</p>
+    <div class="fld">
+      <label>اسم المستخدم</label>
+      <input id="loginUser" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="fld">
+      <label>كلمة المرور</label>
+      <input id="loginPass" type="password" autocomplete="new-password">
+    </div>
+    <button class="btnPrimary" onclick="loginNow()">تسجيل الدخول</button>
+    <p id="loginMsg"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="layout hidden">
+  <!-- Overlay للموبايل -->
+  <div class="sideOverlay" id="sideOverlay" onclick="toggleSide()"></div>
+
+  <aside class="side">
+    <div class="sideTop">
+      <div class="brand">
+        <div class="brandIcon">🐔</div>
+        <div class="brandTexts"><div class="brandName">زهور الوطن</div><div class="brandSub">للإنتاج الزراعي</div></div>
+      </div>
+      <button class="hamburger" onclick="toggleSide()" title="إخفاء/إظهار القائمة">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="sideVer">v25.3</div>
+    </div>
+    <nav class="sideNav" id="sideNav">
+      <!-- rendered by buildNav() -->
+    </nav>
+    <div class="sideBottom">
+      <div class="userChip">
+        <div class="userAvatar" id="userAvatar">—</div>
+        <div class="userInfo">
+          <div class="userName" id="userNameDisplay">—</div>
+          <div class="userRole" id="userRoleDisplay">—</div>
+        </div>
+      </div>
+      <button class="navOut" onclick="logout()"><span>🚪</span><span class="navOutText">تسجيل الخروج</span></button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="pageHeader">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="hamburger" onclick="toggleSide()" title="القائمة" style="color:var(--ink3)">
+          <span style="background:var(--ink3)"></span>
+          <span style="background:var(--ink3)"></span>
+          <span style="background:var(--ink3)"></span>
+        </button>
+        <h1 id="title">لوحة المعلومات</h1>
+      </div>
+      <div id="dbState" style="font-size:11px;color:var(--ink3)"></div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="dash" class="page">
+      <div id="statsCards" class="statsGrid"></div>
+      <div id="statsDetail"></div>
+      <div class="card">
+        <div class="cardTitle">📋 الوجبات النشطة</div>
+        <div class="tableWrap"><table id="batchTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ADD BATCH (admin only) -->
+    <section id="batch" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🥚 تسجيل وجبة</div>
+        <input type="hidden" id="editId">
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الوجبة *</label><input id="bName" placeholder="مثال: وجبة يونيو 1"></div>
+          <div class="formGroup"><label>تاريخ دخول البيض *</label><input id="hatchDate" type="date"></div>
+          <div class="formGroup"><label>النوع</label><select id="bType"><option>لحم</option><option>بياض / تربية</option></select></div>
+          <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0"></div>
+          <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0"></div>
+          <div class="formGroup"><label>نسبة الفحص الضوئي %</label><input id="candle" type="number" min="0" max="100" value="90"></div>
+          <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="alertAge" type="number" min="1" value="35"></div>
+          <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="marketAge" type="number" min="1" value="35"></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="note"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveBatch()">💾 حفظ الوجبة</button>
+          <button class="btn btn-secondary" onclick="clearForm()">مسح</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRANSFER (admin only) -->
+    <section id="transfer" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🔄 نقل الفقسة إلى الحقل</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label><select id="transferBatch" onchange="fillTransferPreview()"></select></div>
+          <div class="formGroup"><label>تاريخ دخول الحقل</label><input id="transferDate" type="date"></div>
+          <div class="formGroup">
+            <label>الحقل المستهدف</label>
+            <select id="transferField" onchange="checkFieldOccupancy()"></select>
+            <div id="fieldWarn" class="warnBox"></div>
+          </div>
+          <div class="formGroup"><label>عدد الطير الفاقس</label><input id="transferHatched" type="number" min="0"></div>
+          <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0"></div>
+          <div class="formGroup"><label>الطير العزل</label><input id="isolatedBirds" type="number" min="0" value="0"></div>
+          <div class="formGroup"><label>الصافي المنقول للحقل</label><input id="fieldBirds" type="number" min="0"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveTransfer()">✅ تأكيد النقل</button>
+          <button class="btn btn-secondary" onclick="fillTransferPreview()">جلب بيانات الوجبة</button>
+        </div>
+        <div id="transferPreview" style="margin-top:16px"></div>
+      </div>
+    </section>
+
+    <!-- MORTALITY -->
+    <section id="mort" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">📉 تسجيل هلاك</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label><select id="mortBatch"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="mortDate" type="date"></div>
+          <div class="formGroup"><label>العدد</label><input id="mortCount" type="number" min="1"></div>
+          <div class="formGroup"><label>السبب</label><input id="mortReason"></div>
+        </div>
+        <div class="formActions"><button class="btn btn-danger" onclick="addMort()">تسجيل الهلاك</button></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل الهلاكات</div>
+        <div class="tableWrap"><table id="mortTable"></table></div>
+      </div>
+    </section>
+
+    <!-- MARKET -->
+    <section id="market" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">💰 تسجيل عملية تسويق</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label><select id="marketBatch"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="marketDate" type="date"></div>
+          <div class="formGroup"><label>العدد</label><input id="marketCount" type="number" min="0"></div>
+          <div class="formGroup"><label>نوع العملية</label><select id="marketStatus"><option>بيعت جزئياً</option><option>تسويق إلى المجزرة</option><option>منتهية</option><option>منقولة</option></select></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="marketNote"></div>
+        </div>
+        <div class="formActions"><button class="btn btn-success" onclick="addMarket()">حفظ العملية</button></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل التسويق</div>
+        <div class="tableWrap"><table id="marketTable"></table></div>
+      </div>
+    </section>
+
+    <!-- FIELDS (admin only) -->
+    <section id="fields" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🏡 إضافة / تعديل حقل</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الحقل *</label><input id="fName" placeholder="مثال: حقل اللحم 1"></div>
+          <div class="formGroup"><label>النوع</label><select id="fType"><option value="لحم">لحم</option><option value="إنتاج">إنتاج</option><option value="تربية">تربية</option></select></div>
+          <div class="formGroup"><label>السعة القصوى (طير)</label><input id="fCapacity" type="number" min="0" placeholder="اختياري"></div>
+        </div>
+        <input type="hidden" id="fEditId">
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveField()">💾 حفظ الحقل</button>
+          <button class="btn btn-secondary" onclick="clearFieldForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">🏡 قائمة الحقول</div>
+        <div class="tableWrap"><table id="fieldsTable"></table></div>
+      </div>
+    </section>
+
+    <!-- USERS (admin only) -->
+    <section id="users" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">👥 إضافة / تعديل مستخدم</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم المستخدم *</label><input id="uName" autocomplete="off"></div>
+          <div class="formGroup"><label>كلمة المرور *</label><input id="uPass" type="password" autocomplete="new-password"></div>
+          <div class="formGroup"><label>الدور</label>
+            <select id="uRole">
+              <option value="user">مستخدم عادي</option>
+              <option value="admin">مدير</option>
+            </select>
+          </div>
+        </div>
+        <div class="formGroup" style="margin-top:14px">
+          <label>الحقول المُخصصة لهذا المستخدم</label>
+          <div class="fieldCheckList" id="uFieldsList"></div>
+          <p style="font-size:11px;color:var(--ink3);margin-top:6px">المدير يرى كل الحقول تلقائياً — هذا الإعداد للمستخدم العادي فقط.</p>
+        </div>
+        <input type="hidden" id="uEditId">
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveUser()">💾 حفظ المستخدم</button>
+          <button class="btn btn-secondary" onclick="clearUserForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">👥 قائمة المستخدمين</div>
+        <div class="tableWrap"><table id="usersTable"></table></div>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section id="cal" class="page hidden">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="cardTitle" style="margin:0">📅 الروزنامة</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <select id="calFilter" onchange="renderCalendar()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);font-family:inherit;font-size:13px;background:#fff"></select>
+            <button class="btn btn-secondary btn-sm" onclick="moveMonth(-1)">&#8250; السابق</button>
+            <span id="monthTitle" style="font-weight:700;font-size:14px;min-width:120px;text-align:center"></span>
+            <button class="btn btn-secondary btn-sm" onclick="moveMonth(1)">التالي &#8249;</button>
+          </div>
+        </div>
+        <div id="calendar" class="calGrid"></div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="reports" class="page hidden">
+      <div class="card noPrint">
+        <div class="cardTitle">📋 التقارير والبيانات</div>
+        <div class="formActions">
+          <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
+          <button class="btn btn-primary" onclick="exportCSV()">📥 تصدير CSV</button>
+          <button class="btn btn-success" id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
+          <label class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
+        </div>
+      </div>
+      <div class="card">
+        <div class="tableWrap"><table id="reportTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ARCHIVE -->
+    <section id="archive" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🗄️ أرشيف الوجبات المنتهية</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">الوجبات التي وصل الحي المتبقي فيها إلى صفر.</p>
+        <div class="tableWrap"><table id="archiveTable"></table></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS (admin only) -->
+    <section id="settings" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">⚙️ الإعدادات</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">تغيير بيانات دخول حساب المدير الرئيسي.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم المستخدم الجديد</label><input id="newUser" autocomplete="off"></div>
+          <div class="formGroup"><label>كلمة المرور الجديدة</label><input id="newPass" type="password" autocomplete="new-password"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveCreds()">حفظ بيانات الدخول</button>
+          <button class="btn btn-danger" onclick="wipeAll()">⚠️ مسح كل البيانات</button>
+        </div>
+        <p style="font-size:12px;color:var(--ink3);margin-top:14px">البيانات محفوظة في المتصفح. خذ نسخة احتياطية قبل مسح بيانات المتصفح.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
 <script>
 const STORE='chicken_field_system_v21_data';
 const OLD_STORES=['chicken_field_system_v11_data'];
-let data={batches:[],morts:[],markets:[],user:'admin',pass:'1234'};let calDate=new Date();let selectedBatchId=null;
-function $(id){return document.getElementById(id)}function today(){return new Date().toISOString().slice(0,10)}function num(id){return +($(id).value||0)}function val(id){return ($(id).value||'').trim()}function msg(t){$('toast').textContent=t;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),1600)}
-function save(){try{localStorage.setItem(STORE,JSON.stringify(data));localStorage.setItem(STORE+'_lastSave',new Date().toISOString());$('dbState').textContent='الحفظ جاهز ✅ آخر تحديث: '+new Date().toLocaleTimeString('ar-IQ');msg('تم الحفظ');return true}catch(e){alert('مشكلة بالحفظ: '+e.message);return false}}
-function load(){try{let raw=localStorage.getItem(STORE);if(!raw){for(const s of OLD_STORES){let old=localStorage.getItem(s);if(old){raw=old;break}}}if(raw){data={...data,...JSON.parse(raw)};data.batches=(data.batches||[]).map(migrateBatch)}let ls=localStorage.getItem(STORE+'_lastSave');$('dbState').textContent=ls?'الحفظ جاهز ✅ آخر حفظ: '+new Date(ls).toLocaleString('ar-IQ'):'الحفظ جاهز ✅';}catch(e){alert('مشكلة بقراءة البيانات: '+e.message)}$('mortDate').value=today();$('marketDate').value=today();$('transferDate').value=today();renderAll()}
-function migrateBatch(b){let vb=+b.vaccineDeaths||0,iso=+b.isolatedBirds||0,hat=+b.hatched||0;let fixedNet=+b.netHatch||Math.max(0,hat-vb-iso);let eggs=+b.eggs||0;let fixedRate=(+b.fixedHatchRate||0)>0?+b.fixedHatchRate:(eggs?+((fixedNet/eggs)*100).toFixed(2):0);return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:+b.fieldBirds||0,fixedHatchRate:fixedRate}}
-function loginNow(){if($('loginUser').value===data.user&&$('loginPass').value===data.pass){sessionStorage.setItem('cf_logged','1');$('loginBox').classList.add('hidden');$('app').classList.remove('hidden');load()}else $('loginMsg').textContent='اليوزر أو الباسورد خطأ'}function logout(){sessionStorage.removeItem('cf_logged');location.reload()}
-function show(id,btn){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));$(id).classList.remove('hidden');document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));if(btn){btn.classList.add('active');$('title').textContent=btn.textContent}renderAll()}
-function addDays(ds,n){let d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}function diffDays(a,b=today()){let A=new Date(a+'T00:00:00'),B=new Date(b+'T00:00:00');return Math.max(0,Math.floor((B-A)/86400000))}function fmt(d){if(!d)return '-';return new Date(d+'T00:00:00').toLocaleDateString('ar-IQ')}
-function calc(b,on=today()){let rawHatchAge=diffDays(b.hatchDate,on);let hatchAge=Math.min(21,rawHatchAge);let hatchComplete=!b.transferDate&&rawHatchAge===21;let hatchLate=!b.transferDate&&rawHatchAge>21;let expectedTransfer=addDays(b.hatchDate,21);let transferred=!!b.transferDate;let entryDate=b.fieldEntryDate||b.transferDate||'';let isInc=!transferred;let flockAge=transferred?diffDays(entryDate,on):0;let est=Math.max(0,Math.round(((+b.eggs||0)-(+b.badEggs||0))*((+b.candle||0)/100)));let hatched=(+b.hatched||0)>0?+b.hatched:est;let vaccineDeaths=+b.vaccineDeaths||0;let isolated=+b.isolatedBirds||0;let hatchLoss=vaccineDeaths+isolated;let netHatch=(+b.netHatch||0)>0?+b.netHatch:Math.max(0,hatched-hatchLoss);let fieldBirds=(+b.fieldBirds||0)>0?+b.fieldBirds:netHatch;let mort=data.morts.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);let sold=data.markets.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);let alive=transferred?Math.max(0,fieldBirds-mort-sold):0;let completed=transferred&&fieldBirds>0&&alive<=0;let alert=transferred&&flockAge>=(+b.alertAge||35)&&!completed;return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,isInc,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,netHatched:netHatch,fieldBirds,mort,sold,alive,completed,alert,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''}}
-function hatchRate(b){let c=calc(b),eggs=+b.eggs||0;if((+b.fixedHatchRate||0)>0)return (+b.fixedHatchRate).toFixed(2);return eggs?((c.netHatch/eggs)*100).toFixed(2):'0.00'}function successRate(b){let c=calc(b),base=c.fieldBirds||0,aliveByMort=Math.max(0,base-c.mort);return base?((aliveByMort/base)*100).toFixed(2):'0.00'}
-function statusBadge(b){let c=calc(b);if(c.completed)return '<span class="badge done">منتهية</span>';if(!c.transferred&&c.rawHatchAge>21)return '<span class="badge alertB">متأخرة عن النقل</span>';if(!c.transferred&&c.hatchComplete)return '<span class="badge alertB">الفقسة اكتملت - انقلها للحقل</span>';if(!c.transferred)return '<span class="badge inc">بالمفقس</span>';if(b.status==='بيعت جزئياً')return '<span class="badge part">بيعت جزئياً</span>';if(b.status==='منقولة')return '<span class="badge move">منقولة</span>';if(c.alert)return '<span class="badge alertB">تنبيه</span>';return '<span class="badge activeB">نشطة</span>'}
-function renderAll(){renderSelectors();renderStats();renderBatches();renderMort();renderMarket();renderReports();renderArchive();renderCalendar();fillTransferPreview(false)}
-function renderSelectors(){let opts=data.batches.map(b=>`<option value="${b.id}">${b.name} - ${b.type||''}</option>`).join('');['mortBatch','marketBatch','transferBatch'].forEach(id=>$(id).innerHTML=opts);$('calFilter').innerHTML='<option value="all">كل الوجبات</option>'+opts}
+
+// ── STATE ──
+let data={
+  batches:[],morts:[],markets:[],fields:[],
+  subUsers:[],          // [{id,name,pass,role,fields:[fieldName,...]}]
+  user:'admin',pass:'1234'  // المدير الرئيسي
+};
+let calDate=new Date();
+let selectedBatchId=null;
+let currentUser=null; // {name, role, fields} — set on login
+
+// ── UTILS ──
+function $(id){return document.getElementById(id)}
+function today(){return new Date().toISOString().slice(0,10)}
+function num(id){return +($(id).value||0)}
+function val(id){return ($(id).value||'').trim()}
+function isAdmin(){return currentUser&&currentUser.role==='admin'}
+function myFields(){if(isAdmin())return data.fields.map(f=>f.name);return currentUser?currentUser.fields:[];}
+function canSeeField(fn){return isAdmin()||myFields().includes(fn)}
+function msg(t){let el=$('toast');el.innerHTML='✓ '+t;el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),1800)}
+
+// ── SAVE / LOAD ──
+function save(){
+  try{
+    localStorage.setItem(STORE,JSON.stringify(data));
+    localStorage.setItem(STORE+'_lastSave',new Date().toISOString());
+    let ts=new Date().toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'});
+    $('dbState').textContent='محفوظ '+ts;
+    msg('تم الحفظ');return true;
+  }catch(e){alert('خطأ في الحفظ: '+e.message);return false;}
+}
+function load(){
+  try{
+    let raw=localStorage.getItem(STORE);
+    if(!raw){for(const s of OLD_STORES){let old=localStorage.getItem(s);if(old){raw=old;break}}}
+    if(raw){
+      let parsed=JSON.parse(raw);
+      data={...data,...parsed};
+      data.batches=(data.batches||[]).map(migrateBatch);
+      data.fields=data.fields||[];
+      data.subUsers=data.subUsers||[];
+    }
+    let ls=localStorage.getItem(STORE+'_lastSave');
+    $('dbState').textContent=ls?'آخر حفظ: '+new Date(ls).toLocaleString('ar-IQ',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'جاهز';
+  }catch(e){alert('خطأ في تحميل البيانات: '+e.message)}
+  $('mortDate').value=today();$('marketDate').value=today();$('transferDate').value=today();
+  renderAll();
+}
+function migrateBatch(b){
+  let vb=+b.vaccineDeaths||0,iso=+b.isolatedBirds||0,hat=+b.hatched||0;
+  let fixedNet=+b.netHatch||Math.max(0,hat-vb-iso);
+  let eggs=+b.eggs||0;let fb=+b.fieldBirds||0;
+  let fixedRate=(+b.fixedHatchRate||0)>0?+b.fixedHatchRate:(fb>0&&eggs?+((fb/eggs)*100).toFixed(2):(eggs?+((fixedNet/eggs)*100).toFixed(2):0));
+  return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate};
+}
+
+// ── LOGIN / LOGOUT ──
+function loginNow(){
+  let u=$('loginUser').value.trim();
+  let p=$('loginPass').value;
+  // تحقق المدير الرئيسي
+  if(u===data.user&&p===data.pass){
+    currentUser={name:u,role:'admin',fields:[]};
+    startSession();return;
+  }
+  // تحقق المستخدمين الفرعيين
+  let su=data.subUsers.find(x=>x.name===u&&x.pass===p);
+  if(su){
+    currentUser={name:su.name,role:su.role||'user',fields:su.fields||[]};
+    startSession();return;
+  }
+  $('loginMsg').textContent='اسم المستخدم أو كلمة المرور غير صحيحة';
+}
+function startSession(){
+  sessionStorage.setItem('cf_logged','1');
+  sessionStorage.setItem('cf_user',JSON.stringify(currentUser));
+  $('loginBox').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  load();
+  buildNav();
+  updateUserChip();
+}
+function toggleSide(){
+  let app=$('app');
+  let isMobile=window.innerWidth<=768;
+  if(isMobile){
+    // على الموبايل: drawer يفتح/يغلق
+    app.classList.toggle('sideOpen');
+    let ov=$('sideOverlay');
+    if(ov)ov.classList.toggle('show',app.classList.contains('sideOpen'));
+  }else{
+    // على الكمبيوتر: sidebar يضيق/يتسع
+    app.classList.toggle('collapsed');
+    sessionStorage.setItem('sideCollapsed',app.classList.contains('collapsed')?'1':'0');
+  }
+}
+// إغلاق drawer على الموبايل عند تغيير الحجم
+window.addEventListener('resize',()=>{
+  if(window.innerWidth>768){
+    $('app').classList.remove('sideOpen');
+    let ov=$('sideOverlay');if(ov)ov.classList.remove('show');
+    // استرجاع حالة collapsed
+    if(sessionStorage.getItem('sideCollapsed')==='1')$('app').classList.add('collapsed');
+  }
+});
+function logout(){sessionStorage.removeItem('cf_logged');sessionStorage.removeItem('cf_user');location.reload()}
+function updateUserChip(){
+  if(!currentUser)return;
+  $('userAvatar').textContent=currentUser.name.charAt(0).toUpperCase();
+  $('userNameDisplay').textContent=currentUser.name;
+  $('userRoleDisplay').textContent=currentUser.role==='admin'?'مدير النظام':'مستخدم';
+}
+
+// ── NAV ──
+function buildNav(){
+  let admin=isAdmin();
+  let n=(icon,txt,fn)=>`<button class="nav" onclick="show('${fn}',this)"><span class="navIcon">${icon}</span><span class="navText">${txt}</span></button>`;
+  let html='';
+  html+=`<div class="navLabel">الرئيسية</div>`;
+  html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">📊</span><span class="navText">لوحة المعلومات</span></button>`;
+  if(admin){
+    html+=`<div class="navLabel">العمليات</div>`;
+    html+=n('🥚','وجبة جديدة','batch');
+    html+=n('🔄','نقل الفقسة','transfer');
+  }else{
+    html+=`<div class="navLabel">العمليات</div>`;
+  }
+  html+=n('📉','الهلاكات','mort');
+  html+=n('💰','التسويق','market');
+  html+=`<div class="navLabel">الإدارة</div>`;
+  if(admin){
+    html+=n('🏡','الحقول','fields');
+    html+=n('👥','المستخدمون','users');
+  }
+  html+=n('📅','الروزنامة','cal');
+  html+=n('📋','التقارير','reports');
+  if(admin){
+    html+=n('🗄️','الأرشيف','archive');
+    html+=n('⚙️','الإعدادات','settings');
+  }
+  $('sideNav').innerHTML=html;
+}
+
+function show(id,btn){
+  const adminOnly=['batch','transfer','fields','users','archive','settings'];
+  if(adminOnly.includes(id)&&!isAdmin()){
+    document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
+    $('dash').classList.remove('hidden');return;
+  }
+  document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
+  $(id).classList.remove('hidden');
+  document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
+  if(btn){btn.classList.add('active');$('title').textContent=btn.textContent.trim()}
+  // أغلق drawer الموبايل عند التنقل
+  if(window.innerWidth<=768){
+    $('app').classList.remove('sideOpen');
+    let ov=$('sideOverlay');if(ov)ov.classList.remove('show');
+  }
+  renderAll();
+}
+
+// ── CALC ──
+function addDays(ds,n){let d=new Date(ds+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function diffDays(a,b=today()){let A=new Date(a+'T00:00:00'),B=new Date(b+'T00:00:00');return Math.max(0,Math.floor((B-A)/86400000))}
+function fmt(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('ar-IQ')}
+
+function calc(b,on=today()){
+  let rawHatchAge=diffDays(b.hatchDate,on);
+  let hatchAge=Math.min(21,rawHatchAge);
+  let hatchComplete=!b.transferDate&&rawHatchAge===21;
+  let hatchLate=!b.transferDate&&rawHatchAge>21;
+  let expectedTransfer=addDays(b.hatchDate,21);
+  let transferred=!!b.transferDate;
+  let entryDate=b.fieldEntryDate||b.transferDate||'';
+  let rawFlockAge=transferred&&entryDate?diffDays(entryDate,on):0;
+  let flockAge=Math.min(40,rawFlockAge);
+  let eggs=+b.eggs||0,badEggs=+b.badEggs||0,candleRate=+b.candle||0;
+  let validEggs=Math.max(0,eggs-badEggs);
+  let est=Math.max(0,Math.round(validEggs*(candleRate/100)));
+  let hatched=(+b.hatched||0)>0?+b.hatched:est;
+  let vaccineDeaths=+b.vaccineDeaths||0,isolated=+b.isolatedBirds||0;
+  let hatchLoss=vaccineDeaths+isolated;
+  let netHatch=(+b.netHatch||0)>0?+b.netHatch:Math.max(0,hatched-hatchLoss);
+  let fieldBirds=(+b.fieldBirds||0)>0?+b.fieldBirds:(transferred?netHatch:0);
+  let mort=data.morts.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
+  let sold=data.markets.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
+  let alive=transferred?Math.max(0,fieldBirds-mort-sold):0;
+  let completed=transferred&&fieldBirds>0&&alive<=0;
+  let alertFlag=transferred&&flockAge>=(+b.alertAge||35)&&!completed;
+  return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,alive,completed,alert:alertFlag,est,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
+}
+function hatchRate(b){if((+b.fixedHatchRate||0)>0)return (+b.fixedHatchRate).toFixed(2);let eggs=+b.eggs||0;if(!eggs)return '0.00';let c=calc(b);return ((c.est/eggs)*100).toFixed(2);}
+function successRate(b){let c=calc(b),base=c.fieldBirds||0;return base?((Math.max(0,base-c.mort)/base)*100).toFixed(2):'0.00'}
+function statusBadge(b){
+  let c=calc(b);
+  if(c.completed)return '<span class="badge b-gray">منتهية</span>';
+  if(!c.transferred&&c.rawHatchAge>21)return '<span class="badge b-red">متأخرة عن النقل</span>';
+  if(!c.transferred&&c.hatchComplete)return '<span class="badge b-amber">جاهزة للنقل</span>';
+  if(!c.transferred)return '<span class="badge b-blue">بالمفقس</span>';
+  if(b.status==='بيعت جزئياً')return '<span class="badge b-violet">بيعت جزئياً</span>';
+  if(b.status==='تسويق إلى المجزرة')return '<span class="badge b-red">مجزرة</span>';
+  if(b.status==='منقولة')return '<span class="badge b-teal">منقولة</span>';
+  if(c.alert)return '<span class="badge b-amber">تنبيه</span>';
+  return '<span class="badge b-green">نشطة</span>';
+}
+
+// ── VISIBLE BATCHES (filtered by user's fields) ──
+function visibleBatches(){
+  if(isAdmin())return data.batches;
+  let mf=myFields();
+  return data.batches.filter(b=>!b.field||mf.includes(b.field)||!b.transferDate);
+}
+
+// ── RENDER ALL ──
+function renderAll(){
+  renderSelectors();renderStats();renderBatches();
+  renderMort();renderMarket();renderReports();
+  renderArchive();renderCalendar();renderFields();
+  renderUsers();renderUserFieldsList();
+  fillTransferPreview(false);
+  // hide backup/restore for non-admin
+  if($('backupBtn'))$('backupBtn').style.display=isAdmin()?'':'none';
+  if($('restoreBtn'))$('restoreBtn').style.display=isAdmin()?'':'none';
+}
+
+function renderSelectors(){
+  let batches=visibleBatches().filter(b=>!calc(b).completed);
+  let opts=batches.map(b=>`<option value="${b.id}">${b.name} — ${b.type||''}</option>`).join('');
+  ['mortBatch','marketBatch'].forEach(id=>{if($(id))$(id).innerHTML=opts});
+  if($('transferBatch'))$('transferBatch').innerHTML=data.batches.filter(b=>!calc(b).completed).map(b=>`<option value="${b.id}">${b.name} — ${b.type||''}</option>`).join('');
+  if($('calFilter'))$('calFilter').innerHTML='<option value="all">كل الوجبات</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  let fOpts=data.fields.length
+    ?data.fields.map(f=>`<option value="${f.name}">${f.name} (${f.type})${f.capacity?' — سعة '+f.capacity:''}</option>`).join('')
+    :'<option value="">— لا توجد حقول — أضف من صفحة الحقول</option>';
+  if($('transferField'))$('transferField').innerHTML=fOpts;
+}
+
 function selectBatch(id){selectedBatchId=id;renderStats();renderBatches();msg('تم اختيار الوجبة')}
-function selectedDetails(b){if(!b)return `<div class="selectedPanel"><h3>تفاصيل الوجبة المختارة</h3><p class="muted">اضغط على أي وجبة من الجدول حتى تشوف حساباتها وحدها.</p></div>`;let c=calc(b);let arr=[['دخول البيض',fmt(b.hatchDate)],['عمر التفقيس',c.hatchAge+'/21'],['موعد النقل المتوقع',fmt(c.expectedTransfer)],['تاريخ دخول الحقل',fmt(c.entryDate)],['عمر الطير بالحقل',c.transferred?c.flockAge+' يوم':'لم تنقل'],['البيض الداخل',b.eggs||0],['التالف',b.badEggs||0],['هلاك اللقاح',c.vaccineDeaths],['الطير العزل',c.isolated],['صافي الفقس',c.netHatch],['الصافي المنقول للحقل',c.fieldBirds||'-'],['نسبة الفقس',hatchRate(b)+'%'],['هلاك الحقل',c.mort],['المسوق',c.sold],['الحي المتبقي',c.alive],['نجاح الوجبة',successRate(b)+'%'],['الحالة',c.completed?'منتهية':(b.status||'نشطة')],['الحقل',b.field||'-']];return `<div class="selectedPanel"><h3>تفاصيل الوجبة المختارة: ${b.name}</h3><div class="selectedGrid">${arr.map(x=>`<div class="mini"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('')}</div><p class="muted" style="margin-top:10px">صافي الفقس ونسبة الفقس والصافي المنقول للحقل أرقام ثابتة. الذي يتغير فقط هو هلاك الحقل والتسويق والحي المتبقي.</p></div>`}
-function renderStats(){let b=data.batches.find(x=>x.id===selectedBatchId);let last=localStorage.getItem(STORE+'_lastSave');let saveInfo=last?new Date(last).toLocaleString('ar-IQ'):'لم يتم الحفظ بعد';if(b){let c=calc(b);let arr=[['عمر التفقيس',c.hatchAge+'/21',c.hatchLate?'متأخرة عن النقل':(c.hatchComplete?'الفقسة اكتملت - انقلها للحقل':'اليوم الأول لا ينحسب')],['عمر الطير بالحقل',c.transferred?c.flockAge+' يوم':'لم تنقل','من تاريخ دخول الحقل'],['صافي الفقس',c.netHatch,'ثابت'],['الصافي المنقول للحقل',c.fieldBirds||'-','ثابت'],['هلاك الحقل',c.mort,'متغير'],['المسوق',c.sold,'متغير'],['الحي المتبقي',c.alive,'يتغير حسب الهلاك والتسويق'],['نجاح الوجبة',successRate(b)+'%','حسب هلاك الحقل فقط']];$('stats').innerHTML=`<div class="dashWrap"><div class="dashHero"><h2>لوحة الوجبة: ${b.name}</h2><p>الصافي المنقول للحقل ثابت، والحي المتبقي وحده يتغير.</p></div><div class="saveBox"><b>الحفظ مفعل ✅</b><p class="muted">آخر حفظ: ${saveInfo}</p></div></div>`+arr.map(x=>`<div class="stat"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('')+selectedDetails(b);return}let activeB=data.batches.filter(b=>!calc(b).completed),arch=data.batches.filter(b=>calc(b).completed);let active=activeB.length,inc=activeB.filter(b=>!calc(b).transferred).length,done=arch.length,eggs=activeB.reduce((s,b)=>s+(+b.eggs||0),0),alive=activeB.reduce((s,b)=>s+calc(b).alive,0),mort=activeB.reduce((s,b)=>s+calc(b).mort,0),field=activeB.reduce((s,b)=>s+(calc(b).fieldBirds||0),0);let arr=[['الوجبات النشطة',active,'غير منتهية'],['باقية بالمفقس',inc,'لم تنقل يدوياً'],['الأرشيف',done,'حي متبقي = 0'],['إجمالي البيض',eggs,'للوجبات الظاهرة'],['الصافي المنقول للحقل',field,'للوجبات الظاهرة'],['هلاك الحقل',mort,'للوجبات الظاهرة'],['الدجاج الحي',alive,'المتبقي'],['الحفظ',active+done,'إجمالي السجلات']];$('stats').innerHTML=`<div class="dashWrap"><div class="dashHero"><h2>لوحة معلومات شركة زهور الوطن</h2><p>اللوحة تعرض الوجبات غير المنتهية فقط. المنتهية تنتقل للأرشيف.</p></div><div class="saveBox"><b>الحفظ دائم ✅</b><p class="muted">آخر حفظ: ${saveInfo}</p></div></div>`+arr.map(x=>`<div class="stat"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('')+selectedDetails(null)}
-function renderBatches(){let rows=data.batches.filter(b=>!calc(b).completed).map(b=>{let c=calc(b),sel=b.id===selectedBatchId?' selectedRow':'';return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td>${b.name}</td><td>${fmt(b.hatchDate)}</td><td>${b.type||''}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'-'}</td><td>${c.transferred?c.flockAge+' يوم':'-'}</td><td>${c.netHatch}</td><td>${c.fieldBirds||'-'}</td><td>${hatchRate(b)}%</td><td>${c.mort}</td><td>${c.sold}</td><td>${c.alive}</td><td>${successRate(b)}%</td><td><button class="secondary" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="danger" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button></td></tr>`}).join('');$('batchTable').innerHTML='<tr><th>الوجبة</th><th>دخول البيض</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>عمر الطير</th><th>صافي الفقس</th><th>الصافي المنقول للحقل</th><th>نسبة الفقس</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>النجاح</th><th>إجراء</th></tr>'+rows}
-function clearForm(){['editId','bName','hatchDate','eggs','badEggs','candle','alertAge','marketAge','note'].forEach(id=>$(id).value='');$('badEggs').value=0;$('candle').value=90;$('alertAge').value=35;$('marketAge').value=35}function formBatch(){return{id:val('editId')?+val('editId'):null,name:val('bName'),hatchDate:val('hatchDate'),type:val('bType'),eggs:num('eggs'),badEggs:num('badEggs'),candle:num('candle'),alertAge:num('alertAge')||35,marketAge:num('marketAge')||35,note:val('note')}}function saveBatch(){let b=formBatch();if(!b.name||!b.hatchDate){alert('اكتب اسم الوجبة وتاريخ دخول البيض. حتى الدجاج يحتاج بداية.');return}if(b.id){let old=data.batches.find(x=>x.id===b.id);Object.assign(old,b)}else{b.id=Date.now();b.status='نشطة';b.transferDate='';b.fieldEntryDate='';b.field='';b.hatched='';b.vaccineDeaths=0;b.isolatedBirds=0;b.netHatch=0;b.fieldBirds=0;b.fixedHatchRate=0;data.batches.push(b)}clearForm();save();renderAll()}function editBatch(id){let b=data.batches.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;$('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;$('candle').value=b.candle||90;$('alertAge').value=b.alertAge||35;$('marketAge').value=b.marketAge||35;$('note').value=b.note||'';show('batch',document.querySelectorAll('.nav')[1])}function deleteBatch(id){if(confirm('حذف الوجبة وكل سجلاتها؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=data.morts.filter(m=>m.batchId!==id);data.markets=data.markets.filter(m=>m.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll()}}
-function fillTransferPreview(showMsg=true){let id=+$('transferBatch').value;if(!id){$('transferPreview').innerHTML='<p class="muted">لا توجد وجبة مختارة.</p>';return}let b=data.batches.find(x=>x.id===id);let c=calc(b);if(!$('transferDate').value)$('transferDate').value=today();$('transferField').value=$('transferField').value||b.field||'';$('transferHatched').value=$('transferHatched').value||b.hatched||c.hatched||'';$('vaccineDeaths').value=$('vaccineDeaths').value||b.vaccineDeaths||0;$('isolatedBirds').value=$('isolatedBirds').value||b.isolatedBirds||0;$('fieldBirds').value=$('fieldBirds').value||b.fieldBirds||'';$('transferPreview').innerHTML=`<h3>معاينة النقل: ${b.name}</h3>${c.hatchLate?'<p class="badge alertB">متأخرة عن النقل</p>':(c.hatchComplete?'<p class="badge alertB">الفقسة اكتملت، انقلها للحقل</p>':'')}<div class="selectedGrid"><div class="mini"><span>موعد النقل المتوقع</span><b>${fmt(c.expectedTransfer)}</b></div><div class="mini"><span>عمر التفقيس حالياً</span><b>${c.hatchAge}/21</b></div><div class="mini"><span>تقدير الفاقس</span><b>${c.hatched}</b></div><div class="mini"><span>دخول الحقل الحالي</span><b>${c.entryDate?fmt(c.entryDate):'غير منقولة'}</b></div></div>`;if(showMsg)msg(c.hatchComplete?'الفقسة اكتملت، انقلها للحقل':'تم جلب بيانات الوجبة')}
-function saveTransfer(){let id=+$('transferBatch').value,b=data.batches.find(x=>x.id===id);if(!b)return alert('اختر وجبة');if(!val('transferDate'))return alert('اكتب تاريخ النقل');let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),field=num('fieldBirds');if(field<=0)return alert('اكتب الصافي المنقول للحقل');let net=Math.max(0,hat-vac-iso);let eggs=+b.eggs||0;b.transferDate=val('transferDate');b.fieldEntryDate=val('transferDate');b.field=val('transferField');b.hatched=hat;b.vaccineDeaths=vac;b.isolatedBirds=iso;b.netHatch=net;b.fieldBirds=field;b.fixedHatchRate=eggs?+((net/eggs)*100).toFixed(2):0;b.status='نشطة';selectedBatchId=b.id;save();renderAll();msg('تم حفظ النقل اليدوي')}
-function addMort(){let id=+$('mortBatch').value;if(!id||!num('mortCount'))return alert('اختر وجبة واكتب عدد الهلاك');data.morts.push({id:Date.now(),batchId:id,date:val('mortDate')||today(),count:num('mortCount'),reason:val('mortReason')});$('mortCount').value='';$('mortReason').value='';save();renderAll()}function renderMort(){let rows=data.morts.map(m=>{let b=data.batches.find(x=>x.id===m.batchId);return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${m.count}</td><td>${m.reason||'-'}</td><td><button class="danger" onclick="deleteMort(${m.id})">حذف</button></td></tr>`}).join('');$('mortTable').innerHTML='<tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>السبب</th><th>إجراء</th></tr>'+rows}function deleteMort(id){if(confirm('حذف الهلاك؟')){data.morts=data.morts.filter(m=>m.id!==id);save();renderAll()}}
-function addMarket(){let id=+$('marketBatch').value;if(!id)return alert('اختر وجبة');data.markets.push({id:Date.now(),batchId:id,date:val('marketDate')||today(),count:num('marketCount'),status:val('marketStatus'),note:val('marketNote')});let b=data.batches.find(x=>x.id===id);if(b){let c=calc(b);b.status=c.completed?'منتهية':'نشطة'}$('marketCount').value='';$('marketNote').value='';save();renderAll()}function renderMarket(){let rows=data.markets.map(m=>{let b=data.batches.find(x=>x.id===m.batchId);return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${m.count}</td><td>${m.status}</td><td>${m.note||'-'}</td><td><button class="danger" onclick="deleteMarket(${m.id})">حذف</button></td></tr>`}).join('');$('marketTable').innerHTML='<tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>العملية</th><th>ملاحظة</th><th>إجراء</th></tr>'+rows}function deleteMarket(id){if(confirm('حذف عملية التسويق؟')){data.markets=data.markets.filter(m=>m.id!==id);save();renderAll()}}
-function renderReports(){let rows=data.batches.map(b=>{let c=calc(b);return `<tr><td>${b.name}</td><td>${b.type||''}</td><td>${b.eggs||0}</td><td>${b.badEggs||0}</td><td>${c.vaccineDeaths}</td><td>${c.isolated}</td><td>${c.netHatch}</td><td>${c.fieldBirds||0}</td><td>${hatchRate(b)}%</td><td>${c.mort}</td><td>${c.sold}</td><td>${c.alive}</td><td>${successRate(b)}%</td><td>${c.completed?'منتهية':(b.status||'نشطة')}</td></tr>`}).join('');$('reportTable').innerHTML='<tr><th>الوجبة</th><th>النوع</th><th>البيض</th><th>التالف</th><th>هلاك اللقاح</th><th>العزل</th><th>صافي الفقس</th><th>الصافي المنقول للحقل</th><th>نسبة الفقس</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>النجاح</th><th>الحالة</th></tr>'+rows}
-function exportCSV(){let rows=[['الوجبة','النوع','البيض','التالف','هلاك اللقاح','العزل','صافي الفقس','الصافي المنقول للحقل','نسبة الفقس','هلاك الحقل','المسوق','الحي المتبقي','النجاح','الحالة']];data.batches.forEach(b=>{let c=calc(b);rows.push([b.name,b.type||'',b.eggs||0,b.badEggs||0,c.vaccineDeaths,c.isolated,c.netHatch,c.fieldBirds||0,hatchRate(b)+'%',c.mort,c.sold,c.alive,successRate(b)+'%',c.completed?'منتهية':(b.status||'نشطة')])});let csv='\ufeff'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='chicken_report_v25_1.csv';a.click()}
-function backup(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='chicken_backup_v25_1.json';a.click()}function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let obj=JSON.parse(r.result);if(confirm('استرجاع النسخة سيستبدل البيانات الحالية؟')){data={...data,...obj};data.batches=(data.batches||[]).map(migrateBatch);save();renderAll()}}catch{alert('ملف النسخة غير صحيح')}e.target.value=''};r.readAsText(f)}
-function renderArchive(){let el=$('archiveTable');if(!el)return;let rows=data.batches.filter(b=>calc(b).completed).map(b=>{let c=calc(b);return `<tr><td>${b.name}</td><td>${fmt(b.hatchDate)}</td><td>${fmt(c.entryDate)}</td><td>${b.field||'-'}</td><td>${c.netHatch}</td><td>${c.fieldBirds}</td><td>${c.mort}</td><td>${c.sold}</td><td>${c.alive}</td><td>منتهية</td><td><button class="secondary" onclick="selectBatch(${b.id});show('dash',document.querySelectorAll('.nav')[0])">عرض</button></td></tr>`}).join('');el.innerHTML='<tr><th>الوجبة</th><th>دخول البيض</th><th>دخول الحقل</th><th>الحقل</th><th>صافي الفقس</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>الحالة</th><th>إجراء</th></tr>'+rows}
-function renderCalendar(){let y=calDate.getFullYear(),m=calDate.getMonth();$('monthTitle').textContent=calDate.toLocaleDateString('ar-IQ',{year:'numeric',month:'long'});let html=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'].map(x=>`<div class="dayname">${x}</div>`).join('');let first=new Date(y,m,1),last=new Date(y,m+1,0);for(let i=0;i<first.getDay();i++)html+='<div></div>';let filter=$('calFilter').value||'all';for(let d=1;d<=last.getDate();d++){let iso=new Date(y,m,d+1).toISOString().slice(0,10);let ev=data.batches.filter(b=>filter==='all'||String(b.id)===String(filter)).map(b=>{let c=calc(b,iso);let txt='';if(!c.transferred&&c.rawHatchAge>=0&&c.rawHatchAge<21)txt='تفقيس '+c.hatchAge+'/21';if(!c.transferred&&c.rawHatchAge===21)txt='الفقسة اكتملت - انقلها';if(!c.transferred&&c.rawHatchAge>21)txt='متأخرة عن النقل';if(iso===c.expectedTransfer&&!c.transferred)txt='الفقسة اكتملت - انقلها';if(c.entryDate&&iso===c.entryDate)txt='دخول الحقل';else if(c.transferred&&iso>c.entryDate)txt='عمر '+c.flockAge;return txt?`<div class="ev">${b.name}: ${txt}</div>`:''}).join('');html+=`<div class="day"><b>${d}</b>${ev}</div>`}$('calendar').innerHTML=html}function moveMonth(n){calDate.setMonth(calDate.getMonth()+n);renderCalendar()}
-function saveCreds(){if(!val('newUser')||!val('newPass'))return alert('اكتب اليوزر والباسورد');data.user=val('newUser');data.pass=val('newPass');save();msg('تم حفظ بيانات الدخول')}function wipeAll(){if(confirm('مسح كل بيانات الوجبات؟ هذا زر مو لعبة.')){data.batches=[];data.morts=[];data.markets=[];selectedBatchId=null;save();renderAll()}}function testSave(){save();alert('الحفظ شغال. إذا مسحت بيانات المتصفح راح تطير، لا تسويها وتلوم البرنامج المسكين.')}
-if(sessionStorage.getItem('cf_logged')==='1'){loginBox.classList.add('hidden');app.classList.remove('hidden');load()}
-</script></body></html>
+
+function selectedDetails(b){
+  if(!b)return `<div class="detailPanel"><p style="color:var(--ink3);font-size:13px">اضغط على أي وجبة من الجدول لعرض تفاصيلها.</p></div>`;
+  let c=calc(b);
+  // قسمان: معلومات الفقس + معلومات الحقل
+  let hatchCells=[
+    ['دخول البيض',fmt(b.hatchDate)],
+    ['عمر التفقيس',c.hatchAge+'/21'],
+    ['موعد النقل',fmt(c.expectedTransfer)],
+    ['البيض الداخل',(b.eggs||0).toLocaleString()],
+    ['البيض التالف',(b.badEggs||0).toLocaleString()],
+    ['الفحص الضوئي',(b.candle||0)+'%'],
+    ['هلاك اللقاح',c.vaccineDeaths.toLocaleString()],
+    ['الطير العزل',c.isolated.toLocaleString()],
+    ['نسبة الفقس',hatchRate(b)+'%','dc-accent'],
+  ];
+  let fieldCells=[
+    ['الحقل',b.field||'—'],
+    ['دخول الحقل',fmt(c.entryDate)],
+    ['عمر الطير',c.transferred?c.flockAge+'/40 يوم':'—'],
+    ['الصافي المنقول',(c.fieldBirds||0).toLocaleString(),'dc-accent'],
+    ['هلاك الحقل',c.mort.toLocaleString()],
+    ['المسوق',c.sold.toLocaleString()],
+    ['الحي المتبقي',c.alive.toLocaleString(),'dc-accent'],
+    ['نسبة النجاح',successRate(b)+'%','dc-accent'],
+    ['الحالة',c.completed?'منتهية':(b.status||'نشطة')],
+  ];
+  let mkCells=c=>c.map(x=>`<div class="dCell${x[2]?' '+x[2]:''}"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('');
+  return `<div class="detailPanel">
+    <div class="dp-head"><span class="dp-title">📌 ${b.name}</span><span class="badge b-${c.completed?'gray':c.alert?'amber':'green'}">${c.completed?'منتهية':c.alert?'تنبيه':'نشطة'}</span></div>
+    <div class="dp-sub">المفقس</div>
+    <div class="detailGrid" style="margin-bottom:6px">${mkCells(hatchCells)}</div>
+    <div class="dp-sub">الحقل</div>
+    <div class="detailGrid">${mkCells(fieldCells)}</div>
+  </div>`;
+}
+
+function renderStats(){
+  let b=data.batches.find(x=>x.id===selectedBatchId);
+  if(b&&!canSeeField(b.field))b=null;
+  let last=localStorage.getItem(STORE+'_lastSave');
+  let lastTxt=last?new Date(last).toLocaleString('ar-IQ',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  let cardsEl=$('statsCards');let detailEl=$('statsDetail');
+  if(!cardsEl)return;
+  if(b){
+    let c=calc(b);
+    let stats=[
+      {l:'عمر التفقيس',v:c.hatchAge+'/21',s:c.hatchLate?'⚠️ متأخرة':c.hatchComplete?'🔔 جاهزة':''},
+      {l:'عمر الطير',v:c.transferred?c.flockAge+'/40':'—',s:'بالحقل'},
+      {l:'الصافي المنقول',v:(c.fieldBirds||0).toLocaleString(),s:'ثابت'},
+      {l:'هلاك الحقل',v:c.mort.toLocaleString(),s:'متراكم'},
+      {l:'المسوق',v:c.sold.toLocaleString(),s:'إجمالي'},
+      {l:'الحي المتبقي',v:c.alive.toLocaleString(),s:'صافي'},
+      {l:'نسبة النجاح',v:successRate(b)+'%',s:''},
+    ];
+    cardsEl.innerHTML=
+      `<div class="heroBanner"><div><h2>${b.name}</h2><p>${b.type||'وجبة'} — ${fmt(b.hatchDate)} — ${b.field||'لم تُنقل'}</p></div><div class="hb-right">آخر حفظ: ${lastTxt}</div></div>`+
+      stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
+    if(detailEl)detailEl.innerHTML=selectedDetails(b);
+    return;
+  }
+  let vis=visibleBatches();
+  let activeB=vis.filter(b=>!calc(b).completed);
+  let arch=vis.filter(b=>calc(b).completed);
+  let active=activeB.length,inc=activeB.filter(b=>!calc(b).transferred).length,done=arch.length;
+  let eggs=activeB.reduce((s,b)=>s+(+b.eggs||0),0);
+  let alive=activeB.reduce((s,b)=>s+calc(b).alive,0);
+  let mort=activeB.reduce((s,b)=>s+calc(b).mort,0);
+  let field=activeB.reduce((s,b)=>s+(calc(b).fieldBirds||0),0);
+  let stats=[{l:'الوجبات النشطة',v:active,s:'غير منتهية'},{l:'بالمفقس',v:inc,s:'لم تُنقل'},{l:'الأرشيف',v:done,s:'منتهية'},{l:'إجمالي البيض',v:eggs.toLocaleString(),s:''},{l:'الصافي المنقول',v:field.toLocaleString(),s:'للحقول'},{l:'هلاك الحقول',v:mort.toLocaleString(),s:'إجمالي'},{l:'الطير الحي',v:alive.toLocaleString(),s:'متبقي'}];
+  let greeting=isAdmin()?'زهور الوطن — لوحة المعلومات':`مرحباً، ${currentUser.name}`;
+  cardsEl.innerHTML=`<div class="heroBanner"><div><h2>${greeting}</h2><p>${isAdmin()?'عرض كامل لجميع الوجبات والحقول.':'عرض مخصص لحقولك فقط.'}</p></div><div class="hb-right">آخر حفظ: ${lastTxt}</div></div>`+stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
+  if(detailEl)detailEl.innerHTML=selectedDetails(null);
+}
+
+function renderBatches(){
+  let batches=visibleBatches().filter(b=>!calc(b).completed);
+  let rows=batches.map(b=>{
+    let c=calc(b),sel=b.id===selectedBatchId?' selectedRow':'';
+    let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button>`:'—';
+    return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${c.transferred?c.flockAge+'/40':'—'}</td><td>${b.candle||0}%</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
+  }).join('');
+  $('batchTable').innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>عمر الطير</th><th>الفحص</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── BATCH CRUD ──
+function clearForm(){['editId','bName','hatchDate','eggs','note'].forEach(id=>$(id)&&($(id).value=''));if($('badEggs'))$('badEggs').value=0;if($('candle'))$('candle').value=90;if($('alertAge'))$('alertAge').value=35;if($('marketAge'))$('marketAge').value=35}
+function formBatch(){return{id:val('editId')?+val('editId'):null,name:val('bName'),hatchDate:val('hatchDate'),type:$('bType').value,eggs:num('eggs'),badEggs:num('badEggs'),candle:num('candle'),alertAge:num('alertAge')||35,marketAge:num('marketAge')||35,note:val('note')}}
+function saveBatch(){if(!isAdmin())return;let b=formBatch();if(!b.name||!b.hatchDate){alert('يرجى إدخال اسم الوجبة وتاريخ دخول البيض');return}if(b.id){let old=data.batches.find(x=>x.id===b.id);Object.assign(old,b)}else{b.id=Date.now();b.status='نشطة';b.transferDate='';b.fieldEntryDate='';b.field='';b.hatched='';b.vaccineDeaths=0;b.isolatedBirds=0;b.netHatch=0;b.fieldBirds=0;b.fixedHatchRate=0;data.batches.push(b)}clearForm();save();renderAll()}
+function editBatch(id){if(!isAdmin())return;let b=data.batches.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;$('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;$('candle').value=b.candle||90;$('alertAge').value=b.alertAge||35;$('marketAge').value=b.marketAge||35;$('note').value=b.note||'';show('batch',null)}
+function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=data.morts.filter(m=>m.batchId!==id);data.markets=data.markets.filter(m=>m.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll()}}
+
+// ── TRANSFER ──
+function fillTransferPreview(showMsg=true){
+  if(!$('transferBatch'))return;
+  let id=+$('transferBatch').value;if(!id){$('transferPreview').innerHTML='';return}
+  let b=data.batches.find(x=>x.id===id);let c=calc(b);
+  if(!$('transferDate').value)$('transferDate').value=today();
+  if(b.field&&$('transferField').querySelector('option[value="'+b.field+'"]'))$('transferField').value=b.field;
+  $('transferHatched').value=$('transferHatched').value||b.hatched||c.est||'';
+  $('vaccineDeaths').value=$('vaccineDeaths').value||b.vaccineDeaths||0;
+  $('isolatedBirds').value=$('isolatedBirds').value||b.isolatedBirds||0;
+  $('fieldBirds').value=$('fieldBirds').value||b.fieldBirds||'';
+  checkFieldOccupancy();
+  let alertHtml=c.hatchLate?`<div style="background:var(--red2);border:1px solid #fecaca;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:var(--red);font-weight:600;margin-bottom:10px">⚠️ متأخرة عن النقل</div>`:c.hatchComplete?`<div style="background:var(--amber2);border:1px solid #fcd34d;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:#78350f;font-weight:600;margin-bottom:10px">🔔 الفقسة اكتملت — انقلها للحقل</div>`:'';
+  $('transferPreview').innerHTML=alertHtml+`<div class="detailGrid" style="grid-template-columns:repeat(4,1fr)"><div class="dCell"><div class="dc-label">موعد النقل</div><div class="dc-val">${fmt(c.expectedTransfer)}</div></div><div class="dCell"><div class="dc-label">عمر التفقيس</div><div class="dc-val">${c.hatchAge}/21</div></div><div class="dCell dc-accent"><div class="dc-label">الفاقس التقديري</div><div class="dc-val">${c.est.toLocaleString()}</div></div><div class="dCell"><div class="dc-label">دخول الحقل السابق</div><div class="dc-val">${c.entryDate?fmt(c.entryDate):'—'}</div></div></div>`;
+  if(showMsg)msg(c.hatchComplete?'الفقسة جاهزة للنقل':'تم جلب بيانات الوجبة');
+}
+function saveTransfer(){
+  if(!isAdmin())return;
+  let id=+$('transferBatch').value,b=data.batches.find(x=>x.id===id);
+  if(!b)return alert('اختر وجبة');if(!val('transferDate'))return alert('أدخل تاريخ دخول الحقل');
+  let fieldName=$('transferField').value;if(!fieldName)return alert('اختر الحقل');
+  let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),field=num('fieldBirds');
+  if(field<=0)return alert('أدخل الصافي المنقول للحقل');
+  let net=Math.max(0,hat-vac-iso);let eggs=+b.eggs||0;
+  b.transferDate=val('transferDate');b.fieldEntryDate=val('transferDate');b.field=fieldName;
+  b.hatched=hat;b.vaccineDeaths=vac;b.isolatedBirds=iso;b.netHatch=net;b.fieldBirds=field;
+  b.fixedHatchRate=eggs?+((field/eggs)*100).toFixed(2):0;b.status='نشطة';
+  selectedBatchId=b.id;save();renderAll();msg('تم تأكيد النقل');
+}
+
+// ── MORTALITY ──
+function addMort(){
+  let id=+$('mortBatch').value;if(!id||!num('mortCount'))return alert('اختر وجبة وأدخل عدد الهلاك');
+  let b=data.batches.find(x=>x.id===id);
+  if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
+  data.morts.push({id:Date.now(),batchId:id,date:val('mortDate')||today(),count:num('mortCount'),reason:val('mortReason')});
+  $('mortCount').value='';$('mortReason').value='';save();renderAll();
+}
+function renderMort(){
+  let mf=myFields();
+  let rows=data.morts.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).map(m=>{
+    let b=data.batches.find(x=>x.id===m.batchId);
+    let canDel=isAdmin();
+    return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${(+m.count).toLocaleString()}</td><td>${m.reason||'—'}</td><td>${canDel?`<button class="btn btn-danger btn-sm" onclick="deleteMort(${m.id})">حذف</button>`:'—'}</td></tr>`;
+  }).join('');
+  $('mortTable').innerHTML='<thead><tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>السبب</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+function deleteMort(id){if(!isAdmin())return;if(confirm('حذف سجل الهلاك؟')){data.morts=data.morts.filter(m=>m.id!==id);save();renderAll()}}
+
+// ── MARKET ──
+function addMarket(){
+  let id=+$('marketBatch').value;if(!id)return alert('اختر وجبة');
+  let b=data.batches.find(x=>x.id===id);
+  if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
+  data.markets.push({id:Date.now(),batchId:id,date:val('marketDate')||today(),count:num('marketCount'),status:val('marketStatus'),note:val('marketNote')});
+  if(b){let c=calc(b);b.status=c.completed?'منتهية':'نشطة'}
+  $('marketCount').value='';$('marketNote').value='';save();renderAll();
+}
+function renderMarket(){
+  function mktBadge(s){
+    if(s==='تسويق إلى المجزرة')return '<span class="badge b-red">🔪 مجزرة</span>';
+    if(s==='بيعت جزئياً')return '<span class="badge b-violet">بيعت جزئياً</span>';
+    if(s==='منتهية')return '<span class="badge b-gray">منتهية</span>';
+    if(s==='منقولة')return '<span class="badge b-teal">منقولة</span>';
+    return s;
+  }
+  let rows=data.markets.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).map(m=>{
+    let b=data.batches.find(x=>x.id===m.batchId);
+    let canDel=isAdmin();
+    return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${(+m.count).toLocaleString()}</td><td>${mktBadge(m.status)}</td><td>${m.note||'—'}</td><td>${canDel?`<button class="btn btn-danger btn-sm" onclick="deleteMarket(${m.id})">حذف</button>`:'—'}</td></tr>`;
+  }).join('');
+  $('marketTable').innerHTML='<thead><tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>نوع العملية</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+function deleteMarket(id){if(!isAdmin())return;if(confirm('حذف عملية التسويق؟')){data.markets=data.markets.filter(m=>m.id!==id);save();renderAll()}}
+
+// ── REPORTS ──
+function renderReports(){
+  let batches=isAdmin()?data.batches:visibleBatches();
+  let rows=batches.map(b=>{let c=calc(b);return `<tr><td><b>${b.name}</b></td><td>${b.type||'—'}</td><td>${(+b.eggs||0).toLocaleString()}</td><td>${(+b.badEggs||0).toLocaleString()}</td><td>${b.candle||0}%</td><td>${c.vaccineDeaths.toLocaleString()}</td><td>${c.isolated.toLocaleString()}</td><td>${hatchRate(b)}%</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>${c.alive.toLocaleString()}</td><td>${successRate(b)}%</td><td>${statusBadge(b)}</td></tr>`}).join('');
+  $('reportTable').innerHTML='<thead><tr><th>الوجبة</th><th>النوع</th><th>البيض</th><th>التالف</th><th>الفحص</th><th>هلاك اللقاح</th><th>العزل</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>الحالة</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+function exportCSV(){
+  let batches=isAdmin()?data.batches:visibleBatches();
+  let rows=[['الوجبة','النوع','البيض','التالف','الفحص الضوئي','هلاك اللقاح','العزل','نسبة الفقس','الصافي المنقول','هلاك الحقل','المسوق','الحي المتبقي','النجاح','الحالة']];
+  batches.forEach(b=>{let c=calc(b);rows.push([b.name,b.type||'',b.eggs||0,b.badEggs||0,(b.candle||0)+'%',c.vaccineDeaths,c.isolated,hatchRate(b)+'%',c.fieldBirds||0,c.mort,c.sold,c.alive,successRate(b)+'%',c.completed?'منتهية':(b.status||'نشطة')])});
+  let csv='\ufeff'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='zohor_report_'+today()+'.csv';a.click();
+}
+function backup(){if(!isAdmin())return;let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='zohor_backup_'+today()+'.json';a.click()}
+function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let obj=JSON.parse(r.result);if(confirm('استرجاع النسخة سيستبدل البيانات الحالية. متأكد؟')){data={...data,...obj};data.batches=(data.batches||[]).map(migrateBatch);data.fields=data.fields||[];data.subUsers=data.subUsers||[];save();renderAll()}}catch{alert('ملف النسخة غير صالح')}e.target.value=''};r.readAsText(f)}
+
+// ── ARCHIVE ──
+function renderArchive(){
+  let el=$('archiveTable');if(!el)return;
+  let batches=isAdmin()?data.batches.filter(b=>calc(b).completed):visibleBatches().filter(b=>calc(b).completed);
+  let rows=batches.map(b=>{let c=calc(b);return `<tr><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${fmt(c.entryDate)}</td><td>${b.field||'—'}</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>0</td><td><span class="badge b-gray">منتهية</span></td><td><button class="btn btn-secondary btn-sm" onclick="selectBatch(${b.id});show('dash',null)">عرض</button></td></tr>`}).join('');
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>دخول الحقل</th><th>الحقل</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── CALENDAR ──
+function renderCalendar(){
+  if(!$('calendar'))return;
+  let y=calDate.getFullYear(),m=calDate.getMonth();
+  $('monthTitle').textContent=calDate.toLocaleDateString('ar-IQ',{year:'numeric',month:'long'});
+  let html=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'].map(x=>`<div class="calDayName">${x}</div>`).join('');
+  let first=new Date(y,m,1),last=new Date(y,m+1,0);
+  for(let i=0;i<first.getDay();i++)html+='<div></div>';
+  let filter=$('calFilter').value||'all';
+  let batches=visibleBatches();
+  for(let d=1;d<=last.getDate();d++){
+    let iso=new Date(y,m,d).toISOString().slice(0,10);
+    let ev=batches.filter(b=>filter==='all'||String(b.id)===String(filter)).map(b=>{
+      let c=calc(b,iso);let txt='';let cls='';
+      if(!c.transferred&&c.rawHatchAge>=0&&c.rawHatchAge<21){txt='تفقيس '+c.hatchAge+'/21';cls='ev-teal'}
+      if(!c.transferred&&c.rawHatchAge===21){txt='جاهزة للنقل';cls='ev-amber'}
+      if(!c.transferred&&c.rawHatchAge>21){txt='متأخرة عن النقل';cls='ev-red'}
+      if(c.entryDate&&iso===c.entryDate){txt='دخول الحقل';cls='ev-teal'}
+      else if(c.transferred&&c.entryDate&&iso>c.entryDate&&c.rawFlockAge<=40){txt='عمر '+c.flockAge+' يوم';cls='ev-green'}
+      return txt?`<div class="ev ${cls}">${b.name}: ${txt}</div>`:'';
+    }).join('');
+    html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:8px;min-height:90px"><div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">${d}</div>${ev}</div>`;
+  }
+  $('calendar').innerHTML=html;
+}
+function moveMonth(n){calDate.setMonth(calDate.getMonth()+n);renderCalendar()}
+
+// ── FIELDS ──
+function saveField(){
+  if(!isAdmin())return;
+  let nm=(val('fName')||'').trim();if(!nm)return alert('أدخل اسم الحقل');
+  let eid=val('fEditId');
+  if(eid){let f=data.fields.find(x=>x.id===+eid);if(f){f.name=nm;f.type=$('fType').value;f.capacity=num('fCapacity')||0}}
+  else{if(data.fields.find(f=>f.name===nm))return alert('يوجد حقل بهذا الاسم');data.fields.push({id:Date.now(),name:nm,type:$('fType').value,capacity:num('fCapacity')||0})}
+  clearFieldForm();save();renderAll();msg('تم حفظ الحقل');
+}
+function clearFieldForm(){if($('fName'))$('fName').value='';if($('fType'))$('fType').value='لحم';if($('fCapacity'))$('fCapacity').value='';if($('fEditId'))$('fEditId').value=''}
+function editField(id){if(!isAdmin())return;let f=data.fields.find(x=>x.id===id);if(!f)return;$('fName').value=f.name;$('fType').value=f.type;$('fCapacity').value=f.capacity||'';$('fEditId').value=f.id;show('fields',null)}
+function deleteField(id){if(!isAdmin())return;if(confirm('حذف الحقل؟')){data.fields=data.fields.filter(f=>f.id!==id);save();renderAll()}}
+function fieldStatus(fn){let active=data.batches.filter(b=>!calc(b).completed&&b.field===fn&&b.transferDate);return{busy:active.length>0,batches:active}}
+function checkFieldOccupancy(){
+  if(!$('transferField'))return;
+  let fn=$('transferField').value;let warn=$('fieldWarn');
+  if(!fn){warn.className='warnBox';return}
+  let st=fieldStatus(fn);let f=data.fields.find(x=>x.name===fn);
+  let info='';
+  if(f&&f.capacity){let used=data.batches.filter(b=>!calc(b).completed&&b.field===fn&&b.transferDate).reduce((s,b)=>s+calc(b).alive,0);if(used>0)info=` — الحي الحالي: ${used.toLocaleString()} من ${f.capacity.toLocaleString()}`}
+  if(st.busy){warn.className='warnBox busy';warn.innerHTML='⚠️ الحقل مشغول بـ: '+st.batches.map(b=>`<b>${b.name}</b>`).join('، ')+info+' — يمكنك المتابعة'}
+  else{warn.className='warnBox free';warn.innerHTML='✅ الحقل متاح'+info}
+}
+function renderFields(){
+  let el=$('fieldsTable');if(!el)return;
+  if(!data.fields.length){el.innerHTML='<tbody><tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:24px">لا توجد حقول مسجلة.</td></tr></tbody>';return}
+  let rows=data.fields.map(f=>{
+    let st=fieldStatus(f.name);
+    let used=data.batches.filter(b=>!calc(b).completed&&b.field===f.name&&b.transferDate).reduce((s,b)=>s+calc(b).alive,0);
+    let capTxt=f.capacity?`${used.toLocaleString()} / ${f.capacity.toLocaleString()}`:'—';
+    let statusBdg=st.busy?`<span class="badge b-amber">مشغول</span>`:`<span class="badge b-green">متاح</span>`;
+    return `<tr><td><b>${f.name}</b></td><td>${f.type}</td><td>${capTxt}</td><td>${statusBdg}${st.busy?' <span style="font-size:11px;color:var(--ink3)">('+st.batches.map(b=>b.name).join('، ')+')</span>':''}</td><td><button class="btn btn-secondary btn-sm" onclick="editField(${f.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="deleteField(${f.id})">حذف</button></td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>اسم الحقل</th><th>النوع</th><th>الحي / السعة</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── USERS MANAGEMENT ──
+function renderUserFieldsList(){
+  let el=$('uFieldsList');if(!el)return;
+  if(!data.fields.length){el.innerHTML='<p style="font-size:12px;color:var(--ink3)">لا توجد حقول مسجلة — أضف حقولاً أولاً من صفحة الحقول.</p>';return}
+  let eid=val('uEditId');
+  let current=eid?data.subUsers.find(u=>u.id===+eid):null;
+  let assigned=current?current.fields||[]:[];
+  el.innerHTML=data.fields.map(f=>`
+    <label class="fieldCheckItem">
+      <input type="checkbox" name="uField" value="${f.name}" ${assigned.includes(f.name)?'checked':''}>
+      ${f.name} <span style="color:var(--ink3);font-size:10px">(${f.type})</span>
+    </label>`).join('');
+}
+function getSelectedUserFields(){
+  return [...document.querySelectorAll('input[name="uField"]:checked')].map(x=>x.value);
+}
+function saveUser(){
+  if(!isAdmin())return;
+  let nm=val('uName').trim();let pw=val('uPass').trim();
+  let role=$('uRole').value;
+  let fields=getSelectedUserFields();
+  let eid=val('uEditId');
+  if(!nm)return alert('أدخل اسم المستخدم');
+  if(eid){
+    let u=data.subUsers.find(x=>x.id===+eid);
+    if(u){u.name=nm;if(pw)u.pass=pw;u.role=role;u.fields=fields;}
+  }else{
+    if(nm===data.user)return alert('هذا الاسم محجوز للمدير الرئيسي');
+    if(data.subUsers.find(u=>u.name===nm))return alert('يوجد مستخدم بهذا الاسم');
+    if(!pw)return alert('أدخل كلمة المرور');
+    data.subUsers.push({id:Date.now(),name:nm,pass:pw,role,fields});
+  }
+  clearUserForm();save();renderAll();msg('تم حفظ المستخدم');
+}
+function clearUserForm(){if($('uName'))$('uName').value='';if($('uPass'))$('uPass').value='';if($('uRole'))$('uRole').value='user';if($('uEditId'))$('uEditId').value='';renderUserFieldsList()}
+function editUser(id){
+  if(!isAdmin())return;
+  let u=data.subUsers.find(x=>x.id===id);if(!u)return;
+  $('uName').value=u.name;$('uPass').value='';$('uRole').value=u.role||'user';$('uEditId').value=u.id;
+  renderUserFieldsList();show('users',null);
+}
+function deleteUser(id){
+  if(!isAdmin())return;
+  if(confirm('حذف المستخدم نهائياً؟')){data.subUsers=data.subUsers.filter(u=>u.id!==id);save();renderAll()}
+}
+function renderUsers(){
+  let el=$('usersTable');if(!el)return;
+  if(!data.subUsers.length){el.innerHTML='<tbody><tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:24px">لا يوجد مستخدمون فرعيون. أضف أول مستخدم من الأعلى.</td></tr></tbody>';return}
+  let rows=data.subUsers.map(u=>{
+    let roleBdg=u.role==='admin'?'<span class="badge b-indigo">مدير</span>':'<span class="badge b-teal">مستخدم</span>';
+    let fieldList=u.role==='admin'?'<span class="badge b-gray">كل الحقول</span>':(u.fields||[]).map(f=>`<span class="badge b-blue" style="margin-left:3px">${f}</span>`).join('')||'—';
+    return `<tr><td><b>${u.name}</b></td><td>${roleBdg}</td><td>${fieldList}</td><td><button class="btn btn-secondary btn-sm" onclick="editUser(${u.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">حذف</button></td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>اسم المستخدم</th><th>الدور</th><th>الحقول المُخصصة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── SETTINGS ──
+function saveCreds(){if(!isAdmin())return;if(!val('newUser')||!val('newPass'))return alert('أدخل اسم المستخدم وكلمة المرور');data.user=val('newUser');data.pass=val('newPass');save();msg('تم حفظ بيانات الدخول')}
+function wipeAll(){if(!isAdmin())return;if(confirm('مسح كل البيانات نهائياً؟ لا يمكن التراجع.')){data.batches=[];data.morts=[];data.markets=[];data.fields=[];data.subUsers=[];selectedBatchId=null;save();renderAll()}}
+
+// ── BOOT ──
+let _sess=sessionStorage.getItem('cf_logged');
+let _user=sessionStorage.getItem('cf_user');
+if(_sess==='1'&&_user){
+  try{currentUser=JSON.parse(_user)}catch(e){currentUser=null}
+  if(currentUser){
+    $('loginBox').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    load();buildNav();updateUserChip();
+  // استرجاع حالة الشريط الجانبي
+  if(sessionStorage.getItem('sideCollapsed')==='1')$('app').classList.add('collapsed');
+  }
+}
+</script>
+</body>
+</html>
