@@ -278,7 +278,7 @@ tbody tr:hover td{background:#f8fafc}
   <div class="loginCard">
     <div class="loginLogo">🐔</div>
     <h2>زهور الوطن</h2>
-    <p>نظام إدارة الوجبات والحقول</p>
+    <p>نظام إدارة الوجبات والحقول - Supabase</p>
     <div class="fld">
       <label>اسم المستخدم</label>
       <input id="loginUser" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -306,7 +306,7 @@ tbody tr:hover td{background:#f8fafc}
       <button class="hamburger" onclick="toggleSide()" title="إخفاء/إظهار القائمة">
         <span></span><span></span><span></span>
       </button>
-      <div class="sideVer">v25.3</div>
+      <div class="sideVer">v25.3 Cloud</div>
     </div>
     <nav class="sideNav" id="sideNav">
       <!-- rendered by buildNav() -->
@@ -547,6 +547,75 @@ tbody tr:hover td{background:#f8fafc}
 <div id="toast" class="toast hidden"></div>
 
 <script>
+
+// ── SUPABASE CLOUD SYNC ──
+const SUPABASE_URL='https://tvuymajwnrzlibxzfdhy.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2dXltYWp3bnJ6bGlieHpmZGh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcxMDMsImV4cCI6MjA5NjE2MzEwM30.pr9dxBM9Ob75T0lg063_y-O3Q6BgL7o6FAM-9eLODj4';
+const SUPABASE_STATE_ID='main';
+let cloudReady=true;
+let cloudBusy=false;
+
+async function pullCloud(){
+  if(!cloudReady) return false;
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.${SUPABASE_STATE_ID}&select=data`,{
+      method:'GET',
+      headers:{
+        'apikey':SUPABASE_ANON_KEY,
+        'Authorization':'Bearer '+SUPABASE_ANON_KEY,
+        'Accept':'application/json'
+      }
+    });
+    if(!res.ok) throw new Error(await res.text());
+    const rows=await res.json();
+    if(rows&&rows[0]&&rows[0].data){
+      data={...data,...rows[0].data};
+      data.batches=(data.batches||[]).map(migrateBatch);
+      data.fields=data.fields||[];
+      data.subUsers=data.subUsers||[];
+      localStorage.setItem(STORE,JSON.stringify(data));
+      if($('dbState')) $('dbState').textContent='متصل بسوبابيس ✅';
+      renderAll();
+      return true;
+    }
+    return false;
+  }catch(e){
+    console.warn('Supabase pull failed:',e);
+    if($('dbState')) $('dbState').textContent='حفظ محلي فقط ⚠️';
+    return false;
+  }
+}
+
+async function pushCloud(){
+  if(!cloudReady||cloudBusy) return false;
+  cloudBusy=true;
+  try{
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/app_state?on_conflict=id`,{
+      method:'POST',
+      headers:{
+        'apikey':SUPABASE_ANON_KEY,
+        'Authorization':'Bearer '+SUPABASE_ANON_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates,return=minimal'
+      },
+      body:JSON.stringify({
+        id:SUPABASE_STATE_ID,
+        data:data,
+        updated_at:new Date().toISOString()
+      })
+    });
+    if(!res.ok) throw new Error(await res.text());
+    if($('dbState')) $('dbState').textContent='محفوظ بسوبابيس ✅ '+new Date().toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'});
+    return true;
+  }catch(e){
+    console.warn('Supabase push failed:',e);
+    if($('dbState')) $('dbState').textContent='تعذر الحفظ السحابي ⚠️';
+    return false;
+  }finally{
+    cloudBusy=false;
+  }
+}
+
 const STORE='chicken_field_system_v21_data';
 const OLD_STORES=['chicken_field_system_v11_data'];
 
@@ -575,6 +644,7 @@ function save(){
   try{
     localStorage.setItem(STORE,JSON.stringify(data));
     localStorage.setItem(STORE+'_lastSave',new Date().toISOString());
+    pushCloud();
     let ts=new Date().toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'});
     $('dbState').textContent='محفوظ '+ts;
     msg('تم الحفظ');return true;
@@ -596,6 +666,7 @@ function load(){
   }catch(e){alert('خطأ في تحميل البيانات: '+e.message)}
   $('mortDate').value=today();$('marketDate').value=today();$('transferDate').value=today();
   renderAll();
+  pullCloud();
 }
 function migrateBatch(b){
   let vb=+b.vaccineDeaths||0,iso=+b.isolatedBirds||0,hat=+b.hatched||0;
