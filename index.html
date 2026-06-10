@@ -391,15 +391,22 @@ tbody tr:hover td{background:#f8fafc}
     <!-- ADD BATCH (admin only) -->
     <section id="batch" class="page hidden">
       <div class="card">
-        <div class="cardTitle">🥚 تسجيل وجبة</div>
+        <div class="cardTitle">🥚 تسجيل وجبة تفقيس</div>
         <input type="hidden" id="editId">
         <div class="formGrid">
           <div class="formGroup"><label>اسم الوجبة *</label><input id="bName" placeholder="مثال: وجبة يونيو 1"></div>
-          <div class="formGroup"><label>تاريخ دخول البيض *</label><input id="hatchDate" type="date"></div>
+          <div class="formGroup"><label>تاريخ استلام البيض</label><input id="eggReceiveDate" type="date"></div>
+          <div class="formGroup"><label>تاريخ الترقيد *</label><input id="hatchDate" type="date"></div>
           <div class="formGroup"><label>النوع</label><select id="bType" onchange="toggleLayerFields()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
-          <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0"></div>
-          <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0"></div>
-          <div class="formGroup"><label>نسبة الفحص الضوئي %</label><input id="candle" type="number" min="0" max="100" value="90"></div>
+          <div class="formGroup"><label>سلالة الطير</label><select id="birdStrain"><option>Ross 308</option><option>Cobb 500</option><option>Arbor Acres</option><option>Hubbard</option><option>Lohmann Brown</option><option>Lohmann LSL</option><option>Hy-Line Brown</option><option>Hy-Line W-36</option><option>ISA Brown</option><option>Bovans Brown</option><option>Dekalb White</option><option>بياض تجاري</option></select></div>
+          <div class="formGroup"><label>المورد</label><input id="batchSupplier" list="supplierList" placeholder="اسم المورد"></div>
+          <div class="formGroup"><label>الشركة</label><input id="batchCompany" list="companyList" placeholder="اسم الشركة"></div>
+          <datalist id="supplierList"></datalist>
+          <datalist id="companyList"></datalist>
+          <div class="formGroup"><label>الحقل المراد النقل إليه</label><select id="batchTargetField"></select></div>
+          <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0" oninput="updateSetEggs()"></div>
+          <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0" oninput="updateSetEggs()"></div>
+          <div class="formGroup"><label>عدد البيض المرقد</label><input id="setEggs" type="number" min="0" readonly></div>
           <!-- حقول البياض الإضافية -->
           <div class="formGroup hidden" id="grpLayerSource"><label>مصدر الوجبة</label><select id="layerSource" onchange="toggleLayerAge()"><option value="مفقس">من المفقس (عمر = 0 عند الدخول)</option><option value="شراء">شراء دجاج جاهز (عمر يدوي)</option></select></div>
           <div class="formGroup hidden" id="grpLayerAge"><label>عمر الطير عند الشراء (أسبوع)</label><input id="layerInitWeeks" type="number" min="0" value="0" placeholder="أسابيع"></div>
@@ -410,6 +417,19 @@ tbody tr:hover td{background:#f8fafc}
           <button class="btn btn-primary" onclick="saveBatch()">💾 حفظ الوجبة</button>
           <button class="btn btn-secondary" onclick="clearForm()">مسح</button>
         </div>
+      </div>
+    </section>
+
+    <!-- SUPPLIERS -->
+    <section id="suppliers" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🏢 الموردين والشركات</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">تتجمع هذه القائمة تلقائياً من بيانات وجبات التفقيس.</p>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث</label><input id="supplierSearch" placeholder="اكتب اسم المورد أو الشركة أو السلالة" oninput="renderSuppliers()"></div>
+        </div>
+        <div id="supplierStats" class="statsGrid"></div>
+        <div class="tableWrap"><table id="suppliersTable"></table></div>
       </div>
     </section>
 
@@ -460,10 +480,12 @@ tbody tr:hover td{background:#f8fafc}
             <label>القاعة المراد إضافة الطير إليها</label>
             <select id="transferHall" onchange="checkFieldOccupancy()"></select>
           </div>
-          <div class="formGroup"><label>عدد الطير الفاقس</label><input id="transferHatched" type="number" min="0"></div>
-          <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0"></div>
-          <div class="formGroup"><label>الطير العزل</label><input id="isolatedBirds" type="number" min="0" value="0"></div>
-          <div class="formGroup"><label>عدد الطير المراد نقله الآن</label><input id="fieldBirds" type="number" min="0"></div>
+          <div class="formGroup"><label>عدد الطير الفاقس</label><input id="transferHatched" type="number" min="0" oninput="updateTransferNet()"></div>
+          <div class="formGroup"><label>نسبة الفحص الضوئي %</label><input id="transferCandle" type="number" min="0" max="100" step="0.01" readonly placeholder="تحسب تلقائياً"></div>
+          <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0" oninput="updateTransferNet()"></div>
+          <div class="formGroup"><label>الطير العزل</label><input id="isolatedBirds" type="number" min="0" value="0" oninput="updateTransferNet()"></div>
+          <div class="formGroup"><label>صافي عدد الطير</label><input id="transferNet" type="number" min="0" readonly></div>
+          <div class="formGroup"><label>عدد الطير المراد نقله الآن</label><input id="fieldBirds" type="number" min="0" oninput="checkFieldOccupancy()"></div>
           <div class="formGroup"><label>وزن الطير عند النقل (غرام)</label><input id="transferBirdWeight" type="number" min="0" placeholder="مثال: 42"></div>
           <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="transferAlertAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
           <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="transferMarketAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
@@ -489,8 +511,9 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">📉 تسجيل هلاك</div>
         <div class="formGrid">
-          <div class="formGroup"><label>الوجبة</label><select id="mortBatch" onchange="fillMortHalls()"></select></div>
-<div class="formGroup"><label>القاعة التي حدث بها الهلاك</label><select id="mortHall"></select></div>
+          <div class="formGroup"><label>الحقل</label><select id="mortField" onchange="onMortFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="mortBatch" onchange="onMortBatchChange()"></select></div>
+          <div class="formGroup"><label>القاعة التي حدث بها الهلاك</label><select id="mortHall"></select></div>
           <div class="formGroup"><label>التاريخ</label><input id="mortDate" type="date"></div>
           <div class="formGroup"><label>العدد</label><input id="mortCount" type="number" min="1"></div>
           <div class="formGroup"><label>السبب</label><input id="mortReason"></div>
@@ -682,6 +705,7 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>الحقل</label><select id="wField" onchange="onWeightFieldChange()"></select></div>
           <div class="formGroup"><label>القاعة</label><select id="wHall" onchange="onWeightHallChange()"></select></div>
           <div class="formGroup"><label>الوجبة داخل القاعة</label><select id="wBatch" onchange="fillWeightDefaults()"></select></div>
+          <div class="formGroup"><label>سلالة الطير</label><input id="wStrain" readonly></div>
           <div class="formGroup"><label>التاريخ</label><input id="wDate" type="date" onchange="fillWeightDefaults()"></div>
           <div class="formGroup"><label>عدد الطير الحي بالقاعة</label><input id="wAlive" type="number" min="0" readonly></div>
           <div class="formGroup"><label>معدل الوزن الفعلي للطير (كغ)</label><input id="wAvg" type="number" min="0" step="0.01" oninput="calcWeightTotal()"></div>
@@ -970,8 +994,9 @@ function migrateBatch(b){
   let vb=+b.vaccineDeaths||0,iso=+b.isolatedBirds||0,hat=+b.hatched||0;
   let fixedNet=+b.netHatch||Math.max(0,hat-vb-iso);
   let eggs=+b.eggs||0;let fb=+b.fieldBirds||0;
-  let fixedRate=(+b.fixedHatchRate||0)>0?+b.fixedHatchRate:(fb>0&&eggs?+((fb/eggs)*100).toFixed(2):(eggs?+((fixedNet/eggs)*100).toFixed(2):0));
-  return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hall:b.hall||'',hallId:b.hallId||null,hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate,transferBirdWeight:+b.transferBirdWeight||0};
+  let setEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-(+b.badEggs||0));
+  let fixedRate=(+b.fixedHatchRate||0)>0?+b.fixedHatchRate:(eggs?+((fixedNet/eggs)*100).toFixed(2):0);
+  return{...b,eggReceiveDate:b.eggReceiveDate||'',targetField:b.targetField||b.field||'',birdStrain:b.birdStrain||(b.type==='بياض'?'بياض تجاري':'Ross 308'),supplier:b.supplier||'',company:b.company||'',setEggs,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hall:b.hall||'',hallId:b.hallId||null,hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate,transferBirdWeight:+b.transferBirdWeight||0};
 }
 
 
@@ -1068,7 +1093,7 @@ function buildNav(){
   html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">📊</span><span class="navText">لوحة المعلومات</span></button>`;
   if(admin){
     html+=`<div class="navLabel">العمليات</div>`;
-    html+=n('🥚','وجبة جديدة','batch');
+    html+=n('🥚','وجبة تفقيس','batch');
     html+=n('🔄','نقل الفقسة','transfer');
     html+=n('🥚','شراء البياض','layerPurchase');
   }else{
@@ -1079,6 +1104,7 @@ function buildNav(){
   html+=`<div class="navLabel">الإدارة</div>`;
   if(admin){
     html+=n('🏡','الحقول','fields');
+    html+=n('🏢','الموردين والشركات','suppliers');
     html+=n('👥','المستخدمون','users');
   }
   html+=n('🌾','العلف','feed');
@@ -1095,7 +1121,7 @@ function buildNav(){
 }
 
 function show(id,btn){
-  const adminOnly=['batch','transfer','layerPurchase','fields','users','archive','settings'];
+  const adminOnly=['batch','transfer','layerPurchase','fields','suppliers','users','archive','settings'];
   if(adminOnly.includes(id)&&!isAdmin()){
     document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
     $('dash').classList.remove('hidden');return;
@@ -1114,6 +1140,7 @@ function show(id,btn){
   if(id==='mort'){clearMortForm();}
   if(id==='market'){clearMarketForm();}
   if(id==='layerPurchase'){clearLayerPurchaseForm();renderLayerPurchase();}
+  if(id==='suppliers'){renderSuppliers();}
   if(id==='feed'){clearFeedForm();renderFeed();}
   if(id==='meds'){clearMedForm();renderMeds();}
   if(id==='weights'){clearWeightForm();renderWeights();}
@@ -1198,9 +1225,9 @@ function calc(b,on=today()){
   let maxAge=isLayer?LAYER_MAX_AGE_DAYS:BROILER_MAX_AGE_DAYS;
   let flockAge=Math.min(maxAge,rawFlockAge);
 
-  let eggs=+b.eggs||0,badEggs=+b.badEggs||0,candleRate=+b.candle||0;
-  let validEggs=Math.max(0,eggs-badEggs);
-  let est=Math.max(0,Math.round(validEggs*(candleRate/100)));
+  let eggs=+b.eggs||0,badEggs=+b.badEggs||0;
+  let validEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-badEggs);
+  let est=validEggs;
   let hatched=(+b.hatched||0)>0?+b.hatched:est;
   let vaccineDeaths=+b.vaccineDeaths||0,isolated=+b.isolatedBirds||0;
   let hatchLoss=vaccineDeaths+isolated;
@@ -1213,7 +1240,7 @@ function calc(b,on=today()){
   let alertFlag=transferred&&(isLayer?flockAge>=(+b.alertAge||980):flockAge>=(+b.alertAge||35))&&!completed;
   return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,alive,completed,alert:alertFlag,est,isLayer,layerInitDays,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
 }
-function hatchRate(b){if((+b.fixedHatchRate||0)>0)return (+b.fixedHatchRate).toFixed(2);let eggs=+b.eggs||0;if(!eggs)return '0.00';let c=calc(b);return ((c.est/eggs)*100).toFixed(2);}
+function hatchRate(b){let eggs=+b.eggs||0;if(!eggs)return '0.00';let c=calc(b);return ((c.netHatch/eggs)*100).toFixed(2);}
 function successRate(b){let c=calc(b),base=c.fieldBirds||0;return base?((Math.max(0,base-c.mort)/base)*100).toFixed(2):'0.00'}
 function statusBadge(b){
   let c=calc(b);
@@ -1241,7 +1268,7 @@ function renderAll(){
   if(typeof updateArchiveStatuses==='function')updateArchiveStatuses();
   renderSelectors();renderStats();renderBatches();
   renderMort();renderMarket();renderReports();
-  renderArchive();renderCalendar();renderTransferredBatches();renderFields();
+  renderArchive();renderCalendar();renderTransferredBatches();renderFields();renderSuppliers();
   renderUsers();renderUserFieldsList();renderLayerPurchase();renderWeights();renderFeed();renderMeds();
   fillTransferPreview(false);
   // تحديث لوحة القاعات إذا كانت مفتوحة
@@ -1256,7 +1283,6 @@ function renderSelectors(){
   let batches=visibleBatches().filter(b=>!calc(b).completed);
   let opts=batches.map(b=>`<option value="${b.id}">${b.name} — ${b.type||''}</option>`).join('');
   ['mortBatch','marketBatch'].forEach(id=>{if($(id))$(id).innerHTML=opts});
-  if($('mortBatch'))fillMortHalls();
   if($('marketBatch'))fillMarketHalls();
   if($('transferBatch'))$('transferBatch').innerHTML=data.batches.filter(b=>!calc(b).completed&&hatchAvailableForTransfer(b)>0).map(b=>`<option value="${b.id}">${b.name} — ${b.type||''} — متبقي بالمفقس ${hatchAvailableForTransfer(b).toLocaleString()}</option>`).join('');
   if($('calFilter'))$('calFilter').innerHTML='<option value="all">كل الوجبات</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
@@ -1264,10 +1290,13 @@ function renderSelectors(){
     ?data.fields.map(f=>`<option value="${f.name}">${f.name} (${f.type})${f.capacity?' — سعة '+f.capacity:''}</option>`).join('')
     :'<option value="">— لا توجد حقول — أضف من صفحة الحقول</option>';
   if($('transferField')){$('transferField').innerHTML=fOpts;onTransferFieldChange();}
+  if($('batchTargetField'))$('batchTargetField').innerHTML='<option value="">— يحدد لاحقاً عند النقل —</option>'+fOpts;
+  if($('transferBatch'))fillTransferPreview(false);
   if($('lpField'))$('lpField').innerHTML=fOpts;
   if($('wField'))$('wField').innerHTML=fOpts;
   if($('feedField'))$('feedField').innerHTML=fOpts;
   if($('medField'))$('medField').innerHTML=fOpts;
+  if($('mortField')){$('mortField').innerHTML=fOpts;onMortFieldChange();}
 
   renderBatchRecordFilters();
   renderArchiveFilters();
@@ -1278,7 +1307,48 @@ function renderSelectors(){
     let label=b.hall?`${b.name} — ${b.field} / ${b.hall}`:`${b.name} — ${b.field||'بلا حقل'}`;
     return `<option value="${b.id}">${label}</option>`;
   }).join('');
+  renderSupplierDatalists();
 
+}
+
+function uniqueClean(arr){
+  return [...new Set(arr.map(x=>String(x||'').trim()).filter(Boolean))];
+}
+function renderSupplierDatalists(){
+  let suppliers=uniqueClean(data.batches.map(b=>b.supplier));
+  let companies=uniqueClean(data.batches.map(b=>b.company));
+  if($('supplierList'))$('supplierList').innerHTML=suppliers.map(x=>`<option value="${x}"></option>`).join('');
+  if($('companyList'))$('companyList').innerHTML=companies.map(x=>`<option value="${x}"></option>`).join('');
+}
+function renderSuppliers(){
+  let table=$('suppliersTable');if(!table)return;
+  let q=($('supplierSearch')&&$('supplierSearch').value||'').trim().toLowerCase();
+  let map=new Map();
+  data.batches.forEach(b=>{
+    let supplier=(b.supplier||'—').trim()||'—';
+    let company=(b.company||'—').trim()||'—';
+    let key=supplier+'|'+company;
+    if(!map.has(key))map.set(key,{supplier,company,count:0,birds:0,strains:new Set(),fields:new Set(),last:''});
+    let rec=map.get(key),c=calc(b);
+    rec.count++;
+    rec.birds+=c.fieldBirds||0;
+    if(b.birdStrain)rec.strains.add(b.birdStrain);
+    if(b.field)rec.fields.add(b.field);
+    let d=b.eggReceiveDate||b.hatchDate||'';
+    if(String(d)>String(rec.last))rec.last=d;
+  });
+  let rows=[...map.values()].filter(r=>{
+    return !q||[r.supplier,r.company,[...r.strains].join(' '),[...r.fields].join(' ')].some(x=>String(x).toLowerCase().includes(q));
+  }).sort((a,b)=>String(a.supplier).localeCompare(String(b.supplier),'ar'));
+  if($('supplierStats'))$('supplierStats').innerHTML=[
+    {l:'عدد الموردين',v:uniqueClean(rows.map(r=>r.supplier).filter(x=>x!=='—')).length},
+    {l:'عدد الشركات',v:uniqueClean(rows.map(r=>r.company).filter(x=>x!=='—')).length},
+    {l:'الوجبات المرتبطة',v:rows.reduce((s,r)=>s+r.count,0)},
+    {l:'الصافي المنقول',v:rows.reduce((s,r)=>s+r.birds,0).toLocaleString()}
+  ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+  table.innerHTML='<thead><tr><th>المورد</th><th>الشركة</th><th>عدد الوجبات</th><th>السلالات</th><th>الحقول</th><th>الصافي المنقول</th><th>آخر تاريخ</th></tr></thead><tbody>'+
+    (rows.map(r=>`<tr><td><b>${r.supplier}</b></td><td>${r.company}</td><td>${r.count}</td><td>${[...r.strains].join(' / ')||'—'}</td><td>${[...r.fields].join(' / ')||'—'}</td><td>${r.birds.toLocaleString()}</td><td>${fmt(r.last)}</td></tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:18px">لا توجد بيانات موردين أو شركات بعد</td></tr>')+
+    '</tbody>';
 }
 
 function renderArchiveFilters(){
@@ -1346,6 +1416,43 @@ function hallCapacityStatus(hallId,addBirds=0,ignoreBatchId=null){
   let remaining=cap?cap-used:999999;
   return {ok:!cap||addBirds<=remaining,used,cap,remaining,hall:h};
 }
+const BROILER_WEIGHT_GUIDES={
+  'Ross 308':[[0,0.04],[7,0.19],[14,0.48],[21,0.93],[28,1.55],[35,2.28],[42,3.05],[49,3.75]],
+  'Cobb 500':[[0,0.04],[7,0.18],[14,0.46],[21,0.89],[28,1.48],[35,2.18],[42,2.92],[49,3.58]],
+  'Arbor Acres':[[0,0.04],[7,0.18],[14,0.45],[21,0.87],[28,1.43],[35,2.10],[42,2.82],[49,3.45]],
+  'Hubbard':[[0,0.04],[7,0.17],[14,0.43],[21,0.82],[28,1.36],[35,2.02],[42,2.70],[49,3.32]]
+};
+const LAYER_WEIGHT_GUIDES={
+  'Lohmann Brown':[[0,0.04],[28,0.28],[56,0.68],[84,1.08],[112,1.40],[126,1.55],[140,1.68]],
+  'Lohmann LSL':[[0,0.04],[28,0.26],[56,0.62],[84,0.98],[112,1.28],[126,1.42],[140,1.55]],
+  'Hy-Line Brown':[[0,0.04],[28,0.29],[56,0.70],[84,1.10],[112,1.42],[126,1.58],[140,1.70]],
+  'Hy-Line W-36':[[0,0.04],[28,0.25],[56,0.60],[84,0.95],[112,1.23],[126,1.36],[140,1.48]],
+  'ISA Brown':[[0,0.04],[28,0.28],[56,0.67],[84,1.06],[112,1.38],[126,1.53],[140,1.66]],
+  'Bovans Brown':[[0,0.04],[28,0.28],[56,0.66],[84,1.05],[112,1.36],[126,1.51],[140,1.64]],
+  'Dekalb White':[[0,0.04],[28,0.25],[56,0.61],[84,0.96],[112,1.25],[126,1.39],[140,1.52]],
+  'بياض تجاري':[[0,0.04],[28,0.27],[56,0.65],[84,1.02],[112,1.32],[126,1.46],[140,1.58]]
+};
+function guideWeightFromTable(ageDays,table){
+  if(!table||!table.length)return 0;
+  if(ageDays<=table[0][0])return table[0][1];
+  for(let i=1;i<table.length;i++){
+    let a=table[i-1],b=table[i];
+    if(ageDays<=b[0]){
+      let ratio=(ageDays-a[0])/(b[0]-a[0]);
+      return +(a[1]+(b[1]-a[1])*ratio).toFixed(2);
+    }
+  }
+  return table[table.length-1][1];
+}
+function expectedWeightForBatch(b,ageDays){
+  if(!b)return defaultExpectedWeight(ageDays,false);
+  if(b.type==='بياض'){
+    let strain=b.birdStrain||'بياض تجاري';
+    return guideWeightFromTable(ageDays,LAYER_WEIGHT_GUIDES[strain]||LAYER_WEIGHT_GUIDES['بياض تجاري']);
+  }
+  let strain=b.birdStrain||'Ross 308';
+  return guideWeightFromTable(ageDays,BROILER_WEIGHT_GUIDES[strain]||BROILER_WEIGHT_GUIDES['Ross 308']);
+}
 function defaultExpectedWeight(ageDays,isLayer=false){
   if(isLayer){
     // تقدير بسيط للبياض حتى لا يبقى النظام غبياً مثل بعض النماذج الإدارية.
@@ -1367,12 +1474,18 @@ function selectedDetails(b){
   let c=calc(b);
   // قسمان: معلومات الفقس + معلومات الحقل
   let hatchCells=[
-    ['دخول البيض',fmt(b.hatchDate)],
+    ['استلام البيض',fmt(b.eggReceiveDate)],
+    ['تاريخ الترقيد',fmt(b.hatchDate)],
+    ['سلالة الطير',b.birdStrain||'—'],
+    ['المورد',b.supplier||'—'],
+    ['الشركة',b.company||'—'],
     ['عمر التفقيس',c.hatchAge+'/21'],
     ['موعد النقل',fmt(c.expectedTransfer)],
+    ['الحقل المراد نقله إليه',b.targetField||'—'],
     ['البيض الداخل',(b.eggs||0).toLocaleString()],
     ['البيض التالف',(b.badEggs||0).toLocaleString()],
-    ['الفحص الضوئي',(b.candle||0)+'%'],
+    ['عدد البيض المرقد',(c.est||0).toLocaleString()],
+    ['الفحص الضوئي',b.candle?b.candle+'%':'—'],
     ['هلاك اللقاح',c.vaccineDeaths.toLocaleString()],
     ['الطير العزل',c.isolated.toLocaleString()],
     ['نسبة الفقس',hatchRate(b)+'%','dc-accent'],
@@ -1550,7 +1663,8 @@ function smartShortcutCards(fieldName=''){
     ['🌾','الأعلاف','feed','feed'],
     ['💰','التسويق','market','market'],
     ['💉','الأدوية واللقاحات','meds','meds'],
-    ['☠️','الهلاك','mort','mort']
+    ['☠️','الهلاك','mort','mort'],
+    ['📈','مخطط بياني','charts','weights']
   ].map(x=>`<div class="statCard smartCard ${x[3]}" onclick="openSmartSection('${x[2]}','${arg}')">
     <div class="sc-label">${x[0]} انتقال سريع</div><div class="sc-val" style="font-size:15px">${x[1]}</div><div class="sc-sub">${fieldName?'لهذا الحقل':'فتح الصفحة'}</div>
   </div>`).join('');
@@ -1563,13 +1677,19 @@ function smartSectionHasData(section,fieldName){
   if(section==='weights')return (data.weights||[]).some(x=>x.field===fieldName);
   if(section==='mort')return (data.morts||[]).some(x=>data.batches.find(b=>b.id===x.batchId)?.field===fieldName);
   if(section==='market')return (data.markets||[]).some(x=>data.batches.find(b=>b.id===x.batchId)?.field===fieldName);
+  if(section==='charts')return true;
   return true;
 }
 
 function openSmartSection(section,fieldName=''){
   if(fieldName&&!smartSectionHasData(section,fieldName)){
-    let names={feed:'العلف',meds:'الأدوية واللقاحات',weights:'الأوزان',market:'التسويق',mort:'الهلاك'};
+    let names={feed:'العلف',meds:'الأدوية واللقاحات',weights:'الأوزان',market:'التسويق',mort:'الهلاك',charts:'المخطط البياني'};
     msg('لا توجد بيانات '+(names[section]||'')+' لهذا الحقل');
+    return;
+  }
+  if(section==='charts'){
+    show('charts',null);
+    setTimeout(()=>renderChartsPage(fieldName),0);
     return;
   }
   show(section,null);
@@ -1659,9 +1779,9 @@ function renderBatches(){
     let ageDisp=c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—';
     let ageMax=c.isLayer?'140أسبوع':'40';
     let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button>`:'—';
-    return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${b.field||'—'}</td><td>${b.hall||'—'}</td><td>${ageDisp}</td><td>${b.candle||0}%</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${(latestWeightForBatch(b.id)?.avgWeight)||'—'}</td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
+    return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.eggReceiveDate)||'—'}</td><td>${fmt(b.hatchDate)}</td><td>${b.targetField||'—'}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${b.field||'—'}</td><td>${b.hall||'—'}</td><td>${ageDisp}</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${(latestWeightForBatch(b.id)?.avgWeight)||'—'}</td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
   }).join('');
-  $('batchTable').innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>عمر الطير</th><th>الفحص</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="17" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مطابقة للبحث</td></tr>')+'</tbody>';
+  $('batchTable').innerHTML='<thead><tr><th>الوجبة</th><th>استلام البيض</th><th>تاريخ الترقيد</th><th>الحقل المراد</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>عمر الطير</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>آخر وزن</th><th>النجاح</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="19" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مطابقة للبحث</td></tr>')+'</tbody>';
 }
 
 // ── BATCH CRUD ──
@@ -1675,10 +1795,17 @@ function toggleLayerAge(){
   let isPurchased=isLayer&&$('layerSource')&&$('layerSource').value==='شراء';
   ['grpLayerAge','grpLayerAgeDays'].forEach(id=>{if($(id))$(id).classList.toggle('hidden',!isPurchased)});
 }
+function updateSetEggs(){
+  let set=Math.max(0,num('eggs')-num('badEggs'));
+  if($('setEggs'))$('setEggs').value=set;
+}
 function clearForm(){
-  ['editId','bName','hatchDate','eggs','note'].forEach(id=>$(id)&&($(id).value=''));
+  ['editId','bName','eggReceiveDate','hatchDate','eggs','setEggs','note'].forEach(id=>$(id)&&($(id).value=''));
+  if($('batchTargetField'))$('batchTargetField').value='';
+  if($('birdStrain'))$('birdStrain').value='Ross 308';
+  if($('batchSupplier'))$('batchSupplier').value='';
+  if($('batchCompany'))$('batchCompany').value='';
   if($('badEggs'))$('badEggs').value=0;
-  if($('candle'))$('candle').value=90;
   if($('bType'))$('bType').value='لحم';
   if($('layerSource'))$('layerSource').value='مفقس';
   if($('layerInitWeeks'))$('layerInitWeeks').value=0;
@@ -1688,9 +1815,13 @@ function clearForm(){
 function formBatch(){
   return{
     id:val('editId')?+val('editId'):null,
-    name:val('bName'),hatchDate:val('hatchDate'),
+    name:val('bName'),eggReceiveDate:val('eggReceiveDate'),hatchDate:val('hatchDate'),
+    targetField:val('batchTargetField'),
+    birdStrain:val('birdStrain')||'Ross 308',
+    supplier:val('batchSupplier'),
+    company:val('batchCompany'),
     type:$('bType').value,
-    eggs:num('eggs'),badEggs:num('badEggs'),candle:num('candle'),
+    eggs:num('eggs'),badEggs:num('badEggs'),setEggs:Math.max(0,num('eggs')-num('badEggs')),
     alertAge:35,marketAge:35,note:val('note'),
     layerSource:$('layerSource')?$('layerSource').value:'مفقس',
     layerInitWeeks:$('layerInitWeeks')?num('layerInitWeeks'):0,
@@ -1700,7 +1831,7 @@ function formBatch(){
 function saveBatch(){
   if(!isAdmin())return;
   let b=formBatch();
-  if(!b.name||!b.hatchDate){alert('يرجى إدخال اسم الوجبة وتاريخ دخول البيض');return}
+  if(!b.name||!b.hatchDate){alert('يرجى إدخال اسم الوجبة وتاريخ الترقيد');return}
   if(b.id){
     let old=data.batches.find(x=>x.id===b.id);Object.assign(old,b);
   }else{
@@ -1715,8 +1846,13 @@ function editBatch(id){
   if(!isAdmin())return;
   let b=data.batches.find(x=>x.id===id);if(!b)return;
   $('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;
+  if($('eggReceiveDate'))$('eggReceiveDate').value=b.eggReceiveDate||'';
+  if($('batchTargetField'))$('batchTargetField').value=b.targetField||b.field||'';
+  if($('birdStrain'))$('birdStrain').value=b.birdStrain||'Ross 308';
+  if($('batchSupplier'))$('batchSupplier').value=b.supplier||'';
+  if($('batchCompany'))$('batchCompany').value=b.company||'';
   $('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;
-  $('candle').value=b.candle||90;
+  updateSetEggs();
   $('note').value=b.note||'';
   if($('layerSource'))$('layerSource').value=b.layerSource||'مفقس';
   if($('layerInitWeeks'))$('layerInitWeeks').value=b.layerInitWeeks||0;
@@ -1729,7 +1865,7 @@ function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة و
 
 function clearTransferForm(keepBatch=false){
   if(!keepBatch&&$('transferBatch')) $('transferBatch').selectedIndex=0;
-  ['transferDate','transferHatched','vaccineDeaths','isolatedBirds','fieldBirds','transferBirdWeight'].forEach(id=>{if($(id))$(id).value=''});
+  ['transferDate','transferCandle','transferHatched','vaccineDeaths','isolatedBirds','transferNet','fieldBirds','transferBirdWeight'].forEach(id=>{if($(id))$(id).value=''});
   if($('transferAlertAge'))$('transferAlertAge').value=35;
   if($('transferMarketAge'))$('transferMarketAge').value=35;
   if($('transferField')) $('transferField').selectedIndex=0;
@@ -1773,9 +1909,11 @@ function editTransferBatch(id){
     setTimeout(()=>{if($('transferHall').querySelector('option[value="'+b.hallId+'"]'))$('transferHall').value=b.hallId;},50);
   }
   $('transferHatched').value=b.hatched||'';
+  if($('transferCandle'))$('transferCandle').value=b.candle||'';
   $('vaccineDeaths').value=b.vaccineDeaths||0;
   $('isolatedBirds').value=b.isolatedBirds||0;
-  $('fieldBirds').value=b.fieldBirds||'';
+  updateTransferNet();
+  if($('fieldBirds'))$('fieldBirds').value=b.fieldBirds||'';
   if($('transferAlertAge'))$('transferAlertAge').value=b.alertAge||35;
   if($('transferMarketAge'))$('transferMarketAge').value=b.marketAge||35;
   fillTransferPreview(false);
@@ -1899,6 +2037,7 @@ function renderTransferredBatches(){
       <td>${b.field||'—'}</td>
       <td>${Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.map(a=>`${a.hall}: ${(+a.birds||0).toLocaleString()}`).join('<br>'):(b.hall||'—')}</td>
       <td>${(b.hatched||0).toLocaleString()}</td>
+      <td>${b.candle?b.candle+'%':'—'}</td>
       <td>${(+b.vaccineDeaths||0).toLocaleString()}</td>
       <td>${(+b.isolatedBirds||0).toLocaleString()}</td>
       <td><b>${(+b.fieldBirds||0).toLocaleString()}</b></td>
@@ -1907,7 +2046,7 @@ function renderTransferredBatches(){
       <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editTransferBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTransfer(${b.id})">حذف النقل</button></td>
     </tr>`;
   }).join('');
-  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>الفاقس</th><th>هلاك اللقاح</th><th>العزل</th><th>الصافي المنقول</th><th>نسبة الفقس</th><th>متبقي بالمفقس</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>الفاقس</th><th>الفحص الضوئي</th><th>هلاك اللقاح</th><th>العزل</th><th>الصافي المنقول</th><th>نسبة الفقس</th><th>متبقي بالمفقس</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
 
@@ -1920,7 +2059,7 @@ function transferredBirdsFromBatch(b){
 }
 function hatchAvailableForTransfer(b){
   let c=calc(b);
-  let source=(+b.hatched||0)>0?+b.hatched:c.est;
+  let source=(+b.netHatch||0)>0?+b.netHatch:c.netHatch;
   return Math.max(0,source-transferredBirdsFromBatch(b));
 }
 function mergeBatchAllocations(oldArr,newArr){
@@ -2000,22 +2139,46 @@ function batchHallSold(b,hallId){
 }
 
 // ── TRANSFER ──
+function transferCandleRate(hatched=null,batch=null){
+  let b=batch;
+  if(!b&&$('transferBatch')){
+    let id=+$('transferBatch').value;
+    b=data.batches.find(x=>x.id===id);
+  }
+  let hat=hatched===null?num('transferHatched'):+hatched||0;
+  let base=b?((+b.setEggs||0)>0?+b.setEggs:Math.max(0,(+b.eggs||0)-(+b.badEggs||0))):0;
+  return base&&hat?+((hat/base)*100).toFixed(2):0;
+}
+function updateTransferCandle(){
+  if($('transferCandle'))$('transferCandle').value=transferCandleRate()||'';
+}
+function updateTransferNet(){
+  updateTransferCandle();
+  let net=Math.max(0,num('transferHatched')-num('vaccineDeaths')-num('isolatedBirds'));
+  if($('transferNet'))$('transferNet').value=net||'';
+  checkFieldOccupancy();
+}
 function fillTransferPreview(showMsg=true){
   if(!$('transferBatch'))return;
   let id=+$('transferBatch').value;if(!id){$('transferPreview').innerHTML='';return}
   let b=data.batches.find(x=>x.id===id);let c=calc(b);
   if(!$('transferDate').value)$('transferDate').value=today();
-  if(b.field&&$('transferField').querySelector('option[value="'+b.field+'"]'))$('transferField').value=b.field;
-  $('transferHatched').value=$('transferHatched').value||b.hatched||c.est||'';
+  let preferredField=b.targetField||b.field||'';
+  if(preferredField&&$('transferField').querySelector('option[value="'+preferredField+'"]')){
+    $('transferField').value=preferredField;
+    onTransferFieldChange();
+  }
+  $('transferHatched').value=$('transferHatched').value||b.hatched||'';
   $('vaccineDeaths').value=$('vaccineDeaths').value||b.vaccineDeaths||0;
   $('isolatedBirds').value=$('isolatedBirds').value||b.isolatedBirds||0;
   $('fieldBirds').value=$('fieldBirds').value||'';
+  updateTransferNet();
   if($('transferBirdWeight'))$('transferBirdWeight').value=$('transferBirdWeight').value||b.transferBirdWeight||'';
   if($('transferAlertAge'))$('transferAlertAge').value=b.alertAge||35;
   if($('transferMarketAge'))$('transferMarketAge').value=b.marketAge||35;
   checkFieldOccupancy();
   let alertHtml=c.hatchLate?`<div style="background:var(--red2);border:1px solid #fecaca;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:var(--red);font-weight:600;margin-bottom:10px">⚠️ متأخرة عن النقل</div>`:c.hatchComplete?`<div style="background:var(--amber2);border:1px solid #fcd34d;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:#78350f;font-weight:600;margin-bottom:10px">🔔 الفقسة اكتملت — انقلها للحقل</div>`:'';
-  $('transferPreview').innerHTML=alertHtml+`<div class="detailGrid" style="grid-template-columns:repeat(4,1fr)"><div class="dCell"><div class="dc-label">موعد النقل</div><div class="dc-val">${fmt(c.expectedTransfer)}</div></div><div class="dCell"><div class="dc-label">عمر التفقيس</div><div class="dc-val">${c.hatchAge}/21</div></div><div class="dCell dc-accent"><div class="dc-label">الفاقس التقديري</div><div class="dc-val">${c.est.toLocaleString()}</div></div><div class="dCell"><div class="dc-label">المنقول سابقاً</div><div class="dc-val">${transferredBirdsFromBatch(b).toLocaleString()}</div></div><div class="dCell dc-accent"><div class="dc-label">المتبقي بالمفقس</div><div class="dc-val">${hatchAvailableForTransfer(b).toLocaleString()}</div></div></div>`;
+  $('transferPreview').innerHTML=alertHtml+`<div class="detailGrid" style="grid-template-columns:repeat(4,1fr)"><div class="dCell"><div class="dc-label">موعد النقل</div><div class="dc-val">${fmt(c.expectedTransfer)}</div></div><div class="dCell"><div class="dc-label">عمر التفقيس</div><div class="dc-val">${c.hatchAge}/21</div></div><div class="dCell dc-accent"><div class="dc-label">البيض المرقد</div><div class="dc-val">${c.est.toLocaleString()}</div></div><div class="dCell"><div class="dc-label">المنقول سابقاً</div><div class="dc-val">${transferredBirdsFromBatch(b).toLocaleString()}</div></div><div class="dCell dc-accent"><div class="dc-label">المتبقي بالمفقس</div><div class="dc-val">${hatchAvailableForTransfer(b).toLocaleString()}</div></div></div>`;
   if(showMsg)msg(c.hatchComplete?'الفقسة جاهزة للنقل':'تم جلب بيانات الوجبة');
 }
 function saveTransfer(){
@@ -2033,32 +2196,36 @@ function saveTransfer(){
   let hallObj=data.halls.find(h=>h.id===hallId);
   if(!hallObj)return alert('القاعة المختارة غير موجودة');
 
-  let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),moveCount=num('fieldBirds');
+  updateTransferNet();
+  let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),net=Math.max(0,hat-vac-iso),moveCount=num('fieldBirds');
   if(hat<=0)return alert('أدخل عدد الطير الفاقس');
-  if(moveCount<=0)return alert('أدخل عدد الطير المراد نقله لهذه القاعة');
+  if(net<=0)return alert('صافي عدد الطير صفر. راجع هلاك اللقاح والطير العزل');
+  if(moveCount<=0)return alert('أدخل عدد الطير المراد نقله الآن');
 
-  let available=hatchAvailableForTransfer(b);
+  let previousTransferred=transferredBirdsFromBatch(b);
+  let available=Math.max(0,net-previousTransferred);
   if(moveCount>available)return alert('العدد المطلوب نقله أكبر من المتبقي بالمفقس. المتبقي: '+available.toLocaleString());
 
   let capCheck=hallCapacityStatus(hallId,moveCount,null);
   if(!capCheck.ok)return alert('القاعة لا تتحمل هذا العدد. المتاح: '+capCheck.remaining.toLocaleString()+' طير');
 
-  let net=Math.max(0,hat-vac-iso);
   let eggs=+b.eggs||0;
   let allocation={hallId:hallId,hall:hallObj.name,birds:moveCount};
 
   b.hatched=hat;
+  b.candle=transferCandleRate(hat,b);
   b.vaccineDeaths=vac;
   b.isolatedBirds=iso;
   b.netHatch=net;
   b.transferBirdWeight=num('transferBirdWeight')||b.transferBirdWeight||0;
   b.hallAllocations=mergeBatchAllocations(b.hallAllocations||[],[allocation]);
   b.fieldBirds=transferredBirdsFromBatch(b);
-  b.fixedHatchRate=eggs?+((b.fieldBirds/eggs)*100).toFixed(2):0;
+  b.fixedHatchRate=eggs?+((net/eggs)*100).toFixed(2):0;
 
   if(!b.transferDate)b.transferDate=val('transferDate');
   if(!b.fieldEntryDate)b.fieldEntryDate=val('transferDate');
   b.field=fieldName;
+  if(!b.targetField)b.targetField=fieldName;
 
   let first=b.hallAllocations[0]||null;
   b.hallId=first?+first.hallId:null;
@@ -2077,11 +2244,13 @@ function saveTransfer(){
 
 
 function clearMortForm(){
+  if($('mortField')) $('mortField').selectedIndex=0;
   if($('mortBatch')) $('mortBatch').selectedIndex=0;
   if($('mortHall')) $('mortHall').innerHTML='';
   if($('mortDate')) $('mortDate').value=today();
   if($('mortCount')) $('mortCount').value='';
   if($('mortReason')) $('mortReason').value='';
+  onMortFieldChange();
 }
 function clearMarketForm(){
   if($('marketBatch')) $('marketBatch').selectedIndex=0;
@@ -2126,14 +2295,14 @@ function saveLayerPurchase(){
   if(!name||!date||!field||!hallId||birds<=0)return alert('أدخل اسم الوجبة والتاريخ والحقل والقاعة والعدد');
   if(!checkLayerPurchaseCapacity())return;
   let hall=data.halls.find(h=>h.id===hallId);
-  let b={id:Date.now(),name,hatchDate:date,type:'بياض',eggs:0,badEggs:0,candle:0,alertAge:980,marketAge:980,note:val('lpNote'),status:'نشطة',
+  let b={id:Date.now(),name,hatchDate:date,type:'بياض',birdStrain:'بياض تجاري',eggs:0,badEggs:0,candle:0,alertAge:980,marketAge:980,note:val('lpNote'),status:'نشطة',
     transferDate:date,fieldEntryDate:date,field,hallId,hall:hall?hall.name:'',hatched:0,vaccineDeaths:0,isolatedBirds:0,netHatch:0,
     fieldBirds:birds,fixedHatchRate:0,layerSource:'شراء',layerInitWeeks:num('lpWeeks')||0,layerInitDays:num('lpDays')||0};
   data.batches.push(b);
   let avg=+($('lpAvgWeight').value||0),cw=num('lpChickWeight')||0;
   if(avg||cw){
     data.weights=data.weights||[];
-    data.weights.push({id:Date.now()+1,batchId:b.id,field,hallId,hall:b.hall,date,avgWeight:avg||0,expectedWeight:defaultExpectedWeight(calc(b,date).flockAge,true),totalWeight:avg?+(avg*birds).toFixed(2):0,note:'وزن الدخول / شراء البياض'});
+    data.weights.push({id:Date.now()+1,batchId:b.id,field,hallId,hall:b.hall,date,avgWeight:avg||0,expectedWeight:expectedWeightForBatch(b,calc(b,date).flockAge),totalWeight:avg?+(avg*birds).toFixed(2):0,note:'وزن الدخول / شراء البياض'});
     if(hall){hall.chickWeight=cw||hall.chickWeight||0;hall.avgWeight=avg||hall.avgWeight||0;hall.totalWeight=avg?+(avg*birds).toFixed(2):(hall.totalWeight||0);}
   }
   selectedBatchId=b.id;save();renderAll();clearLayerPurchaseForm();msg('تم حفظ شراء البياض');
@@ -2155,7 +2324,7 @@ function renderLayerPurchase(){
 function clearWeightForm(){
   if($('wField'))$('wField').selectedIndex=0;
   if($('wDate'))$('wDate').value=today();
-  ['wAvg','wExpected','wTotal','wNote','wAlive','wDiff'].forEach(id=>{if($(id))$(id).value=''});
+  ['wAvg','wExpected','wTotal','wNote','wAlive','wDiff','wStrain'].forEach(id=>{if($(id))$(id).value=''});
   onWeightFieldChange();
 }
 function onWeightFieldChange(){
@@ -2177,7 +2346,7 @@ function calcWeightTotal(){
   if(!b)return;
   let c=calc(b,val('wDate')||today());
   let avg=+($('wAvg').value||0);
-  let expected=+($('wExpected').value||defaultExpectedWeight(c.flockAge,c.isLayer));
+  let expected=+($('wExpected').value||expectedWeightForBatch(b,c.flockAge));
   if($('wAlive'))$('wAlive').value=c.alive||0;
   if($('wTotal'))$('wTotal').value=avg?+(avg*(c.alive||c.fieldBirds||0)).toFixed(2):'';
   if($('wDiff'))$('wDiff').value=avg?((avg-expected).toFixed(2)+' كغ'):'';
@@ -2187,7 +2356,8 @@ function fillWeightDefaults(){
   let b=data.batches.find(x=>x.id===id);if(!b)return;
   let c=calc(b,val('wDate')||today());
   if($('wAlive'))$('wAlive').value=c.alive||0;
-  if($('wExpected'))$('wExpected').value=defaultExpectedWeight(c.flockAge,c.isLayer);
+  if($('wStrain'))$('wStrain').value=b.type==='بياض'?(b.birdStrain||'بياض تجاري'):(b.birdStrain||'Ross 308');
+  if($('wExpected'))$('wExpected').value=expectedWeightForBatch(b,c.flockAge);
   calcWeightTotal();
 }
 function saveWeightRecord(){
@@ -2200,7 +2370,7 @@ function saveWeightRecord(){
   if(!isAdmin()&&!canSeeField(b.field))return alert('لا تملك صلاحية لهذه القاعة');
   let avg=+($('wAvg').value||0);if(avg<=0)return alert('أدخل معدل الوزن الفعلي');
   let c=calc(b,val('wDate')||today());
-  let expected=+($('wExpected').value||defaultExpectedWeight(c.flockAge,c.isLayer));
+  let expected=+($('wExpected').value||expectedWeightForBatch(b,c.flockAge));
   let total=+($('wTotal').value||0)||+(avg*(c.alive||c.fieldBirds||0)).toFixed(2);
   let rec={id:Date.now(),batchId:b.id,field:field,hallId:hallId,hall:hall?hall.name:(b.hall||''),date:val('wDate')||today(),
     alive:c.alive,avgWeight:avg,expectedWeight:expected,totalWeight:total,diff:+(avg-expected).toFixed(2),note:val('wNote')};
@@ -2697,7 +2867,7 @@ function renderReports(){
         <td>${successRate(b)}%</td><td>${lw?lw.avgWeight+' كغ':'—'}</td><td>${statusBadge(b)}</td>
       </tr>`;
     }).join('');
-    el.innerHTML='<thead><tr><th>الوجبة</th><th>النوع</th><th>دخول البيض</th><th>الحقل</th><th>القاعات</th><th>البيض</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك</th><th>مسوق</th><th>الحي</th><th>النجاح</th><th>آخر وزن</th><th>الحالة</th></tr></thead><tbody>'+rows+'</tbody>';
+    el.innerHTML='<thead><tr><th>الوجبة</th><th>النوع</th><th>تاريخ الترقيد</th><th>الحقل</th><th>القاعات</th><th>البيض</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك</th><th>مسوق</th><th>الحي</th><th>النجاح</th><th>آخر وزن</th><th>الحالة</th></tr></thead><tbody>'+rows+'</tbody>';
 
   }else if(type==='feed'){
     if(title)title.textContent='🌾 تقرير استهلاك العلف';
@@ -2952,7 +3122,7 @@ function renderArchive(){
   }
   let rows=batches.map((b,i)=>{let c=calc(b);return `<tr class="selectable" onclick="toggleInlineDetails('archiveDetail${i}')"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${fmt(c.entryDate)}</td><td>${b.field||'—'}</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>0</td><td><span class="badge b-gray">منتهية</span></td><td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleInlineDetails('archiveDetail${i}')">تفاصيل الأرشيف</button></td></tr>
   <tr id="archiveDetail${i}" class="hidden"><td colspan="10">${archiveBatchDetails(b)}</td></tr>`}).join('');
-  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>دخول الحقل</th><th>الحقل</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مؤرشفة</td></tr>')+'</tbody>';
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>تاريخ الترقيد</th><th>دخول الحقل</th><th>الحقل</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مؤرشفة</td></tr>')+'</tbody>';
 }
 
 // ── CALENDAR ──
@@ -3259,7 +3429,7 @@ if(_sess==='1'&&_user){
 function checkFieldOccupancy(){
   let warn=$('fieldWarn');if(!warn)return true;
   let hallId=$('transferHall')&&$('transferHall').value?+$('transferHall').value:null;
-  let birds=num('fieldBirds')||num('transferHatched')||0;
+  let birds=num('fieldBirds')||num('transferNet')||0;
   if(!hallId){
     warn.className='warnBox';
     warn.textContent='';
@@ -3475,27 +3645,65 @@ function onTransferFieldChange(){
 
 
 // V40.2 ربط الهلاك بالقاعة المختارة
-function fillMortHalls(){
-  let id=$('mortBatch')?+$('mortBatch').value:0;
-  let b=data.batches.find(x=>x.id===id);
-  let sel=$('mortHall');if(!sel)return;
-  if(!b){sel.innerHTML='<option value="">اختر الوجبة أولاً</option>';return;}
+function mortBatchesForField(fieldName){
+  return visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&(!fieldName||b.field===fieldName));
+}
+function mortHallOptionsForBatch(b,fieldName=''){
+  if(!b)return [];
   let arr=[];
   if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
     arr=b.hallAllocations;
   }else if(b.hallId){
     arr=[{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}];
+  }else if(fieldName){
+    let f=data.fields.find(x=>x.name===fieldName);
+    let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+    arr=halls.map(h=>({hallId:h.id,hall:h.name,birds:batchHallAlive(b,h.id)}));
   }
+  if(fieldName){
+    let allowed=new Set(fieldHallsByName(fieldName).map(h=>+h.id));
+    arr=arr.filter(a=>allowed.has(+a.hallId));
+  }
+  return arr;
+}
+function onMortFieldChange(){
+  let field=$('mortField')?$('mortField').value:'';
+  let batches=mortBatchesForField(field);
+  if($('mortBatch')){
+    let old=$('mortBatch').value;
+    $('mortBatch').innerHTML=batches.length
+      ?batches.map(b=>`<option value="${b.id}">${b.name} — ${b.field||''}</option>`).join('')
+      :'<option value="">لا توجد وجبات منقولة لهذا الحقل</option>';
+    if(old&&batches.some(b=>String(b.id)===String(old)))$('mortBatch').value=old;
+  }
+  onMortBatchChange(false);
+}
+function onMortBatchChange(syncField=true){
+  let id=$('mortBatch')?+$('mortBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let sel=$('mortHall');if(!sel)return;
+  if(!b){sel.innerHTML='<option value="">اختر الوجبة أولاً</option>';return;}
+  if(syncField&&$('mortField')&&b.field&&$('mortField').value!==b.field){
+    $('mortField').value=b.field;
+  }
+  let field=$('mortField')?$('mortField').value:(b.field||'');
+  let arr=mortHallOptionsForBatch(b,field);
   sel.innerHTML=arr.length
     ?arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — عدد ${(+a.birds||0).toLocaleString()}</option>`).join('')
     :'<option value="">لا توجد قاعات منقولة لهذه الوجبة</option>';
 }
+function fillMortHalls(){onMortBatchChange(true);}
 function addMort(){
   let id=+$('mortBatch').value;
   if(!id)return alert('اختر وجبة');
   let b=data.batches.find(x=>x.id===id);
+  let field=$('mortField')?$('mortField').value:'';
+  if(!field)return alert('اختر الحقل');
+  if(b&&b.field&&field!==b.field)return alert('الوجبة لا تتبع الحقل المختار');
   let hallId=$('mortHall')&&$('mortHall').value?+$('mortHall').value:null;
   let hallObj=hallId?data.halls.find(h=>h.id===hallId):null;
+  let allowedHalls=new Set(fieldHallsByName(field).map(h=>+h.id));
+  if(hallId&&!allowedHalls.has(hallId))return alert('القاعة لا تتبع الحقل المختار');
   if(b&&b.transferDate&&!hallId)return alert('اختر القاعة التي حدث بها الهلاك');
   data.morts.push({
     id:Date.now(),
