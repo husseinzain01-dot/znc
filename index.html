@@ -108,20 +108,28 @@ main{padding:20px;overflow-x:hidden;min-width:0}
 .pageHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .pageHeader h1{font-size:18px;font-weight:700;color:var(--ink)}
 #dbState{font-size:11px;color:var(--ink3)}
+#dash{background:linear-gradient(180deg,#f8fafc 0%,#eefdfa 48%,#f8fafc 100%);border-radius:18px;padding:2px}
+#dash .card{border-color:#d9f3ee;box-shadow:0 10px 26px rgba(15,23,42,.06)}
 
 /* CARDS */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
 .cardTitle{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:14px;display:flex;align-items:center;gap:8px}
 
 /* STATS */
-.statsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;margin-bottom:12px;align-items:start}
-.statCard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;box-shadow:var(--shadow);height:fit-content}
+.statsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:10px;margin-bottom:14px;align-items:stretch}
+.statCard{background:rgba(255,255,255,.94);border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 8px 20px rgba(15,23,42,.05);height:100%;position:relative;overflow:hidden;transition:transform .15s,border .15s,box-shadow .15s}
+.statCard:before{content:"";position:absolute;inset-inline-start:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--p),var(--p2));opacity:.7}
+.statCard:hover{transform:translateY(-1px);border-color:#99f6e4;box-shadow:0 14px 30px rgba(15,23,42,.08)}
 .statCard .sc-label{font-size:10px;color:var(--ink3);font-weight:600;margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
 .statCard .sc-val{font-size:20px;font-weight:700;color:var(--p);line-height:1.1;white-space:nowrap}
 .statCard .sc-sub{font-size:10px;color:var(--ink3);margin-top:2px}
-.heroBanner{grid-column:1/-1;background:linear-gradient(135deg,#0f172a,#134e4a);color:#fff;border-radius:var(--r);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.heroBanner h2{font-size:15px;font-weight:700;margin-bottom:2px}
-.heroBanner p{font-size:11px;color:#99f6e4;margin:0}
+.smartCard{cursor:pointer;border-color:#b2f5ea;background:linear-gradient(180deg,#fff,#f0fdfa)}
+.smartCard:before{background:var(--accent,var(--p))}
+.smartCard .sc-val{color:var(--accent,var(--p));font-size:15px}
+.smartCard.feed{--accent:#0d9488}.smartCard.weights{--accent:#2563eb}.smartCard.market{--accent:#7c3aed}.smartCard.meds{--accent:#059669}.smartCard.mort{--accent:#dc2626}
+.heroBanner{grid-column:1/-1;background:linear-gradient(135deg,#0f172a 0%,#115e59 58%,#0d9488 100%);color:#fff;border-radius:16px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 18px 36px rgba(15,23,42,.16)}
+.heroBanner h2{font-size:19px;font-weight:700;margin-bottom:3px}
+.heroBanner p{font-size:12px;color:#ccfbf1;margin:0}
 .heroBanner .hb-right{font-size:10px;color:#5eead4;white-space:nowrap}
 
 /* DETAIL PANEL — أفقي دائماً */
@@ -132,9 +140,16 @@ main{padding:20px;overflow-x:hidden;min-width:0}
 /* الشبكة: دائماً أفقية — 5 أعمدة على desktop، 3 على موبايل */
 .detailGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
 .dCell{background:#fff;border:1px solid var(--border);border-radius:7px;padding:7px 9px;min-width:0}
+.dCell[onclick]{transition:transform .15s,border .15s,box-shadow .15s}
+.dCell[onclick]:hover{transform:translateY(-1px);box-shadow:0 10px 18px rgba(15,23,42,.07)}
 .dCell .dc-label{font-size:9px;color:var(--ink3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dCell .dc-val{font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.2;word-break:break-word}
 .dCell.dc-accent .dc-val{color:var(--p)}
+.chartWrap{overflow-x:auto}
+.fieldChartSvg{width:100%;min-width:680px;height:260px;display:block}
+.chartLegend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--ink3)}
+.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-left:4px}
+.chartHint{font-size:11px;color:var(--ink3);font-weight:500}
 
 /* FORMS */
 .formGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
@@ -186,11 +201,23 @@ tbody tr:hover td{background:#f8fafc}
 /* CALENDAR */
 .calGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .calDayName{text-align:center;font-size:11px;font-weight:700;background:var(--p);color:#fff;padding:8px 4px;border-radius:var(--r2)}
+.calDay{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:8px;min-height:90px;transition:border .15s,box-shadow .15s}
+.calDay.clickable{cursor:pointer}
+.calDay.clickable:hover{border-color:var(--p);box-shadow:var(--shadow)}
+.calDayNum{font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px}
 .ev{font-size:10px;border-radius:6px;padding:3px 6px;margin-top:3px;color:#fff;background:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ev-green{background:var(--green)}
 .ev-amber{background:var(--amber);color:#1c1917}
 .ev-red{background:var(--red)}
 .ev-teal{background:var(--p)}
+.calFloatOverlay{position:fixed;inset:0;background:rgba(15,23,42,.22);z-index:900;display:flex;align-items:center;justify-content:center;padding:18px}
+.calFloat{width:min(760px,96vw);max-height:86vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow2);padding:16px}
+.calFloatHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.calFloatHead h3{font-size:16px;color:var(--ink);margin:0}
+.calMiniGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.calMini{border:1px solid var(--border);border-radius:var(--r2);padding:9px;background:var(--bg)}
+.calMini .lbl{font-size:10px;color:var(--ink3);font-weight:700;margin-bottom:3px}
+.calMini .val{font-size:15px;color:var(--p);font-weight:700}
 
 /* TOAST */
 .toast{position:fixed;bottom:20px;left:20px;background:#0f172a;color:#fff;padding:10px 18px;border-radius:var(--r3);font-size:13px;font-weight:500;box-shadow:var(--shadow2);z-index:1000;display:flex;align-items:center;gap:8px;animation:slideUp .2s ease}
@@ -278,7 +305,7 @@ tbody tr:hover td{background:#f8fafc}
   <div class="loginCard">
     <div class="loginLogo">🐔</div>
     <h2>زهور الوطن</h2>
-    <p>نظام إدارة الوجبات والحقول - Supabase</p>
+    <p>نظام إدارة الوجبات والحقول</p>
     <div class="fld">
       <label>اسم المستخدم</label>
       <input id="loginUser" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -306,7 +333,7 @@ tbody tr:hover td{background:#f8fafc}
       <button class="hamburger" onclick="toggleSide()" title="إخفاء/إظهار القائمة">
         <span></span><span></span><span></span>
       </button>
-      <div class="sideVer">v25.5 Age-0 FIX</div>
+      <div class="sideVer">v27.0 Smart</div>
     </div>
     <nav class="sideNav" id="sideNav">
       <!-- rendered by buildNav() -->
@@ -333,16 +360,31 @@ tbody tr:hover td{background:#f8fafc}
         </button>
         <h1 id="title">لوحة المعلومات</h1>
       </div>
-      <div id="dbState" style="font-size:11px;color:var(--ink3)"></div>
+      <div id="dbState" style="display:none"></div>
     </div>
 
     <!-- DASHBOARD -->
     <section id="dash" class="page">
       <div id="statsCards" class="statsGrid"></div>
       <div id="statsDetail"></div>
+      <div id="batchHallsPanel"></div>
       <div class="card">
         <div class="cardTitle">📋 الوجبات النشطة</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث عن الوجبة</label><input id="batchSearch" placeholder="اكتب اسم الوجبة أو الحقل أو القاعة" oninput="renderBatches()"></div>
+        </div>
         <div class="tableWrap"><table id="batchTable"></table></div>
+      </div>
+    </section>
+
+    <!-- CHARTS -->
+    <section id="charts" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">📈 مخطط بياني لحالة الحقل</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>الحقل</label><select id="chartField" onchange="renderChartsPage()"></select></div>
+        </div>
+        <div id="fieldChartPanel"></div>
       </div>
     </section>
 
@@ -354,18 +396,50 @@ tbody tr:hover td{background:#f8fafc}
         <div class="formGrid">
           <div class="formGroup"><label>اسم الوجبة *</label><input id="bName" placeholder="مثال: وجبة يونيو 1"></div>
           <div class="formGroup"><label>تاريخ دخول البيض *</label><input id="hatchDate" type="date"></div>
-          <div class="formGroup"><label>النوع</label><select id="bType"><option>لحم</option><option>بياض / تربية</option></select></div>
+          <div class="formGroup"><label>النوع</label><select id="bType" onchange="toggleLayerFields()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
           <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0"></div>
           <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0"></div>
           <div class="formGroup"><label>نسبة الفحص الضوئي %</label><input id="candle" type="number" min="0" max="100" value="90"></div>
-          <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="alertAge" type="number" min="1" value="35"></div>
-          <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="marketAge" type="number" min="1" value="35"></div>
+          <!-- حقول البياض الإضافية -->
+          <div class="formGroup hidden" id="grpLayerSource"><label>مصدر الوجبة</label><select id="layerSource" onchange="toggleLayerAge()"><option value="مفقس">من المفقس (عمر = 0 عند الدخول)</option><option value="شراء">شراء دجاج جاهز (عمر يدوي)</option></select></div>
+          <div class="formGroup hidden" id="grpLayerAge"><label>عمر الطير عند الشراء (أسبوع)</label><input id="layerInitWeeks" type="number" min="0" value="0" placeholder="أسابيع"></div>
+          <div class="formGroup hidden" id="grpLayerAgeDays"><label>+ أيام إضافية</label><input id="layerInitDays" type="number" min="0" max="6" value="0" placeholder="0-6"></div>
           <div class="formGroup"><label>ملاحظة</label><input id="note"></div>
         </div>
         <div class="formActions">
           <button class="btn btn-primary" onclick="saveBatch()">💾 حفظ الوجبة</button>
           <button class="btn btn-secondary" onclick="clearForm()">مسح</button>
         </div>
+      </div>
+    </section>
+
+
+    <!-- LAYER PURCHASE (admin only) -->
+    <section id="layerPurchase" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🥚 شراء طير البياض</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">عملية مستقلة عن نقل الفقسة. اختر الحقل والقاعة، ولا يسمح النظام بتجاوز الطاقة الاستيعابية للقاعة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الوجبة *</label><input id="lpName" placeholder="مثال: بياض شراء 1"></div>
+          <div class="formGroup"><label>تاريخ الدخول إلى الحقل *</label><input id="lpDate" type="date"></div>
+          <div class="formGroup"><label>الحقل *</label><select id="lpField" onchange="onLayerPurchaseFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة *</label><select id="lpHall" onchange="checkLayerPurchaseCapacity()"></select></div>
+          <div class="formGroup"><label>عدد الطير الداخل *</label><input id="lpBirds" type="number" min="1" oninput="checkLayerPurchaseCapacity()"></div>
+          <div class="formGroup"><label>عمر الطير عند الشراء (أسبوع)</label><input id="lpWeeks" type="number" min="0" value="0"></div>
+          <div class="formGroup"><label>+ أيام إضافية</label><input id="lpDays" type="number" min="0" max="6" value="0"></div>
+          <div class="formGroup"><label>وزن الطير عند الدخول (غرام)</label><input id="lpChickWeight" type="number" min="0"></div>
+          <div class="formGroup"><label>معدل الوزن الحالي (كغ)</label><input id="lpAvgWeight" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="lpNote"></div>
+        </div>
+        <div id="lpWarn" class="warnBox"></div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveLayerPurchase()">💾 حفظ شراء البياض</button>
+          <button class="btn btn-secondary" onclick="clearLayerPurchaseForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 وجبات البياض المشتراة</div>
+        <div class="tableWrap"><table id="layerPurchaseTable"></table></div>
       </div>
     </section>
 
@@ -378,13 +452,22 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>تاريخ دخول الحقل</label><input id="transferDate" type="date"></div>
           <div class="formGroup">
             <label>الحقل المستهدف</label>
-            <select id="transferField" onchange="checkFieldOccupancy()"></select>
+            <select id="transferField" onchange="onTransferFieldChange()"></select>
             <div id="fieldWarn" class="warnBox"></div>
+          </div>
+          <!-- قاعة — تظهر فقط للحقول التي تحتوي قاعات -->
+          <div class="formGroup" id="grpTransferHall">
+            <label>القاعة المراد إضافة الطير إليها</label>
+            <select id="transferHall" onchange="checkFieldOccupancy()"></select>
           </div>
           <div class="formGroup"><label>عدد الطير الفاقس</label><input id="transferHatched" type="number" min="0"></div>
           <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0"></div>
           <div class="formGroup"><label>الطير العزل</label><input id="isolatedBirds" type="number" min="0" value="0"></div>
-          <div class="formGroup"><label>الصافي المنقول للحقل</label><input id="fieldBirds" type="number" min="0"></div>
+          <div class="formGroup"><label>عدد الطير المراد نقله الآن</label><input id="fieldBirds" type="number" min="0"></div>
+          <div class="formGroup"><label>وزن الطير عند النقل (غرام)</label><input id="transferBirdWeight" type="number" min="0" placeholder="مثال: 42"></div>
+          <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="transferAlertAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
+          <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="transferMarketAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
+
         </div>
         <div class="formActions">
           <button class="btn btn-primary" onclick="saveTransfer()">✅ تأكيد النقل</button>
@@ -395,6 +478,8 @@ tbody tr:hover td{background:#f8fafc}
           <div class="cardTitle" style="margin-bottom:10px">📦 الوجبات المنقولة</div>
           <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">اضغط على أي وجبة منقولة لتعديل بيانات النقل. التعديل للمدير فقط.</p>
           <div class="tableWrap"><table id="transferredTable"></table></div>
+          <div id="transferAllocationsSummary" style="margin-top:14px"></div>
+          
         </div>
       </div>
     </section>
@@ -404,7 +489,8 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">📉 تسجيل هلاك</div>
         <div class="formGrid">
-          <div class="formGroup"><label>الوجبة</label><select id="mortBatch"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="mortBatch" onchange="fillMortHalls()"></select></div>
+<div class="formGroup"><label>القاعة التي حدث بها الهلاك</label><select id="mortHall"></select></div>
           <div class="formGroup"><label>التاريخ</label><input id="mortDate" type="date"></div>
           <div class="formGroup"><label>العدد</label><input id="mortCount" type="number" min="1"></div>
           <div class="formGroup"><label>السبب</label><input id="mortReason"></div>
@@ -413,6 +499,9 @@ tbody tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <div class="cardTitle">📋 سجل الهلاكات</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="mortBatchFilter" onchange="renderMort()"></select></div>
+        </div>
         <div class="tableWrap"><table id="mortTable"></table></div>
       </div>
     </section>
@@ -422,7 +511,8 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">💰 تسجيل عملية تسويق</div>
         <div class="formGrid">
-          <div class="formGroup"><label>الوجبة</label><select id="marketBatch"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="marketBatch" onchange="fillMarketHalls()"></select></div>
+          <div class="formGroup"><label>القاعة التي تم تسويقها</label><select id="marketHall"></select></div>
           <div class="formGroup"><label>التاريخ</label><input id="marketDate" type="date"></div>
           <div class="formGroup"><label>العدد</label><input id="marketCount" type="number" min="0"></div>
           <div class="formGroup"><label>نوع العملية</label><select id="marketStatus"><option>بيعت جزئياً</option><option>تسويق إلى المجزرة</option><option>منتهية</option><option>منقولة</option></select></div>
@@ -432,6 +522,9 @@ tbody tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <div class="cardTitle">📋 سجل التسويق</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="marketBatchFilter" onchange="renderMarket()"></select></div>
+        </div>
         <div class="tableWrap"><table id="marketTable"></table></div>
       </div>
     </section>
@@ -442,8 +535,8 @@ tbody tr:hover td{background:#f8fafc}
         <div class="cardTitle">🏡 إضافة / تعديل حقل</div>
         <div class="formGrid">
           <div class="formGroup"><label>اسم الحقل *</label><input id="fName" placeholder="مثال: حقل اللحم 1"></div>
-          <div class="formGroup"><label>النوع</label><select id="fType"><option value="لحم">لحم</option><option value="إنتاج">إنتاج</option><option value="تربية">تربية</option></select></div>
-          <div class="formGroup"><label>السعة القصوى (طير)</label><input id="fCapacity" type="number" min="0" placeholder="اختياري"></div>
+          <div class="formGroup"><label>النوع</label><select id="fType"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option><option value="تربية">تربية</option></select></div>
+          <div class="formGroup"><label>السعة القصوى الإجمالية (طير)</label><input id="fCapacity" type="number" min="0" placeholder="اختياري — أو يُجمع من القاعات"></div>
         </div>
         <input type="hidden" id="fEditId">
         <div class="formActions">
@@ -451,6 +544,26 @@ tbody tr:hover td{background:#f8fafc}
           <button class="btn btn-secondary" onclick="clearFieldForm()">مسح</button>
         </div>
       </div>
+
+      <!-- قاعات الحقل -->
+      <div class="card" id="hallsCard" style="display:none">
+        <div class="cardTitle">🚪 إدارة قاعات الحقل: <span id="hallsFieldName" style="color:var(--p)">—</span></div>
+        <div class="formGrid" id="hallForm">
+          <div class="formGroup"><label>اسم القاعة *</label><input id="hName" placeholder="مثال: قاعة A"></div>
+          <div class="formGroup"><label>الطاقة الاستيعابية (طير)</label><input id="hCapacity" type="number" min="0" placeholder="اختياري"></div>
+          
+          
+          
+        </div>
+        <input type="hidden" id="hEditId">
+        <input type="hidden" id="hFieldId">
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveHall()">💾 حفظ القاعة</button>
+          <button class="btn btn-secondary" onclick="clearHallForm()">مسح</button>
+        </div>
+        <div class="tableWrap" style="margin-top:14px"><table id="hallsTable"></table></div>
+      </div>
+
       <div class="card">
         <div class="cardTitle">🏡 قائمة الحقول</div>
         <div class="tableWrap"><table id="fieldsTable"></table></div>
@@ -504,20 +617,166 @@ tbody tr:hover td{background:#f8fafc}
       </div>
     </section>
 
+
+
+    <!-- FEED -->
+    <section id="feed" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🌾 استهلاك العلف لكل قاعة</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>التاريخ</label><input id="feedDate" type="date"></div>
+          <div class="formGroup"><label>الحقل</label><select id="feedField" onchange="onFeedFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="feedHall"></select></div>
+          <div class="formGroup"><label>نوع العلف</label><input id="feedType" placeholder="بادئ / نامي / ناهي"></div>
+          <div class="formGroup"><label>الكمية كغم</label><input id="feedQty" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="feedNote"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveFeed()">💾 حفظ العلف</button>
+          <button class="btn btn-secondary" onclick="clearFeedForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل العلف</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="feedBatchFilter" onchange="renderFeed()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="feedTable"></table></div>
+      </div>
+    </section>
+
+    <!-- MEDS -->
+    <section id="meds" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">💉 الأدوية واللقاحات لكل قاعة</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>التاريخ</label><input id="medDate" type="date"></div>
+          <div class="formGroup"><label>الحقل</label><select id="medField" onchange="onMedFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="medHall"></select></div>
+          <div class="formGroup"><label>النوع</label><select id="medType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
+          <div class="formGroup"><label>اسم المادة</label><input id="medName" placeholder="مثال: نيوكاسل / AD3E"></div>
+          <div class="formGroup"><label>الجرعة</label><input id="medDose"></div>
+          <div class="formGroup"><label>الكمية</label><input id="medQty" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="medNote"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveMed()">💾 حفظ المادة</button>
+          <button class="btn btn-secondary" onclick="clearMedForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل الأدوية واللقاحات</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="medBatchFilter" onchange="renderMeds()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="medTable"></table></div>
+      </div>
+    </section>
+
+    <!-- WEIGHTS -->
+    <section id="weights" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">⚖️ أوزان القاعات</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">سجل وزن القاعة والوزن المتوقع. يظهر آخر وزن في لوحة المعلومات وتفاصيل الوجبة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="wField" onchange="onWeightFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="wHall" onchange="onWeightHallChange()"></select></div>
+          <div class="formGroup"><label>الوجبة داخل القاعة</label><select id="wBatch" onchange="fillWeightDefaults()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="wDate" type="date" onchange="fillWeightDefaults()"></div>
+          <div class="formGroup"><label>عدد الطير الحي بالقاعة</label><input id="wAlive" type="number" min="0" readonly></div>
+          <div class="formGroup"><label>معدل الوزن الفعلي للطير (كغ)</label><input id="wAvg" type="number" min="0" step="0.01" oninput="calcWeightTotal()"></div>
+          <div class="formGroup"><label>الوزن المتوقع حسب العمر (كغ)</label><input id="wExpected" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>فرق الوزن (كغ)</label><input id="wDiff" type="text" readonly></div>
+          <div class="formGroup"><label>مجموع وزن القاعة (كغ)</label><input id="wTotal" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>ملاحظة</label><input id="wNote"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveWeightRecord()">💾 حفظ الوزن</button>
+          <button class="btn btn-secondary" onclick="clearWeightForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل أوزان القاعات</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="weightBatchFilter" onchange="renderWeights()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="weightsTable"></table></div>
+      </div>
+    </section>
+
     <!-- REPORTS -->
     <section id="reports" class="page hidden">
+
+      <!-- أدوات التصفية والتصدير -->
       <div class="card noPrint">
-        <div class="cardTitle">📋 التقارير والبيانات</div>
+        <div class="cardTitle">📋 مركز التقارير</div>
+        <div class="formGrid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px">
+          <div class="formGroup">
+            <label>نوع التقرير</label>
+            <select id="rptType" onchange="renderReports()">
+              <option value="batches">الوجبات</option>
+              <option value="feed">استهلاك العلف</option>
+              <option value="meds">الأدوية واللقاحات</option>
+              <option value="fields">تقرير الحقول</option>
+              <option value="halls">تقرير القاعات</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>الحقل</label>
+            <select id="rptField" onchange="onReportFieldChange()">
+              <option value="">كل الحقول</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>القاعة</label>
+            <select id="rptHall" onchange="renderReports()">
+              <option value="">كل القاعات</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>الوجبة</label>
+            <select id="rptBatch" onchange="renderReports()">
+              <option value="">كل الوجبات</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>الحالة / النوع</label>
+            <select id="rptStatus" onchange="renderReports()">
+              <option value="">الكل</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>بحث نصي</label>
+            <input id="rptSearch" placeholder="اسم وجبة / قاعة / مادة" oninput="renderReports()">
+          </div>
+          <div class="formGroup">
+            <label>من تاريخ</label>
+            <input id="rptFrom" type="date" onchange="renderReports()">
+          </div>
+          <div class="formGroup">
+            <label>إلى تاريخ</label>
+            <input id="rptTo" type="date" onchange="renderReports()">
+          </div>
+        </div>
         <div class="formActions">
+          <button class="btn btn-secondary" onclick="clearReportFilters()">مسح الفلاتر</button>
           <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
-          <button class="btn btn-primary" onclick="exportCSV()">📥 تصدير CSV</button>
+          <button class="btn btn-primary" onclick="exportRptExcel()">📊 تصدير Excel</button>
+          <button class="btn btn-danger" onclick="exportRptPDF()">📄 تصدير PDF</button>
           <button class="btn btn-success" id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
           <label class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
         </div>
       </div>
+
+      <!-- ملخص سريع -->
+      <div id="rptSummaryCards" class="statsGrid" style="margin-bottom:12px"></div>
+
+      <!-- جدول التقرير -->
       <div class="card">
+        <div class="cardTitle" id="rptTitle">—</div>
         <div class="tableWrap"><table id="reportTable"></table></div>
       </div>
+
     </section>
 
     <!-- ARCHIVE -->
@@ -525,6 +784,12 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">🗄️ أرشيف الوجبات المنتهية</div>
         <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">الوجبات التي وصل الحي المتبقي فيها إلى صفر.</p>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث عن الوجبة</label><input id="archiveSearch" placeholder="اكتب اسم الوجبة أو الحقل أو القاعة" oninput="renderArchive()"></div>
+          <div class="formGroup"><label>اختيار الوجبة</label><select id="archiveBatchFilter" onchange="renderArchive()"></select></div>
+          <div class="formGroup"><label>اختيار الحقل</label><select id="archiveFieldFilter" onchange="onArchiveFieldFilterChange()"></select></div>
+          <div class="formGroup"><label>اختيار القاعة</label><select id="archiveHallFilter" onchange="renderArchive()"></select></div>
+        </div>
         <div class="tableWrap"><table id="archiveTable"></table></div>
       </div>
     </section>
@@ -550,6 +815,15 @@ tbody tr:hover td{background:#f8fafc}
 </div>
 
 <div id="toast" class="toast hidden"></div>
+<div id="calDayOverlay" class="calFloatOverlay hidden" onclick="closeCalendarDayDetails()">
+  <div class="calFloat" onclick="event.stopPropagation()">
+    <div class="calFloatHead">
+      <h3 id="calDayTitle">تفاصيل اليوم</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeCalendarDayDetails()">إغلاق</button>
+    </div>
+    <div id="calDayBody"></div>
+  </div>
+</div>
 
 <script>
 
@@ -577,6 +851,11 @@ async function pullCloud(){
       data={...data,...rows[0].data};
       data.batches=(data.batches||[]).map(migrateBatch);
       data.fields=data.fields||[];
+      data.halls=data.halls||[];
+      data.weights=data.weights||[];
+      data.feeds=data.feeds||[];data.meds=data.meds||[];
+      data.feeds=data.feeds||[];data.meds=data.meds||[];
+      data.weights=data.weights||[];
       data.subUsers=data.subUsers||[];
       localStorage.setItem(STORE,JSON.stringify(data));
       if($('dbState')) $('dbState').textContent='متصل بسوبابيس ✅';
@@ -621,17 +900,22 @@ async function pushCloud(){
   }
 }
 
-const STORE='chicken_field_system_v21_data';
-const OLD_STORES=['chicken_field_system_v11_data'];
+const STORE='chicken_field_system_v22_data';
+const OLD_STORES=['chicken_field_system_v21_data','chicken_field_system_v11_data'];
 
 // ── STATE ──
 let data={
   batches:[],morts:[],markets:[],fields:[],
+  halls:[],            // [{id,fieldId,name,capacity,chickWeight,avgWeight,totalWeight}]
+  weights:[],          // [{id,batchId,field,hallId,hall,date,avgWeight,expectedWeight,totalWeight,note}]
+  feeds:[],            // [{id,date,field,hallId,hall,feedType,qty,note}]
+  meds:[],             // [{id,date,field,hallId,hall,type,name,dose,qty,note}]
   subUsers:[],          // [{id,name,pass,role,fields:[fieldName,...]}]
   user:'admin',pass:'1234'  // المدير الرئيسي
 };
 let calDate=new Date();
 let selectedBatchId=null;
+let selectedFieldName=null;
 let currentUser=null; // {name, role, fields} — set on login
 
 // ── UTILS ──
@@ -646,6 +930,7 @@ function today(){
 function num(id){return +($(id).value||0)}
 function val(id){return ($(id).value||'').trim()}
 function isAdmin(){return currentUser&&currentUser.role==='admin'}
+function isDeveloperAdmin(){return isAdmin()&&currentUser&&currentUser.name===data.user}
 function myFields(){if(isAdmin())return data.fields.map(f=>f.name);return currentUser?currentUser.fields:[];}
 function canSeeField(fn){return isAdmin()||myFields().includes(fn)}
 function msg(t){let el=$('toast');el.innerHTML='✓ '+t;el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),1800)}
@@ -670,6 +955,8 @@ function load(){
       data={...data,...parsed};
       data.batches=(data.batches||[]).map(migrateBatch);
       data.fields=data.fields||[];
+      data.halls=data.halls||[];
+      data.weights=data.weights||[];
       data.subUsers=data.subUsers||[];
     }
     let ls=localStorage.getItem(STORE+'_lastSave');
@@ -684,7 +971,7 @@ function migrateBatch(b){
   let fixedNet=+b.netHatch||Math.max(0,hat-vb-iso);
   let eggs=+b.eggs||0;let fb=+b.fieldBirds||0;
   let fixedRate=(+b.fixedHatchRate||0)>0?+b.fixedHatchRate:(fb>0&&eggs?+((fb/eggs)*100).toFixed(2):(eggs?+((fixedNet/eggs)*100).toFixed(2):0));
-  return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate};
+  return{...b,transferDate:b.transferDate||'',fieldEntryDate:b.fieldEntryDate||b.transferDate||'',field:b.field||'',hall:b.hall||'',hallId:b.hallId||null,hatched:b.hatched||'',vaccineDeaths:vb,isolatedBirds:iso,netHatch:fixedNet,fieldBirds:fb,fixedHatchRate:fixedRate,transferBirdWeight:+b.transferBirdWeight||0};
 }
 
 
@@ -702,6 +989,7 @@ function loadUsersBeforeLogin(){
       data={...data,...parsed};
       data.batches=(data.batches||[]).map(migrateBatch);
       data.fields=data.fields||[];
+      data.halls=data.halls||[];
       data.subUsers=data.subUsers||[];
     }
   }catch(e){
@@ -782,6 +1070,7 @@ function buildNav(){
     html+=`<div class="navLabel">العمليات</div>`;
     html+=n('🥚','وجبة جديدة','batch');
     html+=n('🔄','نقل الفقسة','transfer');
+    html+=n('🥚','شراء البياض','layerPurchase');
   }else{
     html+=`<div class="navLabel">العمليات</div>`;
   }
@@ -792,6 +1081,10 @@ function buildNav(){
     html+=n('🏡','الحقول','fields');
     html+=n('👥','المستخدمون','users');
   }
+  html+=n('🌾','العلف','feed');
+  html+=n('💉','الأدوية واللقاحات','meds');
+  html+=n('⚖️','أوزان القاعات','weights');
+  html+=n('📈','مخطط بياني','charts');
   html+=n('📅','الروزنامة','cal');
   html+=n('📋','التقارير','reports');
   if(admin){
@@ -802,7 +1095,7 @@ function buildNav(){
 }
 
 function show(id,btn){
-  const adminOnly=['batch','transfer','fields','users','archive','settings'];
+  const adminOnly=['batch','transfer','layerPurchase','fields','users','archive','settings'];
   if(adminOnly.includes(id)&&!isAdmin()){
     document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
     $('dash').classList.remove('hidden');return;
@@ -817,13 +1110,44 @@ function show(id,btn){
     let ov=$('sideOverlay');if(ov)ov.classList.remove('show');
   }
   renderAll();
-  if(id==='transfer'){clearTransferForm();renderTransferredBatches();}
+  if(id==='transfer'){clearTransferForm();renderTransferredBatches();renderTransferAllocationsSummary();}
   if(id==='mort'){clearMortForm();}
   if(id==='market'){clearMarketForm();}
+  if(id==='layerPurchase'){clearLayerPurchaseForm();renderLayerPurchase();}
+  if(id==='feed'){clearFeedForm();renderFeed();}
+  if(id==='meds'){clearMedForm();renderMeds();}
+  if(id==='weights'){clearWeightForm();renderWeights();}
+  if(id==='charts'){renderChartsPage();}
+  if(id==='reports'){
+    // تهيئة فلاتر التقرير
+    if($('rptFrom')&&!$('rptFrom').value){
+      let d=new Date();d.setMonth(d.getMonth()-1);
+      $('rptFrom').value=d.toISOString().slice(0,10);
+    }
+    if($('rptTo')&&!$('rptTo').value)$('rptTo').value=today();
+    renderReports();
+  }
   if(id==='batch'){clearForm();}
   if(id==='fields'&&typeof clearFieldForm==='function'){clearFieldForm();}
   if(id==='users'&&typeof clearUserForm==='function'){clearUserForm();}
 }
+
+// ── LAYER AGE HELPERS ──
+// تحويل الأيام الكلية إلى {weeks, days}
+function daysToWeeksAndDays(totalDays){
+  let w=Math.floor(totalDays/7);
+  let d=totalDays%7;
+  return{weeks:w,days:d};
+}
+function fmtLayerAge(totalDays){
+  if(totalDays<0)return '—';
+  let{weeks,days}=daysToWeeksAndDays(totalDays);
+  if(days===0)return `${weeks} أسبوع`;
+  return `${weeks} أسبوع و${days} يوم`;
+}
+// الحد الأقصى للبياض = 140 أسبوع = 980 يوم
+const LAYER_MAX_AGE_DAYS=980;
+const BROILER_MAX_AGE_DAYS=40;
 
 // ── CALC ──
 function addDays(ds,n){
@@ -848,6 +1172,7 @@ function diffDays(a,b=today()){
 function fmt(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('ar-IQ')}
 
 function calc(b,on=today()){
+  let isLayer=(b.type==='بياض');
   let rawHatchAge=diffDays(b.hatchDate,on);
   let hatchAge=Math.min(21,rawHatchAge);
   let hatchComplete=!b.transferDate&&rawHatchAge===21;
@@ -855,10 +1180,24 @@ function calc(b,on=today()){
   let expectedTransfer=addDays(b.hatchDate,21);
   let transferred=!!b.transferDate;
   let entryDate=b.fieldEntryDate||b.transferDate||'';
-  // عمر الطير الحقيقي: يوم دخول الحقل = 0، اليوم التالي = 1
-  // لا توجد أي +1 هنا، حتى لا يكبر الطير قبل أوانه.
-  let rawFlockAge=transferred&&entryDate?diffDays(entryDate,on):0;
-  let flockAge=Math.min(40,rawFlockAge);
+
+  // ── حساب عمر الطير ──
+  // للبياض: إذا شراء → عمر مبدئي (بالأيام) + أيام منذ الدخول
+  //          إذا مفقس → أيام منذ الدخول فقط (= 0 يوم دخول)
+  // للحم: أيام منذ دخول الحقل، حد 40 يوم
+  let rawFlockAge=0;
+  let layerInitDays=0;
+  if(isLayer){
+    layerInitDays=(+b.layerInitWeeks||0)*7+(+b.layerInitDays||0);
+    if(transferred&&entryDate){
+      rawFlockAge=layerInitDays+diffDays(entryDate,on);
+    }
+  }else{
+    rawFlockAge=transferred&&entryDate?diffDays(entryDate,on):0;
+  }
+  let maxAge=isLayer?LAYER_MAX_AGE_DAYS:BROILER_MAX_AGE_DAYS;
+  let flockAge=Math.min(maxAge,rawFlockAge);
+
   let eggs=+b.eggs||0,badEggs=+b.badEggs||0,candleRate=+b.candle||0;
   let validEggs=Math.max(0,eggs-badEggs);
   let est=Math.max(0,Math.round(validEggs*(candleRate/100)));
@@ -866,19 +1205,20 @@ function calc(b,on=today()){
   let vaccineDeaths=+b.vaccineDeaths||0,isolated=+b.isolatedBirds||0;
   let hatchLoss=vaccineDeaths+isolated;
   let netHatch=(+b.netHatch||0)>0?+b.netHatch:Math.max(0,hatched-hatchLoss);
-  let fieldBirds=(+b.fieldBirds||0)>0?+b.fieldBirds:(transferred?netHatch:0);
+  let fieldBirds=Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.reduce((s,a)=>s+(+a.birds||0),0):((+b.fieldBirds||0)>0?+b.fieldBirds:(transferred?netHatch:0));
   let mort=data.morts.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
   let sold=data.markets.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
   let alive=transferred?Math.max(0,fieldBirds-mort-sold):0;
   let completed=transferred&&fieldBirds>0&&alive<=0;
-  let alertFlag=transferred&&flockAge>=(+b.alertAge||35)&&!completed;
-  return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,alive,completed,alert:alertFlag,est,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
+  let alertFlag=transferred&&(isLayer?flockAge>=(+b.alertAge||980):flockAge>=(+b.alertAge||35))&&!completed;
+  return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,alive,completed,alert:alertFlag,est,isLayer,layerInitDays,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
 }
 function hatchRate(b){if((+b.fixedHatchRate||0)>0)return (+b.fixedHatchRate).toFixed(2);let eggs=+b.eggs||0;if(!eggs)return '0.00';let c=calc(b);return ((c.est/eggs)*100).toFixed(2);}
 function successRate(b){let c=calc(b),base=c.fieldBirds||0;return base?((Math.max(0,base-c.mort)/base)*100).toFixed(2):'0.00'}
 function statusBadge(b){
   let c=calc(b);
   if(c.completed)return '<span class="badge b-gray">منتهية</span>';
+  if(c.transferred&&hatchAvailableForTransfer(b)>0)return '<span class="badge b-amber">نقل جزئي</span>';
   if(!c.transferred&&c.rawHatchAge>21)return '<span class="badge b-red">متأخرة عن النقل</span>';
   if(!c.transferred&&c.hatchComplete)return '<span class="badge b-amber">جاهزة للنقل</span>';
   if(!c.transferred)return '<span class="badge b-blue">بالمفقس</span>';
@@ -898,11 +1238,15 @@ function visibleBatches(){
 
 // ── RENDER ALL ──
 function renderAll(){
+  if(typeof updateArchiveStatuses==='function')updateArchiveStatuses();
   renderSelectors();renderStats();renderBatches();
   renderMort();renderMarket();renderReports();
   renderArchive();renderCalendar();renderTransferredBatches();renderFields();
-  renderUsers();renderUserFieldsList();
+  renderUsers();renderUserFieldsList();renderLayerPurchase();renderWeights();renderFeed();renderMeds();
   fillTransferPreview(false);
+  // تحديث لوحة القاعات إذا كانت مفتوحة
+  let openFieldId=+val('hFieldId');
+  if(openFieldId)renderHalls(openFieldId);
   // hide backup/restore for non-admin
   if($('backupBtn'))$('backupBtn').style.display=isAdmin()?'':'none';
   if($('restoreBtn'))$('restoreBtn').style.display=isAdmin()?'':'none';
@@ -912,15 +1256,111 @@ function renderSelectors(){
   let batches=visibleBatches().filter(b=>!calc(b).completed);
   let opts=batches.map(b=>`<option value="${b.id}">${b.name} — ${b.type||''}</option>`).join('');
   ['mortBatch','marketBatch'].forEach(id=>{if($(id))$(id).innerHTML=opts});
-  if($('transferBatch'))$('transferBatch').innerHTML=data.batches.filter(b=>!calc(b).completed).map(b=>`<option value="${b.id}">${b.name} — ${b.type||''}</option>`).join('');
+  if($('mortBatch'))fillMortHalls();
+  if($('marketBatch'))fillMarketHalls();
+  if($('transferBatch'))$('transferBatch').innerHTML=data.batches.filter(b=>!calc(b).completed&&hatchAvailableForTransfer(b)>0).map(b=>`<option value="${b.id}">${b.name} — ${b.type||''} — متبقي بالمفقس ${hatchAvailableForTransfer(b).toLocaleString()}</option>`).join('');
   if($('calFilter'))$('calFilter').innerHTML='<option value="all">كل الوجبات</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
   let fOpts=data.fields.length
     ?data.fields.map(f=>`<option value="${f.name}">${f.name} (${f.type})${f.capacity?' — سعة '+f.capacity:''}</option>`).join('')
     :'<option value="">— لا توجد حقول — أضف من صفحة الحقول</option>';
-  if($('transferField'))$('transferField').innerHTML=fOpts;
+  if($('transferField')){$('transferField').innerHTML=fOpts;onTransferFieldChange();}
+  if($('lpField'))$('lpField').innerHTML=fOpts;
+  if($('wField'))$('wField').innerHTML=fOpts;
+  if($('feedField'))$('feedField').innerHTML=fOpts;
+  if($('medField'))$('medField').innerHTML=fOpts;
+
+  renderBatchRecordFilters();
+  renderArchiveFilters();
+
+
+  let activeTransferred=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed);
+  if($('wBatch'))$('wBatch').innerHTML=activeTransferred.map(b=>{
+    let label=b.hall?`${b.name} — ${b.field} / ${b.hall}`:`${b.name} — ${b.field||'بلا حقل'}`;
+    return `<option value="${b.id}">${label}</option>`;
+  }).join('');
+
 }
 
-function selectBatch(id){selectedBatchId=id;renderStats();renderBatches();msg('تم اختيار الوجبة')}
+function renderArchiveFilters(){
+  let archived=(isAdmin()?data.batches:visibleBatches()).filter(b=>calc(b).completed);
+  let oldBatch=$('archiveBatchFilter')?$('archiveBatchFilter').value:'';
+  let oldField=$('archiveFieldFilter')?$('archiveFieldFilter').value:'';
+  let oldHall=$('archiveHallFilter')?$('archiveHallFilter').value:'';
+  if($('archiveBatchFilter')){
+    $('archiveBatchFilter').innerHTML='<option value="">كل الوجبات</option>'+archived.map(b=>`<option value="${b.id}">${b.name}${b.field?' — '+b.field:''}</option>`).join('');
+    if(oldBatch&&[...$('archiveBatchFilter').options].some(o=>o.value===oldBatch))$('archiveBatchFilter').value=oldBatch;
+  }
+  if($('archiveFieldFilter')){
+    let fields=[...new Set(archived.map(b=>b.field).filter(Boolean))];
+    $('archiveFieldFilter').innerHTML='<option value="">كل الحقول</option>'+fields.map(f=>`<option value="${f}">${f}</option>`).join('');
+    if(oldField&&[...$('archiveFieldFilter').options].some(o=>o.value===oldField))$('archiveFieldFilter').value=oldField;
+  }
+  fillArchiveHallFilter(oldHall);
+}
+function fillArchiveHallFilter(keep=''){
+  let field=$('archiveFieldFilter')?$('archiveFieldFilter').value:'';
+  let halls=[];
+  if(field){
+    let f=data.fields.find(x=>x.name===field);
+    halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  }else{
+    halls=data.halls||[];
+  }
+  if($('archiveHallFilter')){
+    $('archiveHallFilter').innerHTML='<option value="">كل القاعات</option>'+halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+    if(keep&&[...$('archiveHallFilter').options].some(o=>o.value===keep))$('archiveHallFilter').value=keep;
+  }
+}
+function onArchiveFieldFilterChange(){
+  fillArchiveHallFilter('');
+  renderArchive();
+}
+
+function allVisibleBatchesForFilters(){
+  return (isAdmin()?data.batches:visibleBatches()).filter(b=>!b.field||canSeeField(b.field));
+}
+function renderBatchRecordFilters(){
+  let all=allVisibleBatchesForFilters();
+  let opts='<option value="">كل الوجبات</option>'+all.map(b=>`<option value="${b.id}">${b.name}${b.field?' — '+b.field:''}</option>`).join('');
+  ['feedBatchFilter','mortBatchFilter','marketBatchFilter','medBatchFilter','weightBatchFilter'].forEach(id=>{
+    let el=$(id);if(!el)return;
+    let old=el.value;
+    el.innerHTML=opts;
+    if(old&&[...el.options].some(o=>o.value===old))el.value=old;
+  });
+}
+
+function selectBatch(id){selectedBatchId=id;selectedFieldName=null;renderStats();renderBatches();msg('تم اختيار الوجبة')}
+
+
+function latestWeightForBatch(batchId){
+  let list=(data.weights||[]).filter(w=>w.batchId===batchId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return list[0]||null;
+}
+function hallUsedBirds(hallId,ignoreBatchId=null){return data.batches.filter(b=>b.id!==ignoreBatchId&&!calc(b).completed&&b.transferDate).reduce((s,b)=>s+batchAllocatedToHall(b,hallId),0);}
+function hallCapacityStatus(hallId,addBirds=0,ignoreBatchId=null){
+  let h=data.halls.find(x=>x.id===+hallId);
+  if(!h)return {ok:true,used:0,cap:0,remaining:999999};
+  let used=hallUsedBirds(h.id,ignoreBatchId);
+  let cap=+h.capacity||0;
+  let remaining=cap?cap-used:999999;
+  return {ok:!cap||addBirds<=remaining,used,cap,remaining,hall:h};
+}
+function defaultExpectedWeight(ageDays,isLayer=false){
+  if(isLayer){
+    // تقدير بسيط للبياض حتى لا يبقى النظام غبياً مثل بعض النماذج الإدارية.
+    if(ageDays<70)return 0.6;
+    if(ageDays<112)return 1.1;
+    if(ageDays<140)return 1.35;
+    return 1.55;
+  }
+  const table=[
+    [0,0.04],[7,0.18],[14,0.45],[21,0.85],[28,1.35],[35,1.95],[40,2.35],[45,2.75]
+  ];
+  let last=table[0];
+  for(const row of table){if(ageDays>=row[0])last=row;else break}
+  return last[1];
+}
 
 function selectedDetails(b){
   if(!b)return `<div class="detailPanel"><p style="color:var(--ink3);font-size:13px">اضغط على أي وجبة من الجدول لعرض تفاصيلها.</p></div>`;
@@ -937,15 +1377,21 @@ function selectedDetails(b){
     ['الطير العزل',c.isolated.toLocaleString()],
     ['نسبة الفقس',hatchRate(b)+'%','dc-accent'],
   ];
+  let lw=latestWeightForBatch(b.id);
   let fieldCells=[
     ['الحقل',b.field||'—'],
+    ['القاعة',b.hall||'—'],
     ['دخول الحقل',fmt(c.entryDate)],
-    ['عمر الطير',c.transferred?c.flockAge+'/40 يوم':'—'],
+    ['عمر الطير',c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):(c.flockAge+'/40 يوم')):'—'],
     ['الصافي المنقول',(c.fieldBirds||0).toLocaleString(),'dc-accent'],
+    ['وزن النقل',b.transferBirdWeight?b.transferBirdWeight+' غم':'—'],
     ['هلاك الحقل',c.mort.toLocaleString()],
     ['المسوق',c.sold.toLocaleString()],
     ['الحي المتبقي',c.alive.toLocaleString(),'dc-accent'],
     ['نسبة النجاح',successRate(b)+'%','dc-accent'],
+    ['آخر وزن',lw?(lw.avgWeight+' كغ'):'—','dc-accent'],
+    ['الوزن المتوقع',lw?(lw.expectedWeight+' كغ'):'—'],
+    ['فرق الوزن',lw?((+lw.avgWeight-+lw.expectedWeight).toFixed(2)+' كغ'):'—'],
     ['الحالة',c.completed?'منتهية':(b.status||'نشطة')],
   ];
   let mkCells=c=>c.map(x=>`<div class="dCell${x[2]?' '+x[2]:''}"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('');
@@ -958,6 +1404,198 @@ function selectedDetails(b){
   </div>`;
 }
 
+
+function buildFieldTopDashboard(fieldName,selectedBatch=null){
+  let f=data.fields.find(x=>x.name===fieldName);
+  let batches=visibleBatches().filter(b=>!calc(b).completed&&b.transferDate&&b.field===fieldName);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  let alive=batches.reduce((s,b)=>s+batchHallAlive(b,h.id),0);
+  let birds=batches.reduce((s,b)=>s+batchAllocatedToHall(b,h.id),0);
+  let mort=batches.reduce((s,b)=>s+batchHallMort(b,h.id),0);
+  let sold=batches.reduce((s,b)=>s+batchHallSold(b,h.id),0);
+  let weights=batches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
+  let avgWeight=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):0;
+  let totalWeight=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  let cap=halls.reduce((s,h)=>s+(+h.capacity||0),0);
+  let occ=cap?((alive/cap)*100).toFixed(1)+'%':'—';
+  let title=selectedBatch?`${selectedBatch.name} — ملخص الحقل ${fieldName}`:`ملخص الحقل ${fieldName}`;
+  let cards=[
+    {l:'عدد القاعات',v:halls.length,s:'داخل الحقل'},
+    {l:'الوجبات النشطة',v:batches.length,s:'داخل الحقل'},
+    {l:'السعة الكلية',v:cap?cap.toLocaleString():'—',s:'طير'},
+    {l:'الصافي المنقول',v:birds.toLocaleString(),s:'ثابت'},
+    {l:'الحي الحالي',v:alive.toLocaleString(),s:'كل القاعات'},
+    {l:'هلاك الحقل',v:mort.toLocaleString(),s:'متراكم'},
+    {l:'المسوق',v:sold.toLocaleString(),s:'متراكم'},
+    {l:'الإشغال',v:occ,s:'من السعة'},
+    {l:'معدل الوزن',v:avgWeight?avgWeight+' كغ':'—',s:'آخر قراءات'},
+    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' كغ':'—',s:'كل القاعات'}
+  ];
+  return `<div class="heroBanner"><div><h2>${title}</h2><p>الواجهة العليا تعرض مجموع الحقل. اضغط على قاعة بالأسفل حتى تتحول الواجهة العليا إلى تفاصيل القاعة.</p></div><div class="hb-right">${f?f.type:'حقل'}</div></div>`+
+    cards.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
+}
+function buildHallTopDashboard(hallId){
+  let h=data.halls.find(x=>x.id===+hallId);if(!h)return '';
+  let f=data.fields.find(x=>x.id===h.fieldId);
+  let batches=visibleBatches().filter(b=>!calc(b).completed&&b.transferDate&&(+b.hallId||0)===h.id);
+  let alive=batches.reduce((s,b)=>s+batchHallAlive(b,h.id),0);
+  let birds=batches.reduce((s,b)=>s+batchAllocatedToHall(b,h.id),0);
+  let mort=batches.reduce((s,b)=>s+batchHallMort(b,h.id),0);
+  let sold=batches.reduce((s,b)=>s+batchHallSold(b,h.id),0);
+  let weights=batches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
+  let avgWeight=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):(+h.avgWeight||0);
+  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):0;
+  let totalWeight=weights.reduce((s,w)=>s+(+w.totalWeight||0),0)||(+h.totalWeight||0);
+  let cap=+h.capacity||0;
+  let remain=cap?Math.max(0,cap-alive):'—';
+  let occ=cap?((alive/cap)*100).toFixed(1)+'%':'—';
+  let cards=[
+    {l:'الحقل',v:f?f.name:'—',s:'تابعة له'},
+    {l:'القاعة',v:h.name,s:'تفاصيل مباشرة'},
+    {l:'السعة',v:cap?cap.toLocaleString():'—',s:'طير'},
+    {l:'المتاح',v:remain.toLocaleString?remain.toLocaleString():remain,s:'طير'},
+    {l:'الإشغال',v:occ,s:'نسبة'},
+    {l:'الوجبات',v:batches.length,s:'نشطة'},
+    {l:'الصافي المنقول',v:birds.toLocaleString(),s:'ثابت'},
+    {l:'الحي الحالي',v:alive.toLocaleString(),s:'داخل القاعة'},
+    {l:'الهلاك',v:mort.toLocaleString(),s:'داخل القاعة'},
+    {l:'المسوق',v:sold.toLocaleString(),s:'داخل القاعة'},
+    {l:'معدل الوزن',v:avgWeight?avgWeight+' كغ':'—',s:'فعلي'},
+    {l:'المتوقع',v:expected?expected+' كغ':'—',s:'حسب العمر'},
+    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' كغ':'—',s:'للقاعة'}
+  ];
+  return `<div class="heroBanner"><div><h2>🚪 ${h.name}</h2><p>تفاصيل القاعة بدل ملخص الحقل. الحقل: ${f?f.name:'—'}</p></div><div class="hb-right">إشغال ${occ}</div></div>`+
+    cards.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
+}
+function setTopToHall(hallId){
+  let cards=$('statsCards');
+  if(cards)cards.innerHTML=buildHallTopDashboard(hallId);
+}
+
+
+function renderBatchHallsPanel(b){
+  let el=$('batchHallsPanel');if(!el)return;
+  if(!b||!b.field){el.innerHTML='';return;}
+  let f=data.fields.find(x=>x.name===b.field);
+  if(!f){el.innerHTML='';return;}
+  let halls=data.halls.filter(h=>h.fieldId===f.id);
+  let rows=halls.map(h=>{
+    let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&(+x.hallId||0)===h.id);
+    let alive=batches.reduce((s,x)=>s+calc(x).alive,0);
+    let birds=batches.reduce((s,x)=>s+(calc(x).fieldBirds||0),0);
+    let mort=batches.reduce((s,x)=>s+calc(x).mort,0);
+    let sold=batches.reduce((s,x)=>s+calc(x).sold,0);
+    let lwList=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+    let avg=lwList.length?+(lwList.reduce((s,w)=>s+(+w.avgWeight||0),0)/lwList.length).toFixed(2):'—';
+    let cap=+h.capacity||0;
+    let remain=cap?Math.max(0,cap-alive):'—';
+    return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
+      <td><b>${h.name}</b></td>
+      <td>${cap?cap.toLocaleString():'—'}</td>
+      <td>${birds.toLocaleString()}</td>
+      <td><b>${alive.toLocaleString()}</b></td>
+      <td>${remain.toLocaleString?remain.toLocaleString():remain}</td>
+      <td>${mort.toLocaleString()}</td>
+      <td>${sold.toLocaleString()}</td>
+      <td>${avg==='—'?'—':avg+' كغ'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showHallDetailsInBatch(${h.id})">تفاصيل القاعة</button></td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<div class="card">
+    <div class="cardTitle">🚪 قاعات ${f.name}</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">اضغط على القاعة لعرض تفاصيلها مكان تفاصيل الوجبة أعلاه.</p>
+    <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>الصافي</th><th>الحي</th><th>المتاح</th><th>الهلاك</th><th>المسوق</th><th>آخر وزن</th><th>إجراء</th></tr></thead><tbody>${rows||'<tr><td colspan="9">لا توجد قاعات لهذا الحقل</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function showHallDetailsInBatch(hallId){
+  let h=data.halls.find(x=>x.id===+hallId);if(!h)return;
+  let f=data.fields.find(x=>x.id===h.fieldId);
+  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&(+x.hallId||0)===h.id);
+  let alive=batches.reduce((s,x)=>s+calc(x).alive,0);
+  let birds=batches.reduce((s,x)=>s+(calc(x).fieldBirds||0),0);
+  let mort=batches.reduce((s,x)=>s+calc(x).mort,0);
+  let sold=batches.reduce((s,x)=>s+calc(x).sold,0);
+  let cap=+h.capacity||0;
+  let remain=cap?Math.max(0,cap-alive):'—';
+  let occ=cap?((alive/cap)*100).toFixed(1)+'%':'—';
+  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
+  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):'—';
+  let total=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  let cells=[
+    ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
+    ['الصافي المنقول',birds.toLocaleString()],['الحي المتبقي',alive.toLocaleString()],['المتاح',remain.toLocaleString?remain.toLocaleString():remain],
+    ['هلاك القاعة',mort.toLocaleString()],['المسوق',sold.toLocaleString()],['آخر معدل وزن',avg==='—'?'—':avg+' كغ'],
+    ['الوزن المتوقع',expected==='—'?'—':expected+' كغ'],['مجموع الوزن',total?total.toLocaleString()+' كغ':'—']
+  ];
+  let rows=batches.map(x=>{let c=calc(x),lw=latestWeightForBatch(x.id);return `<tr><td>${x.name}</td><td>${fmt(c.entryDate)}</td><td>${c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'}</td><td>${batchAllocatedToHall(x,h.id).toLocaleString()}</td><td>${batchHallAlive(x,h.id).toLocaleString()}</td><td>${batchHallMort(x,h.id).toLocaleString()}</td><td>${batchHallSold(x,h.id).toLocaleString()}</td><td>${lw?lw.avgWeight+' كغ':'—'}</td></tr>`}).join('');
+  let detail=$('statsDetail');
+  if(detail)detail.innerHTML=`<div class="detailPanel">
+    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${h.name}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
+    <div class="detailGrid">${cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('')}</div>
+    <div class="dp-sub">الوجبات داخل القاعة</div>
+    <div class="tableWrap"><table><thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>العمر</th><th>الصافي</th><th>الحي</th><th>الهلاك</th><th>المسوق</th><th>آخر وزن</th></tr></thead><tbody>${rows||'<tr><td colspan="8">لا توجد وجبات نشطة داخل القاعة</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function restoreSelectedBatchDetails(){
+  let b=data.batches.find(x=>x.id===selectedBatchId);
+  if(b&&$('statsDetail'))$('statsDetail').innerHTML=selectedDetails(b);
+  else if(selectedFieldName)showFieldDetails(selectedFieldName);
+}
+
+function smartShortcutCards(fieldName=''){
+  let arg=String(fieldName||'').replace(/'/g,"\\'");
+  return [
+    ['⚖️','الأوزان','weights','weights'],
+    ['🌾','الأعلاف','feed','feed'],
+    ['💰','التسويق','market','market'],
+    ['💉','الأدوية واللقاحات','meds','meds'],
+    ['☠️','الهلاك','mort','mort']
+  ].map(x=>`<div class="statCard smartCard ${x[3]}" onclick="openSmartSection('${x[2]}','${arg}')">
+    <div class="sc-label">${x[0]} انتقال سريع</div><div class="sc-val" style="font-size:15px">${x[1]}</div><div class="sc-sub">${fieldName?'لهذا الحقل':'فتح الصفحة'}</div>
+  </div>`).join('');
+}
+
+function smartSectionHasData(section,fieldName){
+  if(!fieldName)return true;
+  if(section==='feed')return (data.feeds||[]).some(x=>x.field===fieldName);
+  if(section==='meds')return (data.meds||[]).some(x=>x.field===fieldName);
+  if(section==='weights')return (data.weights||[]).some(x=>x.field===fieldName);
+  if(section==='mort')return (data.morts||[]).some(x=>data.batches.find(b=>b.id===x.batchId)?.field===fieldName);
+  if(section==='market')return (data.markets||[]).some(x=>data.batches.find(b=>b.id===x.batchId)?.field===fieldName);
+  return true;
+}
+
+function openSmartSection(section,fieldName=''){
+  if(fieldName&&!smartSectionHasData(section,fieldName)){
+    let names={feed:'العلف',meds:'الأدوية واللقاحات',weights:'الأوزان',market:'التسويق',mort:'الهلاك'};
+    msg('لا توجد بيانات '+(names[section]||'')+' لهذا الحقل');
+    return;
+  }
+  show(section,null);
+  setTimeout(()=>{
+    if(fieldName){
+      let fieldSelect={feed:'feedField',meds:'medField',weights:'wField'}[section];
+      if(fieldSelect&&$(fieldSelect)&&[...$(fieldSelect).options].some(o=>o.value===fieldName)){
+        $(fieldSelect).value=fieldName;
+        if(section==='feed')onFeedFieldChange();
+        if(section==='meds')onMedFieldChange();
+        if(section==='weights')onWeightFieldChange();
+      }
+    }
+    if(section==='feed')renderFeed();
+    if(section==='meds')renderMeds();
+    if(section==='weights')renderWeights();
+    if(section==='market')renderMarket();
+    if(section==='mort')renderMort();
+    let tableId={feed:'feedTable',meds:'medTable',weights:'weightsTable',market:'marketTable',mort:'mortTable'}[section];
+    if(fieldName&&$(tableId)){
+      let row=[...$(tableId).querySelectorAll('tbody tr.selectable')].find(r=>r.textContent.includes(fieldName));
+      if(row){row.click();row.scrollIntoView({behavior:'smooth',block:'center'});}
+    }
+  },0);
+}
+
 function renderStats(){
   let b=data.batches.find(x=>x.id===selectedBatchId);
   if(b&&!canSeeField(b.field))b=null;
@@ -967,19 +1605,23 @@ function renderStats(){
   if(!cardsEl)return;
   if(b){
     let c=calc(b);
+    let lw=latestWeightForBatch(b.id);
     let stats=[
       {l:'عمر التفقيس',v:c.hatchAge+'/21',s:c.hatchLate?'⚠️ متأخرة':c.hatchComplete?'🔔 جاهزة':''},
-      {l:'عمر الطير',v:c.transferred?c.flockAge+'/40':'—',s:'بالحقل'},
+      {l:'عمر الطير',v:c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—',s:c.isLayer?'بياض':'بالحقل'},
       {l:'الصافي المنقول',v:(c.fieldBirds||0).toLocaleString(),s:'ثابت'},
       {l:'هلاك الحقل',v:c.mort.toLocaleString(),s:'متراكم'},
       {l:'المسوق',v:c.sold.toLocaleString(),s:'إجمالي'},
       {l:'الحي المتبقي',v:c.alive.toLocaleString(),s:'صافي'},
       {l:'نسبة النجاح',v:successRate(b)+'%',s:''},
+      {l:'آخر وزن',v:lw?(lw.avgWeight+' كغ'):'—',s:lw?('متوقع '+lw.expectedWeight):''},
     ];
     cardsEl.innerHTML=
-      `<div class="heroBanner"><div><h2>${b.name}</h2><p>${b.type||'وجبة'} — ${fmt(b.hatchDate)} — ${b.field||'لم تُنقل'}</p></div><div class="hb-right">آخر حفظ: ${lastTxt}</div></div>`+
-      stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
+      `<div class="heroBanner"><div><h2>${b.name}</h2><p>${b.type||'وجبة'} — ${fmt(b.hatchDate)} — ${b.field||'لم تُنقل'}</p></div></div>`+
+      stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('')+
+      smartShortcutCards(b.field||'');
     if(detailEl)detailEl.innerHTML=selectedDetails(b);
+    renderBatchHallsPanel(b);
     return;
   }
   let vis=visibleBatches();
@@ -992,34 +1634,131 @@ function renderStats(){
   let field=activeB.reduce((s,b)=>s+(calc(b).fieldBirds||0),0);
   let stats=[{l:'الوجبات النشطة',v:active,s:'غير منتهية'},{l:'بالمفقس',v:inc,s:'لم تُنقل'},{l:'الأرشيف',v:done,s:'منتهية'},{l:'إجمالي البيض',v:eggs.toLocaleString(),s:''},{l:'الصافي المنقول',v:field.toLocaleString(),s:'للحقول'},{l:'هلاك الحقول',v:mort.toLocaleString(),s:'إجمالي'},{l:'الطير الحي',v:alive.toLocaleString(),s:'متبقي'}];
   let greeting=isAdmin()?'زهور الوطن — لوحة المعلومات':`مرحباً، ${currentUser.name}`;
-  cardsEl.innerHTML=`<div class="heroBanner"><div><h2>${greeting}</h2><p>${isAdmin()?'عرض كامل لجميع الوجبات والحقول.':'عرض مخصص لحقولك فقط.'}</p></div><div class="hb-right">آخر حفظ: ${lastTxt}</div></div>`+stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
-  if(detailEl)detailEl.innerHTML=selectedDetails(null);
+  cardsEl.innerHTML=`<div class="heroBanner"><div><h2>${greeting}</h2><p>${isAdmin()?'عرض كامل لجميع الوجبات والحقول.':'عرض مخصص لحقولك فقط.'}</p></div></div>`+stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('')+smartShortcutCards('');
+  if(detailEl){
+    detailEl.innerHTML=buildFieldsDashboard();
+    if(selectedFieldName&&data.fields.some(f=>f.name===selectedFieldName)&&canSeeField(selectedFieldName)){
+      showFieldDetails(selectedFieldName);
+    }else{
+    }
+  }
+  if($('batchHallsPanel'))$('batchHallsPanel').innerHTML='';
 }
 
 function renderBatches(){
+  let q=($('batchSearch')&&$('batchSearch').value||'').trim().toLowerCase();
   let batches=visibleBatches().filter(b=>!calc(b).completed);
+  if(q){
+    batches=batches.filter(b=>[
+      b.name,b.field,b.hall,b.type,b.status,
+      ...(Array.isArray(b.hallAllocations)?b.hallAllocations.map(a=>a.hall):[])
+    ].some(x=>String(x||'').toLowerCase().includes(q)));
+  }
   let rows=batches.map(b=>{
     let c=calc(b),sel=b.id===selectedBatchId?' selectedRow':'';
+    let ageDisp=c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—';
+    let ageMax=c.isLayer?'140أسبوع':'40';
     let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button>`:'—';
-    return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${c.transferred?c.flockAge+'/40':'—'}</td><td>${b.candle||0}%</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
+    return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${b.field||'—'}</td><td>${b.hall||'—'}</td><td>${ageDisp}</td><td>${b.candle||0}%</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${(latestWeightForBatch(b.id)?.avgWeight)||'—'}</td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
   }).join('');
-  $('batchTable').innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>عمر الطير</th><th>الفحص</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  $('batchTable').innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>النوع</th><th>الحالة</th><th>التفقيس</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>عمر الطير</th><th>الفحص</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="17" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مطابقة للبحث</td></tr>')+'</tbody>';
 }
 
 // ── BATCH CRUD ──
-function clearForm(){['editId','bName','hatchDate','eggs','note'].forEach(id=>$(id)&&($(id).value=''));if($('badEggs'))$('badEggs').value=0;if($('candle'))$('candle').value=90;if($('alertAge'))$('alertAge').value=35;if($('marketAge'))$('marketAge').value=35}
-function formBatch(){return{id:val('editId')?+val('editId'):null,name:val('bName'),hatchDate:val('hatchDate'),type:$('bType').value,eggs:num('eggs'),badEggs:num('badEggs'),candle:num('candle'),alertAge:num('alertAge')||35,marketAge:num('marketAge')||35,note:val('note')}}
-function saveBatch(){if(!isAdmin())return;let b=formBatch();if(!b.name||!b.hatchDate){alert('يرجى إدخال اسم الوجبة وتاريخ دخول البيض');return}if(b.id){let old=data.batches.find(x=>x.id===b.id);Object.assign(old,b)}else{b.id=Date.now();b.status='نشطة';b.transferDate='';b.fieldEntryDate='';b.field='';b.hatched='';b.vaccineDeaths=0;b.isolatedBirds=0;b.netHatch=0;b.fieldBirds=0;b.fixedHatchRate=0;data.batches.push(b)}clearForm();save();renderAll()}
-function editBatch(id){if(!isAdmin())return;let b=data.batches.find(x=>x.id===id);if(!b)return;$('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;$('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;$('candle').value=b.candle||90;$('alertAge').value=b.alertAge||35;$('marketAge').value=b.marketAge||35;$('note').value=b.note||'';show('batch',null)}
+function toggleLayerFields(){
+  let isLayer=$('bType').value==='بياض';
+  ['grpLayerSource'].forEach(id=>{if($(id))$(id).classList.toggle('hidden',!isLayer)});
+  toggleLayerAge();
+}
+function toggleLayerAge(){
+  let isLayer=$('bType')&&$('bType').value==='بياض';
+  let isPurchased=isLayer&&$('layerSource')&&$('layerSource').value==='شراء';
+  ['grpLayerAge','grpLayerAgeDays'].forEach(id=>{if($(id))$(id).classList.toggle('hidden',!isPurchased)});
+}
+function clearForm(){
+  ['editId','bName','hatchDate','eggs','note'].forEach(id=>$(id)&&($(id).value=''));
+  if($('badEggs'))$('badEggs').value=0;
+  if($('candle'))$('candle').value=90;
+  if($('bType'))$('bType').value='لحم';
+  if($('layerSource'))$('layerSource').value='مفقس';
+  if($('layerInitWeeks'))$('layerInitWeeks').value=0;
+  if($('layerInitDays'))$('layerInitDays').value=0;
+  toggleLayerFields();
+}
+function formBatch(){
+  return{
+    id:val('editId')?+val('editId'):null,
+    name:val('bName'),hatchDate:val('hatchDate'),
+    type:$('bType').value,
+    eggs:num('eggs'),badEggs:num('badEggs'),candle:num('candle'),
+    alertAge:35,marketAge:35,note:val('note'),
+    layerSource:$('layerSource')?$('layerSource').value:'مفقس',
+    layerInitWeeks:$('layerInitWeeks')?num('layerInitWeeks'):0,
+    layerInitDays:$('layerInitDays')?num('layerInitDays'):0
+  };
+}
+function saveBatch(){
+  if(!isAdmin())return;
+  let b=formBatch();
+  if(!b.name||!b.hatchDate){alert('يرجى إدخال اسم الوجبة وتاريخ دخول البيض');return}
+  if(b.id){
+    let old=data.batches.find(x=>x.id===b.id);Object.assign(old,b);
+  }else{
+    b.id=Date.now();b.status='نشطة';b.transferDate='';b.fieldEntryDate='';
+    b.field='';b.hall='';b.hatched='';b.vaccineDeaths=0;b.isolatedBirds=0;
+    b.netHatch=0;b.fieldBirds=0;b.fixedHatchRate=0;
+    data.batches.push(b);
+  }
+  clearForm();save();renderAll();
+}
+function editBatch(id){
+  if(!isAdmin())return;
+  let b=data.batches.find(x=>x.id===id);if(!b)return;
+  $('editId').value=b.id;$('bName').value=b.name;$('hatchDate').value=b.hatchDate;
+  $('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;
+  $('candle').value=b.candle||90;
+  $('note').value=b.note||'';
+  if($('layerSource'))$('layerSource').value=b.layerSource||'مفقس';
+  if($('layerInitWeeks'))$('layerInitWeeks').value=b.layerInitWeeks||0;
+  if($('layerInitDays'))$('layerInitDays').value=b.layerInitDays||0;
+  toggleLayerFields();
+  show('batch',null);
+}
 function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=data.morts.filter(m=>m.batchId!==id);data.markets=data.markets.filter(m=>m.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll()}}
 
 
 function clearTransferForm(keepBatch=false){
   if(!keepBatch&&$('transferBatch')) $('transferBatch').selectedIndex=0;
-  ['transferDate','transferHatched','vaccineDeaths','isolatedBirds','fieldBirds'].forEach(id=>{if($(id))$(id).value=''});
+  ['transferDate','transferHatched','vaccineDeaths','isolatedBirds','fieldBirds','transferBirdWeight'].forEach(id=>{if($(id))$(id).value=''});
+  if($('transferAlertAge'))$('transferAlertAge').value=35;
+  if($('transferMarketAge'))$('transferMarketAge').value=35;
   if($('transferField')) $('transferField').selectedIndex=0;
+  if($('transferHall')) $('transferHall').innerHTML='';
+  if($('grpTransferHall')) $('grpTransferHall').classList.remove('hidden');
+  if($('transferHall')) $('transferHall').innerHTML='';
+  if($('grpTransferHall')) $('grpTransferHall').classList.remove('hidden');
   if($('fieldWarn')) {$('fieldWarn').className='warnBox';$('fieldWarn').textContent=''}
   if($('transferPreview')) $('transferPreview').innerHTML='';
+  onTransferFieldChange();
+}
+function onTransferFieldChange(){
+  // تحديث قائمة القاعات بناءً على الحقل المختار
+  let fn=$('transferField').value;
+  let grp=$('grpTransferHall');
+  let hallSel=$('transferHall');
+  if(!fn||!grp||!hallSel){checkFieldOccupancy();return;}
+  let f=data.fields.find(x=>x.name===fn);
+  let halls=data.halls.filter(h=>h.fieldId===(f?f.id:null));
+  if(halls.length>0){
+    hallSel.innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}${h.capacity?' — سعة '+h.capacity:''}</option>`).join('');
+    grp.classList.remove('hidden');
+  }else{
+    hallSel.innerHTML='<option value="">— لا توجد قاعات —</option>';
+    grp.classList.add('hidden');
+  }
+  checkFieldOccupancy();
+  renderHallAllocationRows();
+  renderTransferAllocationsSummary();
 }
 function editTransferBatch(id){
   if(!isAdmin())return alert('تعديل النقل بصلاحية المدير فقط');
@@ -1028,13 +1767,128 @@ function editTransferBatch(id){
   $('transferBatch').value=b.id;
   $('transferDate').value=b.fieldEntryDate||b.transferDate||today();
   if($('transferField').querySelector('option[value="'+(b.field||'')+'"]')) $('transferField').value=b.field;
+  onTransferFieldChange();
+  // اختيار القاعة المحفوظة
+  if(b.hallId&&$('transferHall')){
+    setTimeout(()=>{if($('transferHall').querySelector('option[value="'+b.hallId+'"]'))$('transferHall').value=b.hallId;},50);
+  }
   $('transferHatched').value=b.hatched||'';
   $('vaccineDeaths').value=b.vaccineDeaths||0;
   $('isolatedBirds').value=b.isolatedBirds||0;
   $('fieldBirds').value=b.fieldBirds||'';
+  if($('transferAlertAge'))$('transferAlertAge').value=b.alertAge||35;
+  if($('transferMarketAge'))$('transferMarketAge').value=b.marketAge||35;
   fillTransferPreview(false);
   msg('تم جلب بيانات النقل للتعديل');
 }
+
+
+function editBatchAllocation(batchId,hallId){
+  if(!isAdmin())return alert('تعديل القاعات بصلاحية المدير فقط');
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!b||!Array.isArray(b.hallAllocations))return;
+  let a=b.hallAllocations.find(x=>+x.hallId===+hallId);
+  if(!a)return;
+  let old=+a.birds||0;
+  let v=prompt('اكتب العدد الجديد لهذه القاعة', old);
+  if(v===null)return;
+  let newCount=+v;
+  if(!Number.isFinite(newCount)||newCount<=0)return alert('أدخل عدد صحيح أكبر من صفر');
+
+  // احسب السعة مع تجاهل هذا التخصيص القديم مؤقتاً
+  a.birds=0;
+  let st=hallCapacityStatus(+hallId,newCount,null);
+  if(!st.ok){
+    a.birds=old;
+    return alert('القاعة لا تتحمل العدد الجديد. المتاح: '+st.remaining.toLocaleString());
+  }
+  a.birds=newCount;
+  b.hallAllocations=b.hallAllocations.filter(x=>(+x.birds||0)>0);
+  b.fieldBirds=transferredBirdsFromBatch(b);
+  let first=b.hallAllocations[0]||null;
+  b.hallId=first?+first.hallId:null;
+  b.hall=first?first.hall:'';
+  save();renderAll();msg('تم تعديل توزيع القاعة');
+}
+function deleteBatchAllocation(batchId,hallId){
+  if(!isAdmin())return alert('حذف توزيع القاعة بصلاحية المدير فقط');
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!b||!Array.isArray(b.hallAllocations))return;
+  let a=b.hallAllocations.find(x=>+x.hallId===+hallId);
+  if(!a)return;
+  if(!confirm('حذف توزيع هذه القاعة؟\nسيعود عددها إلى المتبقي بالمفقس.'))return;
+  b.hallAllocations=b.hallAllocations.filter(x=>+x.hallId!==+hallId);
+  b.fieldBirds=transferredBirdsFromBatch(b);
+  if(!b.hallAllocations.length){
+    b.transferDate='';
+    b.fieldEntryDate='';
+    b.field='';
+    b.hallId=null;
+    b.hall='';
+    b.fieldBirds=0;
+    b.status='نشطة';
+  }else{
+    let first=b.hallAllocations[0];
+    b.hallId=+first.hallId;
+    b.hall=first.hall||'';
+    b.status=hatchAvailableForTransfer(b)>0?'نقل جزئي':'نشطة';
+  }
+  save();renderAll();msg('تم حذف توزيع القاعة');
+}
+function renderTransferFieldHallDetails(){renderTransferAllocationsSummary();}
+
+
+function renderTransferAllocationsSummary(){
+  let el=$('transferAllocationsSummary');if(!el)return;
+  let fieldName=$('transferField')?$('transferField').value:'';
+  if(!fieldName){el.innerHTML='';return;}
+  let batches=data.batches.filter(b=>b.transferDate&&!calc(b).completed&&b.field===fieldName);
+  let rows=[];
+  batches.forEach(b=>{
+    let arr=(Array.isArray(b.hallAllocations)&&b.hallAllocations.length)?b.hallAllocations:[];
+    arr.forEach(a=>{
+      rows.push(`<tr>
+        <td>${b.name}</td>
+        <td>${a.hall||'—'}</td>
+        <td><b>${(+a.birds||0).toLocaleString()}</b></td>
+        <td>${hatchAvailableForTransfer(b).toLocaleString()}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="editBatchAllocation(${b.id},${+a.hallId})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="deleteBatchAllocation(${b.id},${+a.hallId})">حذف</button></td>
+      </tr>`);
+    });
+  });
+  el.innerHTML=`<div class="detailPanel"><div class="dp-head"><span class="dp-title">📌 توزيع الوجبات على قاعات ${fieldName}</span></div>
+    <div class="tableWrap"><table><thead><tr><th>الوجبة</th><th>القاعة</th><th>العدد</th><th>متبقي بالمفقس</th><th>إجراء</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="5">لا توجد وجبات منقولة لهذا الحقل</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+
+function deleteTransfer(batchId){
+  if(!isAdmin())return alert('حذف النقل بصلاحية المدير فقط');
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!b)return alert('الوجبة غير موجودة');
+  if(!b.transferDate&&!b.fieldBirds&&!(b.hallAllocations||[]).length)return alert('هذه الوجبة غير منقولة');
+  if(!confirm('هل أنت متأكد من حذف عملية النقل؟\n\nسيتم إرجاع جميع الطيور إلى المفقس وإلغاء توزيع القاعات.'))return;
+
+  b.transferDate='';
+  b.fieldEntryDate='';
+  b.field='';
+  b.hallId=null;
+  b.hall='';
+  b.hallAllocations=[];
+  b.fieldBirds=0;
+  b.transferBirdWeight=0;
+  b.hatched='';
+  b.vaccineDeaths=0;
+  b.isolatedBirds=0;
+  b.netHatch=0;
+  b.fixedHatchRate=0;
+  b.status='نشطة';
+
+  selectedBatchId=b.id;
+  save();
+  renderAll();
+  msg('تم حذف النقل وإرجاع الوجبة إلى المفقس');
+}
+
 function renderTransferredBatches(){
   let el=$('transferredTable');if(!el)return;
   let rows=data.batches.filter(b=>b.transferDate).map(b=>{
@@ -1043,15 +1897,106 @@ function renderTransferredBatches(){
       <td><b>${b.name}</b></td>
       <td>${fmt(c.entryDate)}</td>
       <td>${b.field||'—'}</td>
+      <td>${Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.map(a=>`${a.hall}: ${(+a.birds||0).toLocaleString()}`).join('<br>'):(b.hall||'—')}</td>
       <td>${(b.hatched||0).toLocaleString()}</td>
       <td>${(+b.vaccineDeaths||0).toLocaleString()}</td>
       <td>${(+b.isolatedBirds||0).toLocaleString()}</td>
       <td><b>${(+b.fieldBirds||0).toLocaleString()}</b></td>
       <td>${hatchRate(b)}%</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editTransferBatch(${b.id})">تعديل</button></td>
+      <td>${hatchAvailableForTransfer(b).toLocaleString()}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editTransferBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteTransfer(${b.id})">حذف النقل</button></td>
     </tr>`;
   }).join('');
-  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>الحقل</th><th>الفاقس</th><th>هلاك اللقاح</th><th>العزل</th><th>الصافي المنقول</th><th>نسبة الفقس</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>الحقل</th><th>القاعة</th><th>الفاقس</th><th>هلاك اللقاح</th><th>العزل</th><th>الصافي المنقول</th><th>نسبة الفقس</th><th>متبقي بالمفقس</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+
+
+function transferredBirdsFromBatch(b){
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    return b.hallAllocations.reduce((s,a)=>s+(+a.birds||0),0);
+  }
+  return +b.fieldBirds||0;
+}
+function hatchAvailableForTransfer(b){
+  let c=calc(b);
+  let source=(+b.hatched||0)>0?+b.hatched:c.est;
+  return Math.max(0,source-transferredBirdsFromBatch(b));
+}
+function mergeBatchAllocations(oldArr,newArr){
+  let map=new Map();
+  (oldArr||[]).forEach(a=>{
+    if(!a||!a.hallId)return;
+    map.set(+a.hallId,{hallId:+a.hallId,hall:a.hall||'',birds:+a.birds||0});
+  });
+  (newArr||[]).forEach(a=>{
+    if(!a||!a.hallId)return;
+    let id=+a.hallId;
+    let old=map.get(id)||{hallId:id,hall:a.hall||'',birds:0};
+    old.hall=a.hall||old.hall;
+    old.birds=(+old.birds||0)+(+a.birds||0);
+    map.set(id,old);
+  });
+  return [...map.values()].filter(a=>(+a.birds||0)>0);
+}
+
+function currentTransferHalls(){
+  let fn=$('transferField')?$('transferField').value:'';
+  let f=data.fields.find(x=>x.name===fn);
+  return f?data.halls.filter(h=>h.fieldId===f.id):[];
+}
+function renderHallAllocationRows(rows=[]){return;}
+function getHallAllocationsFromUI(){return [];}
+function addHallAllocationRow(){
+  let arr=getHallAllocationsFromUI();
+  let halls=currentTransferHalls();
+  let used=new Set(arr.map(x=>x.hallId));
+  let next=halls.find(h=>!used.has(h.id))||halls[0];
+  if(next)arr.push({hallId:next.id,birds:''});
+  renderHallAllocationRows(arr);
+}
+function removeHallAllocationRow(i){
+  let arr=getHallAllocationsFromUI();
+  arr.splice(i,1);
+  renderHallAllocationRows(arr);
+}
+function autoDistributeHalls(){
+  let total=num('fieldBirds');
+  if(total<=0)return alert('اكتب الصافي المنقول للحقل أولاً');
+  let halls=currentTransferHalls();
+  let remaining=total, arr=[];
+  for(const h of halls){
+    if(remaining<=0)break;
+    let st=hallCapacityStatus(h.id,0,null);
+    let cap=st.cap?Math.max(0,st.remaining):remaining;
+    let take=Math.min(remaining,cap);
+    if(take>0){arr.push({hallId:h.id,birds:take});remaining-=take;}
+  }
+  if(remaining>0)return alert('سعة القاعات غير كافية. المتبقي بدون قاعة: '+remaining.toLocaleString());
+  renderHallAllocationRows(arr);
+}
+function checkAllocations(){return true;}
+function batchAllocatedToHall(b,hallId){
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    let a=b.hallAllocations.find(x=>+x.hallId===+hallId);
+    return a?+a.birds||0:0;
+  }
+  return (+b.hallId===+hallId)?(+b.fieldBirds||0):0;
+}
+function batchHallAlive(b,hallId){
+  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
+  if(!alloc||!base)return 0;
+  let ratio=alloc/base;
+  let loss=Math.round((c.mort+c.sold)*ratio);
+  return Math.max(0,alloc-loss);
+}
+function batchHallMort(b,hallId){
+  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
+  return base?Math.round(c.mort*(alloc/base)):0;
+}
+function batchHallSold(b,hallId){
+  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
+  return base?Math.round(c.sold*(alloc/base)):0;
 }
 
 // ── TRANSFER ──
@@ -1064,67 +2009,504 @@ function fillTransferPreview(showMsg=true){
   $('transferHatched').value=$('transferHatched').value||b.hatched||c.est||'';
   $('vaccineDeaths').value=$('vaccineDeaths').value||b.vaccineDeaths||0;
   $('isolatedBirds').value=$('isolatedBirds').value||b.isolatedBirds||0;
-  $('fieldBirds').value=$('fieldBirds').value||b.fieldBirds||'';
+  $('fieldBirds').value=$('fieldBirds').value||'';
+  if($('transferBirdWeight'))$('transferBirdWeight').value=$('transferBirdWeight').value||b.transferBirdWeight||'';
+  if($('transferAlertAge'))$('transferAlertAge').value=b.alertAge||35;
+  if($('transferMarketAge'))$('transferMarketAge').value=b.marketAge||35;
   checkFieldOccupancy();
   let alertHtml=c.hatchLate?`<div style="background:var(--red2);border:1px solid #fecaca;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:var(--red);font-weight:600;margin-bottom:10px">⚠️ متأخرة عن النقل</div>`:c.hatchComplete?`<div style="background:var(--amber2);border:1px solid #fcd34d;border-radius:var(--r2);padding:10px 14px;font-size:12px;color:#78350f;font-weight:600;margin-bottom:10px">🔔 الفقسة اكتملت — انقلها للحقل</div>`:'';
-  $('transferPreview').innerHTML=alertHtml+`<div class="detailGrid" style="grid-template-columns:repeat(4,1fr)"><div class="dCell"><div class="dc-label">موعد النقل</div><div class="dc-val">${fmt(c.expectedTransfer)}</div></div><div class="dCell"><div class="dc-label">عمر التفقيس</div><div class="dc-val">${c.hatchAge}/21</div></div><div class="dCell dc-accent"><div class="dc-label">الفاقس التقديري</div><div class="dc-val">${c.est.toLocaleString()}</div></div><div class="dCell"><div class="dc-label">دخول الحقل السابق</div><div class="dc-val">${c.entryDate?fmt(c.entryDate):'—'}</div></div></div>`;
+  $('transferPreview').innerHTML=alertHtml+`<div class="detailGrid" style="grid-template-columns:repeat(4,1fr)"><div class="dCell"><div class="dc-label">موعد النقل</div><div class="dc-val">${fmt(c.expectedTransfer)}</div></div><div class="dCell"><div class="dc-label">عمر التفقيس</div><div class="dc-val">${c.hatchAge}/21</div></div><div class="dCell dc-accent"><div class="dc-label">الفاقس التقديري</div><div class="dc-val">${c.est.toLocaleString()}</div></div><div class="dCell"><div class="dc-label">المنقول سابقاً</div><div class="dc-val">${transferredBirdsFromBatch(b).toLocaleString()}</div></div><div class="dCell dc-accent"><div class="dc-label">المتبقي بالمفقس</div><div class="dc-val">${hatchAvailableForTransfer(b).toLocaleString()}</div></div></div>`;
   if(showMsg)msg(c.hatchComplete?'الفقسة جاهزة للنقل':'تم جلب بيانات الوجبة');
 }
 function saveTransfer(){
   if(!isAdmin())return;
   let id=+$('transferBatch').value,b=data.batches.find(x=>x.id===id);
-  if(!b)return alert('اختر وجبة');if(!val('transferDate'))return alert('أدخل تاريخ دخول الحقل');
-  let fieldName=$('transferField').value;if(!fieldName)return alert('اختر الحقل');
-  let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),field=num('fieldBirds');
-  if(field<=0)return alert('أدخل الصافي المنقول للحقل');
-  let net=Math.max(0,hat-vac-iso);let eggs=+b.eggs||0;
-  b.transferDate=val('transferDate');b.fieldEntryDate=val('transferDate');b.field=fieldName;
-  b.hatched=hat;b.vaccineDeaths=vac;b.isolatedBirds=iso;b.netHatch=net;b.fieldBirds=field;
-  b.fixedHatchRate=eggs?+((field/eggs)*100).toFixed(2):0;b.status='نشطة';
-  selectedBatchId=b.id;save();renderAll();clearTransferForm();msg('تم تأكيد النقل');
+  if(!b)return alert('اختر وجبة');
+  if(!val('transferDate'))return alert('أدخل تاريخ دخول الحقل');
+
+  let fieldName=$('transferField').value;
+  if(!fieldName)return alert('اختر الحقل');
+
+  let hallId=$('transferHall')&&$('transferHall').value?+$('transferHall').value:null;
+  if(!hallId)return alert('اختر القاعة المختارة');
+
+  let hallObj=data.halls.find(h=>h.id===hallId);
+  if(!hallObj)return alert('القاعة المختارة غير موجودة');
+
+  let hat=num('transferHatched'),vac=num('vaccineDeaths'),iso=num('isolatedBirds'),moveCount=num('fieldBirds');
+  if(hat<=0)return alert('أدخل عدد الطير الفاقس');
+  if(moveCount<=0)return alert('أدخل عدد الطير المراد نقله لهذه القاعة');
+
+  let available=hatchAvailableForTransfer(b);
+  if(moveCount>available)return alert('العدد المطلوب نقله أكبر من المتبقي بالمفقس. المتبقي: '+available.toLocaleString());
+
+  let capCheck=hallCapacityStatus(hallId,moveCount,null);
+  if(!capCheck.ok)return alert('القاعة لا تتحمل هذا العدد. المتاح: '+capCheck.remaining.toLocaleString()+' طير');
+
+  let net=Math.max(0,hat-vac-iso);
+  let eggs=+b.eggs||0;
+  let allocation={hallId:hallId,hall:hallObj.name,birds:moveCount};
+
+  b.hatched=hat;
+  b.vaccineDeaths=vac;
+  b.isolatedBirds=iso;
+  b.netHatch=net;
+  b.transferBirdWeight=num('transferBirdWeight')||b.transferBirdWeight||0;
+  b.hallAllocations=mergeBatchAllocations(b.hallAllocations||[],[allocation]);
+  b.fieldBirds=transferredBirdsFromBatch(b);
+  b.fixedHatchRate=eggs?+((b.fieldBirds/eggs)*100).toFixed(2):0;
+
+  if(!b.transferDate)b.transferDate=val('transferDate');
+  if(!b.fieldEntryDate)b.fieldEntryDate=val('transferDate');
+  b.field=fieldName;
+
+  let first=b.hallAllocations[0]||null;
+  b.hallId=first?+first.hallId:null;
+  b.hall=first?first.hall:'';
+
+  b.status=hatchAvailableForTransfer(b)>0?'نقل جزئي':'نشطة';
+  if($('transferAlertAge')&&num('transferAlertAge')>0)b.alertAge=num('transferAlertAge');
+  if($('transferMarketAge')&&num('transferMarketAge')>0)b.marketAge=num('transferMarketAge');
+
+  selectedBatchId=b.id;
+  save();
+  renderAll();
+  clearTransferForm();
+  msg('تم نقل '+moveCount.toLocaleString()+' طير إلى '+hallObj.name+'، المتبقي بالمفقس '+hatchAvailableForTransfer(b).toLocaleString());
 }
 
 
 function clearMortForm(){
   if($('mortBatch')) $('mortBatch').selectedIndex=0;
+  if($('mortHall')) $('mortHall').innerHTML='';
   if($('mortDate')) $('mortDate').value=today();
   if($('mortCount')) $('mortCount').value='';
   if($('mortReason')) $('mortReason').value='';
 }
 function clearMarketForm(){
   if($('marketBatch')) $('marketBatch').selectedIndex=0;
+  if($('marketHall')) $('marketHall').innerHTML='';
   if($('marketDate')) $('marketDate').value=today();
   if($('marketCount')) $('marketCount').value='';
   if($('marketStatus')) $('marketStatus').selectedIndex=0;
   if($('marketNote')) $('marketNote').value='';
+  fillMarketHalls();
+}
+
+
+// ── LAYER PURCHASE ──
+function clearLayerPurchaseForm(){
+  ['lpName','lpBirds','lpWeeks','lpDays','lpChickWeight','lpAvgWeight','lpNote'].forEach(id=>{if($(id))$(id).value=''});
+  if($('lpDate'))$('lpDate').value=today();
+  if($('lpField'))$('lpField').selectedIndex=0;
+  onLayerPurchaseFieldChange();
+  if($('lpWarn')){$('lpWarn').className='warnBox';$('lpWarn').textContent=''}
+}
+function onLayerPurchaseFieldChange(){
+  let fn=$('lpField')?$('lpField').value:'';
+  let f=data.fields.find(x=>x.name===fn);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  if($('lpHall'))$('lpHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}${h.capacity?' — سعة '+h.capacity:''}</option>`).join('');
+  checkLayerPurchaseCapacity();
+}
+function checkLayerPurchaseCapacity(){
+  let warn=$('lpWarn');if(!warn)return;
+  let hallId=$('lpHall')&&$('lpHall').value?+$('lpHall').value:null;
+  let birds=num('lpBirds');
+  if(!hallId){warn.className='warnBox';warn.textContent='';return true}
+  let st=hallCapacityStatus(hallId,birds,null);
+  if(!st.cap){warn.className='warnBox free';warn.textContent='✅ القاعة بدون سعة محددة، يسمح بالحفظ';return true}
+  if(st.ok){warn.className='warnBox free';warn.textContent=`✅ متاح في القاعة: ${st.remaining.toLocaleString()} طير`;return true}
+  warn.className='warnBox busy';warn.textContent=`⚠️ العدد أكبر من طاقة القاعة. المشغول: ${st.used.toLocaleString()} / ${st.cap.toLocaleString()}، المتاح: ${st.remaining.toLocaleString()}`;
+  return false;
+}
+function saveLayerPurchase(){
+  if(!isAdmin())return;
+  let name=val('lpName'),date=val('lpDate'),field=val('lpField'),hallId=$('lpHall')&&$('lpHall').value?+$('lpHall').value:null,birds=num('lpBirds');
+  if(!name||!date||!field||!hallId||birds<=0)return alert('أدخل اسم الوجبة والتاريخ والحقل والقاعة والعدد');
+  if(!checkLayerPurchaseCapacity())return;
+  let hall=data.halls.find(h=>h.id===hallId);
+  let b={id:Date.now(),name,hatchDate:date,type:'بياض',eggs:0,badEggs:0,candle:0,alertAge:980,marketAge:980,note:val('lpNote'),status:'نشطة',
+    transferDate:date,fieldEntryDate:date,field,hallId,hall:hall?hall.name:'',hatched:0,vaccineDeaths:0,isolatedBirds:0,netHatch:0,
+    fieldBirds:birds,fixedHatchRate:0,layerSource:'شراء',layerInitWeeks:num('lpWeeks')||0,layerInitDays:num('lpDays')||0};
+  data.batches.push(b);
+  let avg=+($('lpAvgWeight').value||0),cw=num('lpChickWeight')||0;
+  if(avg||cw){
+    data.weights=data.weights||[];
+    data.weights.push({id:Date.now()+1,batchId:b.id,field,hallId,hall:b.hall,date,avgWeight:avg||0,expectedWeight:defaultExpectedWeight(calc(b,date).flockAge,true),totalWeight:avg?+(avg*birds).toFixed(2):0,note:'وزن الدخول / شراء البياض'});
+    if(hall){hall.chickWeight=cw||hall.chickWeight||0;hall.avgWeight=avg||hall.avgWeight||0;hall.totalWeight=avg?+(avg*birds).toFixed(2):(hall.totalWeight||0);}
+  }
+  selectedBatchId=b.id;save();renderAll();clearLayerPurchaseForm();msg('تم حفظ شراء البياض');
+}
+function renderLayerPurchase(){
+  let el=$('layerPurchaseTable');if(!el)return;
+  let rows=data.batches.filter(b=>b.type==='بياض'&&b.layerSource==='شراء').map(b=>{
+    let c=calc(b),lw=latestWeightForBatch(b.id);
+    return `<tr class="selectable" onclick="selectBatch(${b.id});show('dash',document.querySelectorAll('.nav')[0])">
+      <td><b>${b.name}</b></td><td>${fmt(c.entryDate)}</td><td>${b.field||'—'}</td><td>${b.hall||'—'}</td>
+      <td>${(+b.fieldBirds||0).toLocaleString()}</td><td>${fmtLayerAge(c.flockAge)}</td><td>${lw?lw.avgWeight+' كغ':'—'}</td><td>${c.alive.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>تاريخ الدخول</th><th>الحقل</th><th>القاعة</th><th>العدد</th><th>العمر</th><th>آخر وزن</th><th>الحي</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── WEIGHTS ──
+
+function clearWeightForm(){
+  if($('wField'))$('wField').selectedIndex=0;
+  if($('wDate'))$('wDate').value=today();
+  ['wAvg','wExpected','wTotal','wNote','wAlive','wDiff'].forEach(id=>{if($(id))$(id).value=''});
+  onWeightFieldChange();
+}
+function onWeightFieldChange(){
+  let fn=$('wField')?$('wField').value:'';
+  let f=data.fields.find(x=>x.name===fn);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  if($('wHall'))$('wHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}${h.capacity?' — سعة '+h.capacity:''}</option>`).join('');
+  onWeightHallChange();
+}
+function onWeightHallChange(){
+  let hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&batchAllocatedToHall(b,hallId)>0);
+  if($('wBatch'))$('wBatch').innerHTML=batches.map(b=>`<option value="${b.id}">${b.name} — حي ${calc(b).alive.toLocaleString()}</option>`).join('');
+  fillWeightDefaults();
+}
+function calcWeightTotal(){
+  let id=$('wBatch')?+$('wBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  if(!b)return;
+  let c=calc(b,val('wDate')||today());
+  let avg=+($('wAvg').value||0);
+  let expected=+($('wExpected').value||defaultExpectedWeight(c.flockAge,c.isLayer));
+  if($('wAlive'))$('wAlive').value=c.alive||0;
+  if($('wTotal'))$('wTotal').value=avg?+(avg*(c.alive||c.fieldBirds||0)).toFixed(2):'';
+  if($('wDiff'))$('wDiff').value=avg?((avg-expected).toFixed(2)+' كغ'):'';
+}
+function fillWeightDefaults(){
+  let id=$('wBatch')?+$('wBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);if(!b)return;
+  let c=calc(b,val('wDate')||today());
+  if($('wAlive'))$('wAlive').value=c.alive||0;
+  if($('wExpected'))$('wExpected').value=defaultExpectedWeight(c.flockAge,c.isLayer);
+  calcWeightTotal();
+}
+function saveWeightRecord(){
+  let field=$('wField')?$('wField').value:'';
+  let hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
+  let hall=data.halls.find(h=>h.id===hallId);
+  let id=+$('wBatch').value,b=data.batches.find(x=>x.id===id);
+  if(!field||!hallId)return alert('اختر الحقل والقاعة');
+  if(!b)return alert('اختر الوجبة داخل القاعة');
+  if(!isAdmin()&&!canSeeField(b.field))return alert('لا تملك صلاحية لهذه القاعة');
+  let avg=+($('wAvg').value||0);if(avg<=0)return alert('أدخل معدل الوزن الفعلي');
+  let c=calc(b,val('wDate')||today());
+  let expected=+($('wExpected').value||defaultExpectedWeight(c.flockAge,c.isLayer));
+  let total=+($('wTotal').value||0)||+(avg*(c.alive||c.fieldBirds||0)).toFixed(2);
+  let rec={id:Date.now(),batchId:b.id,field:field,hallId:hallId,hall:hall?hall.name:(b.hall||''),date:val('wDate')||today(),
+    alive:c.alive,avgWeight:avg,expectedWeight:expected,totalWeight:total,diff:+(avg-expected).toFixed(2),note:val('wNote')};
+  data.weights=data.weights||[];data.weights.push(rec);
+  if(hall){hall.avgWeight=avg;hall.totalWeight=total;}
+  save();renderAll();clearWeightForm();msg('تم حفظ وزن القاعة');
+}
+function renderWeights(){
+  let el=$('weightsTable');if(!el)return;
+  let weights=(data.weights||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('weightBatchFilter')&&$('weightBatchFilter').value?+$('weightBatchFilter').value:0;
+  if(filterBatchId)weights=weights.filter(w=>+w.batchId===filterBatchId);
+  let fields=[...new Set(weights.map(w=>w.field).filter(Boolean))];
+  let rows=fields.map((field,i)=>{
+    let fieldWeights=weights.filter(w=>w.field===field);
+    let latest=fieldWeights[0]||{};
+    let avgCount=fieldWeights.filter(w=>+w.avgWeight>0).length;
+    let avgWeight=avgCount?+(fieldWeights.reduce((s,w)=>s+(+w.avgWeight||0),0)/avgCount).toFixed(2):0;
+    let totalWeight=fieldWeights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+    let halls=[...new Set(fieldWeights.map(w=>w.hall||'—'))];
+    let hallRows=halls.map(hall=>{
+      let hallWeights=fieldWeights.filter(w=>(w.hall||'—')===hall);
+      let last=hallWeights[0]||{};
+      let b=data.batches.find(x=>x.id===last.batchId);
+      let diff=(+last.avgWeight-(+last.expectedWeight||0)).toFixed(2);
+      let badge=diff>=0?'<span class="badge b-green">جيد</span>':'<span class="badge b-amber">أقل من المتوقع</span>';
+      let delBtns=hallWeights.map(w=>`<button class="btn btn-danger btn-sm" title="${fmt(w.date)}" onclick="deleteWeight(${w.id})">حذف</button>`).join(' ');
+      return `<tr>
+        <td><b>${hall}</b></td>
+        <td>${fmt(last.date)}</td>
+        <td>${b?b.name:'—'}</td>
+        <td>${(+last.alive||0).toLocaleString()}</td>
+        <td>${last.avgWeight||'—'} كغ</td>
+        <td>${last.expectedWeight||'—'} كغ</td>
+        <td>${last.avgWeight?diff+' كغ '+badge:'—'}</td>
+        <td>${(+last.totalWeight||0).toLocaleString()} كغ</td>
+        <td>${hallWeights.length.toLocaleString()}</td>
+        <td>${last.note||'—'}</td>
+        <td>${isAdmin()?delBtns:'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('weightDetail${i}')" style="background:var(--bg)">
+      <td><b>🏡 ${field}</b></td>
+      <td>${fmt(latest.date)}</td>
+      <td>${halls.length.toLocaleString()} قاعة</td>
+      <td>${avgWeight?avgWeight+' كغ':'—'}</td>
+      <td><b>${totalWeight.toLocaleString()} كغ</b></td>
+      <td>${fieldWeights.length.toLocaleString()}</td>
+      <td colspan="4">اضغط لعرض القاعات</td>
+    </tr>
+    <tr id="weightDetail${i}" class="hidden"><td colspan="10">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>الوجبة</th><th>الطير الحي</th><th>الفعلي</th><th>المتوقع</th><th>الفرق</th><th>مجموع وزن القاعة</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+    </td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الحقل</th><th>آخر تاريخ</th><th>القاعات</th><th>معدل الوزن</th><th>مجموع الوزن</th><th>السجلات</th><th colspan="4">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان</td></tr>')+'</tbody>';
+}
+
+function deleteWeight(id){
+  if(!isAdmin())return;
+  if(confirm('حذف سجل الوزن؟')){
+    data.weights=(data.weights||[]).filter(w=>w.id!==id);
+    save();renderAll();msg('تم حذف سجل الوزن');
+  }
+}
+
+
+// ── FEED & MEDS ──
+function hallInfo(hallId){return data.halls.find(h=>+h.id===+hallId)||null}
+function fieldHallsByName(fieldName){
+  let f=data.fields.find(x=>x.name===fieldName);
+  return f?data.halls.filter(h=>h.fieldId===f.id):[];
+}
+function feedTotalHall(hallId,date=null){
+  return (data.feeds||[]).filter(x=>(+x.hallId||0)===+hallId&&(!date||x.date===date)).reduce((s,x)=>s+(+x.qty||0),0);
+}
+function feedTotalField(fieldName,date=null){
+  return (data.feeds||[]).filter(x=>x.field===fieldName&&(!date||x.date===date)).reduce((s,x)=>s+(+x.qty||0),0);
+}
+function medsCountHall(hallId,date=null){
+  return (data.meds||[]).filter(x=>(+x.hallId||0)===+hallId&&(!date||x.date===date)).length;
+}
+function medsCountField(fieldName,date=null){
+  return (data.meds||[]).filter(x=>x.field===fieldName&&(!date||x.date===date)).length;
+}
+function lastMedHall(hallId){
+  let list=(data.meds||[]).filter(x=>(+x.hallId||0)===+hallId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return list[0]||null;
+}
+function onFeedFieldChange(){
+  let field=val('feedField');
+  let halls=fieldHallsByName(field);
+  if($('feedHall'))$('feedHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+}
+function onMedFieldChange(){
+  let field=val('medField');
+  let halls=fieldHallsByName(field);
+  if($('medHall'))$('medHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+}
+function clearFeedForm(){
+  if($('feedDate'))$('feedDate').value=today();
+  if($('feedField'))$('feedField').selectedIndex=0;
+  ['feedType','feedQty','feedNote'].forEach(id=>{if($(id))$(id).value=''});
+  onFeedFieldChange();
+}
+function clearMedForm(){
+  if($('medDate'))$('medDate').value=today();
+  if($('medField'))$('medField').selectedIndex=0;
+  if($('medType'))$('medType').selectedIndex=0;
+  ['medName','medDose','medQty','medNote'].forEach(id=>{if($(id))$(id).value=''});
+  onMedFieldChange();
+}
+function saveFeed(){
+  let field=val('feedField'),hallId=$('feedHall')&&$('feedHall').value?+$('feedHall').value:null;
+  let hall=hallInfo(hallId);
+  if(!field||!hallId)return alert('اختر الحقل والقاعة');
+  let qty=num('feedQty');
+  if(qty<=0)return alert('أدخل كمية العلف');
+  data.feeds=data.feeds||[];
+  data.feeds.push({id:Date.now(),date:val('feedDate')||today(),field,hallId,hall:hall?hall.name:'',feedType:val('feedType'),qty,note:val('feedNote')});
+  save();renderAll();clearFeedForm();msg('تم حفظ استهلاك العلف');
+}
+function saveMed(){
+  let field=val('medField'),hallId=$('medHall')&&$('medHall').value?+$('medHall').value:null;
+  let hall=hallInfo(hallId);
+  if(!field||!hallId)return alert('اختر الحقل والقاعة');
+  if(!val('medName'))return alert('أدخل اسم المادة');
+  data.meds=data.meds||[];
+  data.meds.push({id:Date.now(),date:val('medDate')||today(),field,hallId,hall:hall?hall.name:'',type:val('medType'),name:val('medName'),dose:val('medDose'),qty:num('medQty'),note:val('medNote')});
+  save();renderAll();clearMedForm();msg('تم حفظ الدواء/اللقاح');
+}
+function deleteFeed(id){
+  if(!isAdmin())return;
+  if(confirm('حذف سجل العلف؟')){
+    data.feeds=(data.feeds||[]).filter(x=>x.id!==id);
+    save();renderAll();msg('تم حذف سجل العلف');
+  }
+}
+function deleteMed(id){
+  if(!isAdmin())return;
+  if(confirm('حذف سجل الدواء/اللقاح؟')){
+    data.meds=(data.meds||[]).filter(x=>x.id!==id);
+    save();renderAll();msg('تم حذف سجل الدواء/اللقاح');
+  }
+}
+function toggleInlineDetails(id){
+  let el=$(id);if(!el)return;
+  el.classList.toggle('hidden');
+}
+function renderFeed(){
+  let el=$('feedTable');if(!el)return;
+  let feeds=(data.feeds||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('feedBatchFilter')&&$('feedBatchFilter').value?+$('feedBatchFilter').value:0;
+  if(filterBatchId){
+    let fb=data.batches.find(b=>b.id===filterBatchId);
+    let halls=batchHallIds(fb);
+    feeds=feeds.filter(x=>fb&&x.field===fb.field&&(!halls.length||halls.includes(+x.hallId)));
+  }
+  let fields=[...new Set(feeds.map(x=>x.field).filter(Boolean))];
+  let rows=fields.map((field,i)=>{
+    let fieldFeeds=feeds.filter(x=>x.field===field);
+    let total=fieldFeeds.reduce((s,x)=>s+(+x.qty||0),0);
+    let todayQty=fieldFeeds.filter(x=>x.date===today()).reduce((s,x)=>s+(+x.qty||0),0);
+    let halls=[...new Set(fieldFeeds.map(x=>x.hall||'—'))];
+    let hallRows=halls.map(hall=>{
+      let hallFeeds=fieldFeeds.filter(x=>(x.hall||'—')===hall);
+      let hTotal=hallFeeds.reduce((s,x)=>s+(+x.qty||0),0);
+      let latest=hallFeeds[0]||{};
+      let delBtns=hallFeeds.map(x=>`<button class="btn btn-danger btn-sm" title="${fmt(x.date)}" onclick="deleteFeed(${x.id})">حذف</button>`).join(' ');
+      return `<tr><td>${hall}</td><td>${fmt(latest.date)}</td><td>${latest.feedType||'—'}</td><td>${hTotal.toLocaleString()} كغم</td><td>${hallFeeds.length.toLocaleString()}</td><td>${latest.note||'—'}</td><td>${isAdmin()?delBtns:'—'}</td></tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('feedDetail${i}')" style="background:var(--bg)">
+      <td><b>🏡 ${field}</b></td>
+      <td>اليوم: ${todayQty.toLocaleString()} كغم</td>
+      <td>${halls.length.toLocaleString()} قاعة</td>
+      <td><b>${total.toLocaleString()} كغم</b></td>
+      <td>${fieldFeeds.length.toLocaleString()}</td>
+      <td>اضغط لعرض التفاصيل</td>
+    </tr>
+    <tr id="feedDetail${i}" class="hidden"><td colspan="6">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>آخر نوع</th><th>مجموع العلف</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+    </td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الحقل</th><th>علف اليوم</th><th>القاعات</th><th>مجموع العلف</th><th>السجلات</th><th>تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات علف</td></tr>')+'</tbody>';
+}
+function renderMeds(){
+  let el=$('medTable');if(!el)return;
+  let meds=(data.meds||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('medBatchFilter')&&$('medBatchFilter').value?+$('medBatchFilter').value:0;
+  if(filterBatchId){
+    let fb=data.batches.find(b=>b.id===filterBatchId);
+    let halls=batchHallIds(fb);
+    meds=meds.filter(x=>fb&&x.field===fb.field&&(!halls.length||halls.includes(+x.hallId)));
+  }
+  let fields=[...new Set(meds.map(x=>x.field).filter(Boolean))];
+  let rows=fields.map((field,i)=>{
+    let fieldMeds=meds.filter(x=>x.field===field);
+    let todayCount=fieldMeds.filter(x=>x.date===today()).length;
+    let halls=[...new Set(fieldMeds.map(x=>x.hall||'—'))];
+    let hallRows=halls.map(hall=>{
+      let hallMeds=fieldMeds.filter(x=>(x.hall||'—')===hall);
+      let latest=hallMeds[0]||{};
+      let delBtns=hallMeds.map(x=>`<button class="btn btn-danger btn-sm" title="${fmt(x.date)}" onclick="deleteMed(${x.id})">حذف</button>`).join(' ');
+      return `<tr>
+        <td>${hall}</td>
+        <td>${fmt(latest.date)}</td>
+        <td>${latest.type||'—'}</td>
+        <td><b>${latest.name||'—'}</b></td>
+        <td>${hallMeds.length.toLocaleString()}</td>
+        <td>${latest.note||'—'}</td>
+        <td>${isAdmin()?delBtns:'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('medDetail${i}')" style="background:var(--bg)">
+      <td><b>🏡 ${field}</b></td>
+      <td>اليوم: ${todayCount.toLocaleString()}</td>
+      <td>${halls.length.toLocaleString()} قاعة</td>
+      <td><b>${fieldMeds.length.toLocaleString()} سجل</b></td>
+      <td>${fieldMeds.length.toLocaleString()}</td>
+      <td>اضغط لعرض التفاصيل</td>
+    </tr>
+    <tr id="medDetail${i}" class="hidden"><td colspan="6">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>آخر نوع</th><th>آخر مادة</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+    </td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الحقل</th><th>لقاحات اليوم</th><th>القاعات</th><th>المجموع</th><th>السجلات</th><th>تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات لقاحات أو أدوية</td></tr>')+'</tbody>';
 }
 
 // ── MORTALITY ──
 function addMort(){
-  let id=+$('mortBatch').value;if(!id||!num('mortCount'))return alert('اختر وجبة وأدخل عدد الهلاك');
+  let id=+$('mortBatch').value;
+  if(!id)return alert('اختر وجبة');
   let b=data.batches.find(x=>x.id===id);
-  if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
-  data.morts.push({id:Date.now(),batchId:id,date:val('mortDate')||today(),count:num('mortCount'),reason:val('mortReason')});
+  let hallId=$('mortHall')&&$('mortHall').value?+$('mortHall').value:null;
+  let hallObj=hallId?data.halls.find(h=>h.id===hallId):null;
+  if(b&&b.transferDate&&!hallId)return alert('اختر القاعة التي حدث بها الهلاك');
+  data.morts.push({id:Date.now(),batchId:id,hallId:hallId,hall:hallObj?hallObj.name:'',date:val('mortDate')||today(),count:num('mortCount'),reason:val('mortReason')});
+  updateBatchArchiveStatus(b);
   save();renderAll();clearMortForm();
 }
 function renderMort(){
-  let mf=myFields();
-  let rows=data.morts.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).map(m=>{
-    let b=data.batches.find(x=>x.id===m.batchId);
-    let canDel=isAdmin();
-    return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${(+m.count).toLocaleString()}</td><td>${m.reason||'—'}</td><td>${canDel?`<button class="btn btn-danger btn-sm" onclick="deleteMort(${m.id})">حذف</button>`:'—'}</td></tr>`;
+  let morts=data.morts.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('mortBatchFilter')&&$('mortBatchFilter').value?+$('mortBatchFilter').value:0;
+  if(filterBatchId)morts=morts.filter(m=>+m.batchId===filterBatchId);
+  let fields=[...new Set(morts.map(m=>data.batches.find(b=>b.id===m.batchId)?.field).filter(Boolean))];
+  let rows=fields.map((field,i)=>{
+    let fieldMorts=morts.filter(m=>data.batches.find(b=>b.id===m.batchId)?.field===field);
+    let total=fieldMorts.reduce((s,m)=>s+(+m.count||0),0);
+    let todayCount=fieldMorts.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
+    let halls=[...new Set(fieldMorts.map(m=>m.hall||'—'))];
+    let detailRows=halls.map(hall=>{
+      let hallMorts=fieldMorts.filter(m=>(m.hall||'—')===hall);
+      let latest=hallMorts[0]||{};
+      let hTotal=hallMorts.reduce((s,m)=>s+(+m.count||0),0);
+      let hToday=hallMorts.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
+      let batches=[...new Set(hallMorts.map(m=>data.batches.find(b=>b.id===m.batchId)?.name).filter(Boolean))];
+      let delBtns=hallMorts.map(m=>`<button class="btn btn-danger btn-sm" title="${fmt(m.date)}" onclick="deleteMort(${m.id})">حذف</button>`).join(' ');
+      return `<tr>
+        <td><b>${hall}</b></td>
+        <td>${fmt(latest.date)}</td>
+        <td>${hToday.toLocaleString()}</td>
+        <td><b>${hTotal.toLocaleString()}</b></td>
+        <td>${hallMorts.length.toLocaleString()}</td>
+        <td>${batches.join(' / ')||'—'}</td>
+        <td>${latest.reason||'—'}</td>
+        <td>${isAdmin()?delBtns:'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('mortDetail${i}')" style="background:var(--bg)">
+      <td><b>🏡 ${field}</b></td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMorts.length.toLocaleString()}</td><td colspan="2">اضغط لعرض التفاصيل</td>
+    </tr>
+    <tr id="mortDetail${i}" class="hidden"><td colspan="6">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th>الوجبات</th><th>آخر سبب</th><th>حذف</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+    </td></tr>`;
   }).join('');
-  $('mortTable').innerHTML='<thead><tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>السبب</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  $('mortTable').innerHTML='<thead><tr><th>الحقل</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th colspan="2">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات هلاك</td></tr>')+'</tbody>';
 }
-function deleteMort(id){if(!isAdmin())return;if(confirm('حذف سجل الهلاك؟')){data.morts=data.morts.filter(m=>m.id!==id);save();renderAll()}}
+function deleteMort(id){if(!isAdmin())return;if(confirm('حذف سجل الهلاك؟')){let old=data.morts.find(m=>m.id===id);data.morts=data.morts.filter(m=>m.id!==id);if(old)updateBatchArchiveStatus(data.batches.find(b=>b.id===old.batchId));save();renderAll()}}
 
 // ── MARKET ──
+function marketHallOptionsForBatch(b){
+  if(!b)return [];
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length)return b.hallAllocations;
+  if(b.hallId)return [{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}];
+  return [];
+}
+function fillMarketHalls(){
+  let sel=$('marketHall');if(!sel)return;
+  let id=$('marketBatch')?+$('marketBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let arr=marketHallOptionsForBatch(b);
+  sel.innerHTML=arr.length
+    ?arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — حي ${batchHallAlive(b,+a.hallId).toLocaleString()}</option>`).join('')
+    :'<option value="">لا توجد قاعات لهذه الوجبة</option>';
+}
 function addMarket(){
   let id=+$('marketBatch').value;if(!id)return alert('اختر وجبة');
   let b=data.batches.find(x=>x.id===id);
   if(!isAdmin()&&b&&!canSeeField(b.field))return alert('لا تملك صلاحية للوجبة المختارة');
-  data.markets.push({id:Date.now(),batchId:id,date:val('marketDate')||today(),count:num('marketCount'),status:val('marketStatus'),note:val('marketNote')});
-  if(b){let c=calc(b);b.status=c.completed?'منتهية':'نشطة'}
+  let hallId=$('marketHall')&&$('marketHall').value?+$('marketHall').value:null;
+  let hallObj=hallId?data.halls.find(h=>h.id===hallId):null;
+  if(b&&marketHallOptionsForBatch(b).length&&!hallId)return alert('اختر القاعة التي تم تسويقها');
+  let count=num('marketCount');
+  if(count<=0)return alert('أدخل عدد الطيور المسوقة');
+  if(hallId&&count>batchHallAlive(b,hallId))return alert('العدد أكبر من الحي داخل القاعة. الحي: '+batchHallAlive(b,hallId).toLocaleString());
+  data.markets.push({id:Date.now(),batchId:id,hallId:hallId,hall:hallObj?hallObj.name:'',date:val('marketDate')||today(),count:count,status:val('marketStatus'),note:val('marketNote')});
+  if(b)updateBatchArchiveStatus(b);
   save();renderAll();clearMarketForm();
 }
 function renderMarket(){
@@ -1135,40 +2517,480 @@ function renderMarket(){
     if(s==='منقولة')return '<span class="badge b-teal">منقولة</span>';
     return s;
   }
-  let rows=data.markets.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).map(m=>{
-    let b=data.batches.find(x=>x.id===m.batchId);
-    let canDel=isAdmin();
-    return `<tr><td>${b?b.name:'محذوفة'}</td><td>${fmt(m.date)}</td><td>${(+m.count).toLocaleString()}</td><td>${mktBadge(m.status)}</td><td>${m.note||'—'}</td><td>${canDel?`<button class="btn btn-danger btn-sm" onclick="deleteMarket(${m.id})">حذف</button>`:'—'}</td></tr>`;
+  let markets=data.markets.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('marketBatchFilter')&&$('marketBatchFilter').value?+$('marketBatchFilter').value:0;
+  if(filterBatchId)markets=markets.filter(m=>+m.batchId===filterBatchId);
+  let fields=[...new Set(markets.map(m=>data.batches.find(b=>b.id===m.batchId)?.field).filter(Boolean))];
+  let rows=fields.map((field,i)=>{
+    let fieldMarkets=markets.filter(m=>data.batches.find(b=>b.id===m.batchId)?.field===field);
+    let total=fieldMarkets.reduce((s,m)=>s+(+m.count||0),0);
+    let todayCount=fieldMarkets.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
+    let halls=[...new Set(fieldMarkets.map(m=>m.hall||'—'))];
+    let detailRows=halls.map(hall=>{
+      let hallMarkets=fieldMarkets.filter(m=>(m.hall||'—')===hall);
+      let latest=hallMarkets[0]||{};
+      let hTotal=hallMarkets.reduce((s,m)=>s+(+m.count||0),0);
+      let hToday=hallMarkets.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
+      let batches=[...new Set(hallMarkets.map(m=>data.batches.find(b=>b.id===m.batchId)?.name).filter(Boolean))];
+      let delBtns=hallMarkets.map(m=>`<button class="btn btn-danger btn-sm" title="${fmt(m.date)}" onclick="deleteMarket(${m.id})">حذف</button>`).join(' ');
+      return `<tr>
+        <td><b>${hall}</b></td>
+        <td>${fmt(latest.date)}</td>
+        <td>${hToday.toLocaleString()}</td>
+        <td><b>${hTotal.toLocaleString()}</b></td>
+        <td>${hallMarkets.length.toLocaleString()}</td>
+        <td>${batches.join(' / ')||'—'}</td>
+        <td>${mktBadge(latest.status||'—')}</td>
+        <td>${isDeveloperAdmin()?hallMarkets.map(m=>`<button class="btn btn-secondary btn-sm" onclick="editMarketCount(${m.id})">${(+m.count||0).toLocaleString()}</button>`).join(' '):'—'}</td>
+        <td>${isAdmin()?delBtns:'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('marketDetail${i}')" style="background:var(--bg)">
+      <td><b>🏡 ${field}</b></td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMarkets.length.toLocaleString()}</td><td colspan="3">اضغط لعرض التفاصيل</td>
+    </tr>
+    <tr id="marketDetail${i}" class="hidden"><td colspan="7">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>تسويق اليوم</th><th>مجموع التسويق</th><th>السجلات</th><th>الوجبات</th><th>آخر نوع</th><th>تعديل العدد</th><th>حذف</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+    </td></tr>`;
   }).join('');
-  $('marketTable').innerHTML='<thead><tr><th>الوجبة</th><th>التاريخ</th><th>العدد</th><th>نوع العملية</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  $('marketTable').innerHTML='<thead><tr><th>الحقل</th><th>تسويق اليوم</th><th>مجموع التسويق</th><th>السجلات</th><th colspan="3">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات تسويق</td></tr>')+'</tbody>';
 }
-function deleteMarket(id){if(!isAdmin())return;if(confirm('حذف عملية التسويق؟')){data.markets=data.markets.filter(m=>m.id!==id);save();renderAll()}}
+function deleteMarket(id){if(!isAdmin())return;if(confirm('حذف عملية التسويق؟')){let old=data.markets.find(m=>m.id===id);data.markets=data.markets.filter(m=>m.id!==id);if(old)updateBatchArchiveStatus(data.batches.find(b=>b.id===old.batchId));save();renderAll()}}
+
+function editMarketCount(id){
+  if(!isDeveloperAdmin())return alert('تعديل عدد الطير المسوق للمدير الرئيسي فقط');
+  let m=data.markets.find(x=>x.id===id);if(!m)return;
+  let b=data.batches.find(x=>x.id===m.batchId);if(!b)return;
+  let old=+m.count||0;
+  let hallId=+m.hallId||0;
+  let available=(hallId?batchHallAlive(b,hallId):calc(b).alive)+old;
+  let v=prompt('تعديل عدد الطير المسوق فقط',old);
+  if(v===null)return;
+  let next=+v;
+  if(!Number.isFinite(next)||next<0)return alert('أدخل عدد صحيح');
+  if(next>available)return alert('العدد أكبر من المتاح. المتاح مع السجل الحالي: '+available.toLocaleString());
+  m.count=next;
+  updateBatchArchiveStatus(b);
+  save();renderAll();msg('تم تعديل عدد الطير المسوق');
+}
+
+function updateBatchArchiveStatus(b){
+  if(!b)return;
+  let c=calc(b);
+  if(c.completed){
+    b.status='منتهية';
+    b.archiveDate=b.archiveDate||today();
+  }else if(b.status==='منتهية'){
+    b.status='نشطة';
+    b.archiveDate='';
+  }
+}
+function updateArchiveStatuses(){
+  (data.batches||[]).forEach(updateBatchArchiveStatus);
+}
 
 // ── REPORTS ──
+// ── REPORTS ENGINE ──
+function rptFilteredData(){
+  let type=$('rptType')?$('rptType').value:'batches';
+  let field=$('rptField')?$('rptField').value:'';
+  let hallId=$('rptHall')&&$('rptHall').value?+$('rptHall').value:0;
+  let batchId=$('rptBatch')&&$('rptBatch').value?+$('rptBatch').value:0;
+  let status=$('rptStatus')?$('rptStatus').value:'';
+  let search=($('rptSearch')&&$('rptSearch').value||'').trim().toLowerCase();
+  let from=$('rptFrom')?$('rptFrom').value:'';
+  let to=$('rptTo')?$('rptTo').value:'';
+  let inRange=(d)=>(!from||d>=from)&&(!to||d<=to);
+  let inField=(f)=>!field||f===field;
+  let inHall=(id)=>!hallId||(+id||0)===hallId;
+  let textMatch=(parts)=>!search||parts.some(x=>String(x||'').toLowerCase().includes(search));
+  return{type,field,hallId,batchId,status,search,from,to,inRange,inField,inHall,textMatch};
+}
+
+function reportStatusOptions(type){
+  if(type==='batches')return [
+    ['active','نشطة'],['completed','منتهية'],['transferred','منقولة للحقل'],['hatch','بالمفقس']
+  ];
+  if(type==='meds')return [['لقاح','لقاح'],['دواء','دواء'],['فيتامين','فيتامين'],['تعقيم','تعقيم']];
+  if(type==='feed')return [...new Set((data.feeds||[]).map(x=>x.feedType).filter(Boolean))].map(x=>[x,x]);
+  return [];
+}
+function renderReportFilters(){
+  if($('rptField')){
+    let cur=$('rptField').value;
+    $('rptField').innerHTML='<option value="">كل الحقول</option>'+data.fields.map(f=>`<option value="${f.name}">${f.name}</option>`).join('');
+    if(cur&&[...$('rptField').options].some(o=>o.value===cur))$('rptField').value=cur;
+  }
+  if($('rptHall'))fillReportHallFilter($('rptHall').value);
+  if($('rptBatch')){
+    let cur=$('rptBatch').value;
+    let field=$('rptField')?$('rptField').value:'';
+    let batches=(isAdmin()?data.batches:visibleBatches()).filter(b=>(!field||b.field===field));
+    $('rptBatch').innerHTML='<option value="">كل الوجبات</option>'+batches.map(b=>`<option value="${b.id}">${b.name}${b.field?' — '+b.field:''}</option>`).join('');
+    if(cur&&[...$('rptBatch').options].some(o=>o.value===cur))$('rptBatch').value=cur;
+  }
+  if($('rptStatus')){
+    let cur=$('rptStatus').value,type=$('rptType')?$('rptType').value:'batches';
+    let opts=reportStatusOptions(type);
+    $('rptStatus').innerHTML='<option value="">الكل</option>'+opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+    if(cur&&[...$('rptStatus').options].some(o=>o.value===cur))$('rptStatus').value=cur;
+  }
+}
+function fillReportHallFilter(keep=''){
+  let field=$('rptField')?$('rptField').value:'';
+  let halls=field?(fieldHallsByName(field)):(data.halls||[]);
+  $('rptHall').innerHTML='<option value="">كل القاعات</option>'+halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+  if(keep&&[...$('rptHall').options].some(o=>o.value===keep))$('rptHall').value=keep;
+}
+function onReportFieldChange(){
+  fillReportHallFilter('');
+  if($('rptBatch'))$('rptBatch').value='';
+  renderReports();
+}
+function clearReportFilters(){
+  ['rptField','rptHall','rptBatch','rptStatus'].forEach(id=>{if($(id))$(id).value=''});
+  ['rptSearch','rptFrom','rptTo'].forEach(id=>{if($(id))$(id).value=''});
+  renderReports();
+}
+
 function renderReports(){
-  let batches=isAdmin()?data.batches:visibleBatches();
-  let rows=batches.map(b=>{let c=calc(b);return `<tr><td><b>${b.name}</b></td><td>${b.type||'—'}</td><td>${(+b.eggs||0).toLocaleString()}</td><td>${(+b.badEggs||0).toLocaleString()}</td><td>${b.candle||0}%</td><td>${c.vaccineDeaths.toLocaleString()}</td><td>${c.isolated.toLocaleString()}</td><td>${hatchRate(b)}%</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>${c.alive.toLocaleString()}</td><td>${successRate(b)}%</td><td>${statusBadge(b)}</td></tr>`}).join('');
-  $('reportTable').innerHTML='<thead><tr><th>الوجبة</th><th>النوع</th><th>البيض</th><th>التالف</th><th>الفحص</th><th>هلاك اللقاح</th><th>العزل</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي</th><th>النجاح</th><th>الحالة</th></tr></thead><tbody>'+rows+'</tbody>';
+  renderReportFilters();
+
+  let{type,field,hallId,batchId,status,inRange,inField,inHall,textMatch}=rptFilteredData();
+  let el=$('reportTable');if(!el)return;
+  let title=$('rptTitle');
+  let summary=$('rptSummaryCards');
+
+  if(type==='batches'){
+    if(title)title.textContent='📋 تقرير الوجبات';
+    let batches=(isAdmin()?data.batches:visibleBatches()).filter(b=>inField(b.field));
+    if(batchId)batches=batches.filter(b=>b.id===batchId);
+    if(hallId)batches=batches.filter(b=>batchHallIds(b).includes(hallId));
+    if(status){
+      batches=batches.filter(b=>{
+        let c=calc(b);
+        if(status==='active')return !c.completed;
+        if(status==='completed')return c.completed;
+        if(status==='transferred')return c.transferred&&!c.completed;
+        if(status==='hatch')return !c.transferred;
+        return true;
+      });
+    }
+    batches=batches.filter(b=>textMatch([b.name,b.field,b.hall,b.type,b.status,...(Array.isArray(b.hallAllocations)?b.hallAllocations.map(a=>a.hall):[])]));
+    let totalAlive=batches.reduce((s,b)=>s+calc(b).alive,0);
+    let totalField=batches.reduce((s,b)=>s+(calc(b).fieldBirds||0),0);
+    let totalMort=batches.reduce((s,b)=>s+calc(b).mort,0);
+    let totalSold=batches.reduce((s,b)=>s+calc(b).sold,0);
+    if(summary)summary.innerHTML=[
+      {l:'إجمالي الوجبات',v:batches.length},{l:'الحي الكلي',v:totalAlive.toLocaleString()},
+      {l:'هلاك كلي',v:totalMort.toLocaleString()},{l:'مسوق كلي',v:totalSold.toLocaleString()},
+      {l:'الصافي المنقول',v:totalField.toLocaleString()},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    let rows=batches.map(b=>{
+      let c=calc(b);let lw=latestWeightForBatch(b.id);
+      let allocs=Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.map(a=>`${a.hall}:${(+a.birds||0).toLocaleString()}`).join(' / '):(b.hall||'—');
+      return `<tr>
+        <td><b>${b.name}</b></td><td>${b.type||'—'}</td><td>${fmt(b.hatchDate)}</td>
+        <td>${b.field||'—'}</td><td>${allocs}</td>
+        <td>${(+b.eggs||0).toLocaleString()}</td><td>${hatchRate(b)}%</td>
+        <td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td>
+        <td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td>
+        <td>${successRate(b)}%</td><td>${lw?lw.avgWeight+' كغ':'—'}</td><td>${statusBadge(b)}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML='<thead><tr><th>الوجبة</th><th>النوع</th><th>دخول البيض</th><th>الحقل</th><th>القاعات</th><th>البيض</th><th>نسبة الفقس</th><th>الصافي</th><th>هلاك</th><th>مسوق</th><th>الحي</th><th>النجاح</th><th>آخر وزن</th><th>الحالة</th></tr></thead><tbody>'+rows+'</tbody>';
+
+  }else if(type==='feed'){
+    if(title)title.textContent='🌾 تقرير استهلاك العلف';
+    let feeds=(data.feeds||[]).filter(x=>inField(x.field)&&inRange(x.date)).sort((a,b)=>b.date.localeCompare(a.date));
+    if(hallId)feeds=feeds.filter(x=>inHall(x.hallId));
+    if(batchId){
+      let rb=data.batches.find(b=>b.id===batchId),hids=batchHallIds(rb);
+      feeds=feeds.filter(x=>rb&&x.field===rb.field&&(!hids.length||hids.includes(+x.hallId)));
+    }
+    if(status)feeds=feeds.filter(x=>x.feedType===status);
+    feeds=feeds.filter(x=>textMatch([x.field,x.hall,x.feedType,x.note]));
+    let totalQty=feeds.reduce((s,x)=>s+(+x.qty||0),0);
+    // ملخص حسب الحقل
+    let byField={};feeds.forEach(x=>{byField[x.field]=(byField[x.field]||0)+(+x.qty||0);});
+    // ملخص حسب القاعة
+    let byHall={};feeds.forEach(x=>{let k=x.field+'/'+x.hall;byHall[k]=(byHall[k]||0)+(+x.qty||0);});
+    if(summary)summary.innerHTML=[
+      {l:'إجمالي العلف (كغم)',v:totalQty.toLocaleString()},
+      {l:'عدد السجلات',v:feeds.length},
+      ...Object.entries(byField).map(([f,q])=>({l:'علف '+f,v:q.toLocaleString()+' كغم'})),
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    let rows=feeds.map(x=>`<tr>
+      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall}</td>
+      <td>${x.feedType||'—'}</td><td><b>${(+x.qty||0).toLocaleString()} كغم</b></td><td>${x.note||'—'}</td>
+    </tr>`).join('');
+    el.innerHTML='<thead><tr><th>التاريخ</th><th>الحقل</th><th>القاعة</th><th>نوع العلف</th><th>الكمية (كغم)</th><th>ملاحظة</th></tr></thead><tbody>'+rows+'</tbody>';
+
+  }else if(type==='meds'){
+    if(title)title.textContent='💉 تقرير الأدوية واللقاحات';
+    let meds=(data.meds||[]).filter(x=>inField(x.field)&&inRange(x.date)).sort((a,b)=>b.date.localeCompare(a.date));
+    if(hallId)meds=meds.filter(x=>inHall(x.hallId));
+    if(batchId){
+      let rb=data.batches.find(b=>b.id===batchId),hids=batchHallIds(rb);
+      meds=meds.filter(x=>rb&&x.field===rb.field&&(!hids.length||hids.includes(+x.hallId)));
+    }
+    if(status)meds=meds.filter(x=>x.type===status);
+    meds=meds.filter(x=>textMatch([x.field,x.hall,x.type,x.name,x.dose,x.note]));
+    let byType={};meds.forEach(x=>{byType[x.type]=(byType[x.type]||0)+1;});
+    if(summary)summary.innerHTML=[
+      {l:'إجمالي الجرعات',v:meds.length},
+      ...Object.entries(byType).map(([t,c])=>({l:t,v:c+' جرعة'})),
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    let rows=meds.map(x=>`<tr>
+      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall}</td>
+      <td><span class="badge ${x.type==='لقاح'?'b-violet':x.type==='دواء'?'b-red':x.type==='فيتامين'?'b-green':'b-gray'}">${x.type}</span></td>
+      <td><b>${x.name}</b></td><td>${x.dose||'—'}</td>
+      <td>${(+x.qty||0).toLocaleString()}</td><td>${x.note||'—'}</td>
+    </tr>`).join('');
+    el.innerHTML='<thead><tr><th>التاريخ</th><th>الحقل</th><th>القاعة</th><th>النوع</th><th>المادة</th><th>الجرعة</th><th>الكمية</th><th>ملاحظة</th></tr></thead><tbody>'+rows+'</tbody>';
+
+  }else if(type==='fields'){
+    if(title)title.textContent='🏡 تقرير الحقول';
+    let fields=data.fields.filter(f=>inField(f.name));
+    if(batchId){
+      let rb=data.batches.find(b=>b.id===batchId);
+      fields=fields.filter(f=>rb&&f.name===rb.field);
+    }
+    fields=fields.filter(f=>textMatch([f.name,f.type]));
+    let rows=fields.map(f=>{
+      let ft=fieldTotals(f.name);
+      let fToday=feedTotalField(f.name,today());
+      let mToday=medsCountField(f.name,today());
+      return `<tr>
+        <td><b>${f.name}</b></td>
+        <td><span class="badge ${f.type==='بياض'?'b-violet':f.type==='تربية'?'b-amber':'b-teal'}">${f.type}</span></td>
+        <td>${ft.halls.length}</td>
+        <td>${ft.allocated.toLocaleString()}</td>
+        <td><b>${ft.alive.toLocaleString()}</b></td>
+        <td>${ft.mort.toLocaleString()}</td>
+        <td>${ft.sold.toLocaleString()}</td>
+        <td>${fToday.toLocaleString()} كغم</td>
+        <td>${ft.feedTotal.toLocaleString()} كغم</td>
+        <td>${mToday}</td>
+        <td>${ft.medsTotal}</td>
+        <td>${ft.avgWeight?ft.avgWeight+' كغ':'—'}</td>
+      </tr>`;
+    }).join('');
+    let totalFeed=fields.reduce((s,f)=>s+feedTotalField(f.name),0);
+    let totalAlive=fields.reduce((s,f)=>s+fieldTotals(f.name).alive,0);
+    if(summary)summary.innerHTML=[
+      {l:'عدد الحقول',v:fields.length},{l:'الطير الحي الكلي',v:totalAlive.toLocaleString()},
+      {l:'إجمالي العلف (كغم)',v:totalFeed.toLocaleString()},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    el.innerHTML='<thead><tr><th>الحقل</th><th>النوع</th><th>القاعات</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>إجمالي اللقاحات</th><th>آخر وزن</th></tr></thead><tbody>'+rows+'</tbody>';
+
+  }else if(type==='halls'){
+    if(title)title.textContent='🚪 تقرير القاعات';
+    let halls=data.halls.filter(h=>{
+      let f=data.fields.find(x=>x.id===h.fieldId);
+      return !field||(f&&f.name===field);
+    });
+    if(hallId)halls=halls.filter(h=>h.id===hallId);
+    if(batchId){
+      let rb=data.batches.find(b=>b.id===batchId),hids=batchHallIds(rb);
+      halls=halls.filter(h=>rb&&hids.includes(h.id));
+    }
+    halls=halls.filter(h=>{let f=data.fields.find(x=>x.id===h.fieldId);return textMatch([h.name,f?f.name:'']);});
+    let rows=halls.map(h=>{
+      let f=data.fields.find(x=>x.id===h.fieldId);
+      let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+      let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+      let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+      let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+      let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+      let cap=+h.capacity||0;
+      let occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
+      let lm=lastMedHall(h.id);
+      let lw=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+      let avgW=lw.length?+(lw.reduce((s,w)=>s+(+w.avgWeight||0),0)/lw.length).toFixed(2):'—';
+      let fToday=feedTotalHall(h.id,today());
+      let fTotal=feedTotalHall(h.id);
+      let mToday=medsCountHall(h.id,today());
+      return `<tr>
+        <td>${f?f.name:'—'}</td><td><b>${h.name}</b></td>
+        <td>${cap?cap.toLocaleString():'—'}</td><td>${allocated.toLocaleString()}</td>
+        <td><b>${alive.toLocaleString()}</b></td><td>${mort.toLocaleString()}</td>
+        <td>${sold.toLocaleString()}</td><td>${occ}</td>
+        <td>${fToday.toLocaleString()} كغم</td><td>${fTotal.toLocaleString()} كغم</td>
+        <td>${mToday}</td>
+        <td>${lm?`<span class="badge b-violet" style="font-size:10px">${lm.name}</span>`:'—'}</td>
+        <td>${avgW==='—'?'—':avgW+' كغ'}</td>
+        <td>${batches.map(x=>x.name).join(' / ')||'—'}</td>
+      </tr>`;
+    }).join('');
+    if(summary)summary.innerHTML=[
+      {l:'عدد القاعات',v:halls.length},
+      {l:'إجمالي علف اليوم',v:halls.reduce((s,h)=>s+feedTotalHall(h.id,today()),0).toLocaleString()+' كغم'},
+      {l:'إجمالي اللقاحات اليوم',v:halls.reduce((s,h)=>s+medsCountHall(h.id,today()),0).toLocaleString()},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>السعة</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>الإشغال</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>الوجبات</th></tr></thead><tbody>'+rows+'</tbody>';
+  }
 }
-function exportCSV(){
-  let batches=isAdmin()?data.batches:visibleBatches();
-  let rows=[['الوجبة','النوع','البيض','التالف','الفحص الضوئي','هلاك اللقاح','العزل','نسبة الفقس','الصافي المنقول','هلاك الحقل','المسوق','الحي المتبقي','النجاح','الحالة']];
-  batches.forEach(b=>{let c=calc(b);rows.push([b.name,b.type||'',b.eggs||0,b.badEggs||0,(b.candle||0)+'%',c.vaccineDeaths,c.isolated,hatchRate(b)+'%',c.fieldBirds||0,c.mort,c.sold,c.alive,successRate(b)+'%',c.completed?'منتهية':(b.status||'نشطة')])});
-  let csv='\ufeff'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
-  let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='zohor_report_'+today()+'.csv';a.click();
+
+// ── EXPORT EXCEL (CSV مُحسَّن) ──
+function exportRptExcel(){
+  let{type}=rptFilteredData();
+  let el=$('reportTable');if(!el)return;
+  // استخرج رؤوس الأعمدة
+  let headers=[...el.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+  // استخرج الصفوف — نظّف badges و HTML
+  let rows=[...el.querySelectorAll('tbody tr')].map(tr=>
+    [...tr.querySelectorAll('td')].map(td=>td.textContent.trim())
+  );
+  let csv='\ufeff'+[headers,...rows].map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n');
+  let names={batches:'الوجبات',feed:'العلف',meds:'الأدوية',fields:'الحقول',halls:'القاعات'};
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`zohor_${names[type]||type}_${today()}.csv`;
+  a.click();
+  msg('تم تصدير ملف Excel (CSV)');
 }
+
+// ── EXPORT PDF ──
+function exportRptPDF(){
+  let{type}=rptFilteredData();
+  let names={batches:'الوجبات',feed:'استهلاك العلف',meds:'الأدوية واللقاحات',fields:'الحقول',halls:'القاعات'};
+  let title=names[type]||type;
+  let summaryEl=$('rptSummaryCards');
+  let tableEl=$('reportTable');
+  if(!tableEl)return;
+
+  // بناء HTML مستقل للـ PDF
+  let summaryHtml=summaryEl?`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">${
+    [...summaryEl.querySelectorAll('.statCard')].map(c=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;min-width:120px;text-align:center">
+      <div style="font-size:10px;color:#64748b;margin-bottom:3px;text-transform:uppercase">${c.querySelector('.sc-label')?.textContent||''}</div>
+      <div style="font-size:18px;font-weight:700;color:#0d9488">${c.querySelector('.sc-val')?.textContent||''}</div>
+    </div>`).join('')
+  }</div>`:'';
+
+  let tableHtml=tableEl.outerHTML.replace(/class="[^"]*"/g,'style="border:1px solid #e2e8f0;padding:8px;font-size:12px"');
+
+  let win=window.open('','_blank');
+  win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head>
+    <meta charset="utf-8">
+    <title>تقرير ${title} — زهور الوطن</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap');
+      body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;padding:20px;color:#0f172a;font-size:12px}
+      h2{font-size:18px;font-weight:700;margin-bottom:4px;color:#0f172a}
+      .meta{font-size:11px;color:#64748b;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#f8fafc;border:1px solid #e2e8f0;padding:7px 9px;text-align:right;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase}
+      td{border:1px solid #e2e8f0;padding:7px 9px;text-align:right}
+      tr:nth-child(even) td{background:#f8fafc}
+      .badge{padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;display:inline-block}
+      .summary{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+      .sc{border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;min-width:120px;text-align:center}
+      .sc-label{font-size:9px;color:#64748b;margin-bottom:3px;text-transform:uppercase}
+      .sc-val{font-size:16px;font-weight:700;color:#0d9488}
+      @media print{button{display:none}}
+    </style>
+  </head><body>
+    <h2>📋 تقرير ${title}</h2>
+    <p class="meta">زهور الوطن — تاريخ التصدير: ${new Date().toLocaleDateString('ar-IQ',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p>
+    ${summaryHtml}
+    ${tableEl.outerHTML}
+    <div style="margin-top:24px;text-align:center">
+      <button onclick="window.print()" style="padding:10px 24px;background:#0d9488;color:#fff;border:0;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">🖨️ طباعة / حفظ PDF</button>
+    </div>
+  </body></html>`);
+  win.document.close();
+  msg('تم فتح نافذة PDF — اضغط طباعة ثم "حفظ كـ PDF"');
+}
+
+function exportCSV(){exportRptExcel();}
+
 function backup(){if(!isAdmin())return;let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='zohor_backup_'+today()+'.json';a.click()}
-function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let obj=JSON.parse(r.result);if(confirm('استرجاع النسخة سيستبدل البيانات الحالية. متأكد؟')){data={...data,...obj};data.batches=(data.batches||[]).map(migrateBatch);data.fields=data.fields||[];data.subUsers=data.subUsers||[];save();renderAll()}}catch{alert('ملف النسخة غير صالح')}e.target.value=''};r.readAsText(f)}
+function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let obj=JSON.parse(r.result);if(confirm('استرجاع النسخة سيستبدل البيانات الحالية. متأكد؟')){data={...data,...obj};data.batches=(data.batches||[]).map(migrateBatch);data.fields=data.fields||[];data.halls=data.halls||[];data.weights=data.weights||[];data.subUsers=data.subUsers||[];save();renderAll()}}catch{alert('ملف النسخة غير صالح')}e.target.value=''};r.readAsText(f)}
 
 // ── ARCHIVE ──
+function archiveBatchDetails(b){
+  let hallIds=batchHallIds(b);
+  let inHall=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let weights=(data.weights||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let feeds=(data.feeds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let meds=(data.meds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let morts=(data.morts||[]).filter(x=>+x.batchId===b.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let markets=(data.markets||[]).filter(x=>+x.batchId===b.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let tr=(rows,empty,cols)=>rows||`<tr><td colspan="${cols}" style="text-align:center;color:var(--ink3)"> ${empty}</td></tr>`;
+  let weightRows=weights.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.hall||'—'}</td><td>${x.avgWeight||'—'} كغ</td><td>${x.expectedWeight||'—'} كغ</td><td>${(+x.totalWeight||0).toLocaleString()} كغ</td></tr>`).join('');
+  let feedRows=feeds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.hall||'—'}</td><td>${x.feedType||'—'}</td><td>${(+x.qty||0).toLocaleString()} كغم</td></tr>`).join('');
+  let medRows=meds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.hall||'—'}</td><td>${x.type||'—'}</td><td>${x.name||'—'}</td><td>${x.dose||'—'}</td><td>${(+x.qty||0).toLocaleString()}</td></tr>`).join('');
+  let mortRows=morts.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.hall||'—'}</td><td>${(+x.count||0).toLocaleString()}</td><td>${x.reason||'—'}</td></tr>`).join('');
+  let marketRows=markets.map(x=>`<tr><td>${fmt(x.date)}</td><td>${x.hall||'—'}</td><td>${(+x.count||0).toLocaleString()}</td><td>${x.status||'—'}</td><td>${x.note||'—'}</td></tr>`).join('');
+  return `<div class="detailGrid" style="margin-bottom:12px">
+    <div class="dCell"><div class="dc-label">الحقل</div><div class="dc-val">${b.field||'—'}</div></div>
+    <div class="dCell"><div class="dc-label">تاريخ الأرشفة</div><div class="dc-val">${fmt(b.archiveDate||today())}</div></div>
+    <div class="dCell"><div class="dc-label">القاعات</div><div class="dc-val">${hallIds.length}</div></div>
+    <div class="dCell"><div class="dc-label">الحالة</div><div class="dc-val">منتهية</div></div>
+  </div>
+  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="5">الأوزان</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>الفعلي</th><th>المتوقع</th><th>المجموع</th></tr></thead><tbody>${tr(weightRows,'لا توجد أوزان',5)}</tbody></table></div>
+  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="4">الأعلاف</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>الكمية</th></tr></thead><tbody>${tr(feedRows,'لا توجد أعلاف',4)}</tbody></table></div>
+  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="6">الأدوية واللقاحات</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>المادة</th><th>الجرعة</th><th>الكمية</th></tr></thead><tbody>${tr(medRows,'لا توجد أدوية أو لقاحات',6)}</tbody></table></div>
+  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="4">الهلاك</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>السبب</th></tr></thead><tbody>${tr(mortRows,'لا يوجد هلاك',4)}</tbody></table></div>
+  <div class="tableWrap"><table><thead><tr><th colspan="5">التسويق</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>النوع</th><th>ملاحظة</th></tr></thead><tbody>${tr(marketRows,'لا يوجد تسويق',5)}</tbody></table></div>`;
+}
 function renderArchive(){
   let el=$('archiveTable');if(!el)return;
+  let q=($('archiveSearch')&&$('archiveSearch').value||'').trim().toLowerCase();
+  let batchFilter=$('archiveBatchFilter')&&$('archiveBatchFilter').value?+$('archiveBatchFilter').value:0;
+  let fieldFilter=$('archiveFieldFilter')?$('archiveFieldFilter').value:'';
+  let hallFilter=$('archiveHallFilter')&&$('archiveHallFilter').value?+$('archiveHallFilter').value:0;
   let batches=isAdmin()?data.batches.filter(b=>calc(b).completed):visibleBatches().filter(b=>calc(b).completed);
-  let rows=batches.map(b=>{let c=calc(b);return `<tr><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${fmt(c.entryDate)}</td><td>${b.field||'—'}</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>0</td><td><span class="badge b-gray">منتهية</span></td><td><button class="btn btn-secondary btn-sm" onclick="selectBatch(${b.id});show('dash',null)">عرض</button></td></tr>`}).join('');
-  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>دخول الحقل</th><th>الحقل</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  if(batchFilter)batches=batches.filter(b=>b.id===batchFilter);
+  if(fieldFilter)batches=batches.filter(b=>b.field===fieldFilter);
+  if(hallFilter)batches=batches.filter(b=>batchHallIds(b).includes(hallFilter));
+  if(q){
+    batches=batches.filter(b=>[
+      b.name,b.field,b.hall,b.type,b.status,
+      ...(Array.isArray(b.hallAllocations)?b.hallAllocations.map(a=>a.hall):[])
+    ].some(x=>String(x||'').toLowerCase().includes(q)));
+  }
+  let rows=batches.map((b,i)=>{let c=calc(b);return `<tr class="selectable" onclick="toggleInlineDetails('archiveDetail${i}')"><td><b>${b.name}</b></td><td>${fmt(b.hatchDate)}</td><td>${fmt(c.entryDate)}</td><td>${b.field||'—'}</td><td>${(c.fieldBirds||0).toLocaleString()}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td>0</td><td><span class="badge b-gray">منتهية</span></td><td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();toggleInlineDetails('archiveDetail${i}')">تفاصيل الأرشيف</button></td></tr>
+  <tr id="archiveDetail${i}" class="hidden"><td colspan="10">${archiveBatchDetails(b)}</td></tr>`}).join('');
+  el.innerHTML='<thead><tr><th>الوجبة</th><th>دخول البيض</th><th>دخول الحقل</th><th>الحقل</th><th>الصافي المنقول</th><th>هلاك الحقل</th><th>المسوق</th><th>الحي المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+(rows||'<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مؤرشفة</td></tr>')+'</tbody>';
 }
 
 // ── CALENDAR ──
+function batchHallIds(b){
+  if(!b)return [];
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length)return b.hallAllocations.map(a=>+a.hallId).filter(Boolean);
+  return b.hallId?[+b.hallId]:[];
+}
+function closeCalendarDayDetails(){
+  if($('calDayOverlay'))$('calDayOverlay').classList.add('hidden');
+}
+function showCalendarDayDetails(batchId,date){
+  let b=data.batches.find(x=>x.id===+batchId);if(!b)return;
+  let c=calc(b,date);
+  let hallIds=batchHallIds(b);
+  let inBatchHall=x=>hallIds.length?(hallIds.includes(+x.hallId)):x.field===b.field;
+  let feeds=(data.feeds||[]).filter(x=>x.date===date&&x.field===b.field&&inBatchHall(x));
+  let meds=(data.meds||[]).filter(x=>x.date===date&&x.field===b.field&&inBatchHall(x));
+  let morts=(data.morts||[]).filter(x=>x.date===date&&+x.batchId===b.id);
+  let feedTotal=feeds.reduce((s,x)=>s+(+x.qty||0),0);
+  let mortTotal=morts.reduce((s,x)=>s+(+x.count||0),0);
+  let medCount=meds.length;
+  let feedRows=feeds.map(x=>`<tr><td>${x.hall||'—'}</td><td>${x.feedType||'—'}</td><td>${(+x.qty||0).toLocaleString()} كغم</td><td>${x.note||'—'}</td></tr>`).join('');
+  let medRows=meds.map(x=>`<tr><td>${x.hall||'—'}</td><td>${x.type||'—'}</td><td>${x.name||'—'}</td><td>${x.dose||'—'}</td><td>${(+x.qty||0).toLocaleString()}</td></tr>`).join('');
+  let mortRows=morts.map(x=>`<tr><td>${x.hall||'—'}</td><td>${(+x.count||0).toLocaleString()}</td><td>${x.reason||'—'}</td></tr>`).join('');
+  if($('calDayTitle'))$('calDayTitle').textContent=`${b.name} — ${fmt(date)}`;
+  if($('calDayBody'))$('calDayBody').innerHTML=`
+    <div class="calMiniGrid">
+      <div class="calMini"><div class="lbl">العمر</div><div class="val">${c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+' يوم'):(c.hatchAge+'/21 تفقيس')}</div></div>
+      <div class="calMini"><div class="lbl">استهلاك العلف</div><div class="val">${feedTotal.toLocaleString()} كغم</div></div>
+      <div class="calMini"><div class="lbl">الهلاك</div><div class="val">${mortTotal.toLocaleString()}</div></div>
+      <div class="calMini"><div class="lbl">الأدوية واللقاحات</div><div class="val">${medCount.toLocaleString()}</div></div>
+    </div>
+    <div class="card" style="box-shadow:none;margin-bottom:10px"><div class="cardTitle">🌾 العلف في هذا اليوم</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>نوع العلف</th><th>الكمية</th><th>ملاحظة</th></tr></thead><tbody>${feedRows||'<tr><td colspan="4">لا يوجد علف مسجل لهذا اليوم</td></tr>'}</tbody></table></div></div>
+    <div class="card" style="box-shadow:none;margin-bottom:10px"><div class="cardTitle">☠️ الهلاك في هذا اليوم</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>العدد</th><th>السبب</th></tr></thead><tbody>${mortRows||'<tr><td colspan="3">لا يوجد هلاك مسجل لهذا اليوم</td></tr>'}</tbody></table></div></div>
+    <div class="card" style="box-shadow:none;margin-bottom:0"><div class="cardTitle">💉 الأدوية واللقاحات في هذا اليوم</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>النوع</th><th>المادة</th><th>الجرعة</th><th>الكمية</th></tr></thead><tbody>${medRows||'<tr><td colspan="5">لا توجد أدوية أو لقاحات لهذا اليوم</td></tr>'}</tbody></table></div></div>`;
+  if($('calDayOverlay'))$('calDayOverlay').classList.remove('hidden');
+}
 function renderCalendar(){
   if(!$('calendar'))return;
   let y=calDate.getFullYear(),m=calDate.getMonth();
@@ -1180,55 +3002,183 @@ function renderCalendar(){
   let batches=visibleBatches();
   for(let d=1;d<=last.getDate();d++){
     let iso=new Date(y,m,d).toISOString().slice(0,10);
-    let ev=batches.filter(b=>filter==='all'||String(b.id)===String(filter)).map(b=>{
+    let dayBatches=batches.filter(b=>filter==='all'||String(b.id)===String(filter));
+    let ev=dayBatches.map(b=>{
       let c=calc(b,iso);let txt='';let cls='';
       if(!c.transferred&&c.rawHatchAge>=0&&c.rawHatchAge<21){txt='تفقيس '+c.hatchAge+'/21';cls='ev-teal'}
       if(!c.transferred&&c.rawHatchAge===21){txt='جاهزة للنقل';cls='ev-amber'}
       if(!c.transferred&&c.rawHatchAge>21){txt='متأخرة عن النقل';cls='ev-red'}
       if(c.entryDate&&iso===c.entryDate){txt='دخول الحقل';cls='ev-teal'}
-      else if(c.transferred&&c.entryDate&&iso>=c.entryDate&&c.rawFlockAge<=40){txt='عمر '+c.flockAge+' يوم';cls='ev-green'}
+      else if(c.transferred&&c.entryDate&&iso>=c.entryDate&&c.rawFlockAge<=(c.isLayer?LAYER_MAX_AGE_DAYS:40)){
+        if(c.isLayer){txt='عمر '+fmtLayerAge(c.flockAge);cls='ev-green'}
+        else{txt='عمر '+c.flockAge+' يوم';cls='ev-green'}
+      }
       return txt?`<div class="ev ${cls}">${b.name}: ${txt}</div>`:'';
     }).join('');
-    html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:8px;min-height:90px"><div style="font-size:12px;font-weight:700;color:var(--ink3);margin-bottom:4px">${d}</div>${ev}</div>`;
+    let clickable=filter!=='all';
+    html+=`<div class="calDay ${clickable?'clickable':''}" ${clickable?`onclick="showCalendarDayDetails(${+filter},'${iso}')"`:''}><div class="calDayNum">${d}</div>${ev}</div>`;
   }
   $('calendar').innerHTML=html;
 }
 function moveMonth(n){calDate.setMonth(calDate.getMonth()+n);renderCalendar()}
 
-// ── FIELDS ──
 function saveField(){
   if(!isAdmin())return;
   let nm=(val('fName')||'').trim();if(!nm)return alert('أدخل اسم الحقل');
   let eid=val('fEditId');
   if(eid){let f=data.fields.find(x=>x.id===+eid);if(f){f.name=nm;f.type=$('fType').value;f.capacity=num('fCapacity')||0}}
   else{if(data.fields.find(f=>f.name===nm))return alert('يوجد حقل بهذا الاسم');data.fields.push({id:Date.now(),name:nm,type:$('fType').value,capacity:num('fCapacity')||0})}
-  clearFieldForm();save();renderAll();clearFieldForm();msg('تم حفظ الحقل');
+  save();renderAll();
+  let saved=data.fields.find(f=>f.name===nm);
+  if(saved)openHallsPanel(saved.id);
+  msg('تم حفظ الحقل — يمكنك إضافة أكثر من قاعة لهذا الحقل من اللوحة المفتوحة');
+  ['fName','fCapacity','fEditId'].forEach(id=>{if($(id))$(id).value=''});
 }
-function clearFieldForm(){if($('fName'))$('fName').value='';if($('fType'))$('fType').value='لحم';if($('fCapacity'))$('fCapacity').value='';if($('fEditId'))$('fEditId').value=''}
-function editField(id){if(!isAdmin())return;let f=data.fields.find(x=>x.id===id);if(!f)return;$('fName').value=f.name;$('fType').value=f.type;$('fCapacity').value=f.capacity||'';$('fEditId').value=f.id;show('fields',null)}
-function deleteField(id){if(!isAdmin())return;if(confirm('حذف الحقل؟')){data.fields=data.fields.filter(f=>f.id!==id);save();renderAll()}}
+function clearFieldForm(){
+  if($('fName'))$('fName').value='';
+  if($('fType'))$('fType').value='لحم';
+  if($('fCapacity'))$('fCapacity').value='';
+  if($('fEditId'))$('fEditId').value='';
+  // إخفاء لوحة القاعات
+  if($('hallsCard'))$('hallsCard').style.display='none';
+}
+function editField(id){
+  if(!isAdmin())return;
+  let f=data.fields.find(x=>x.id===id);if(!f)return;
+  $('fName').value=f.name;$('fType').value=f.type;$('fCapacity').value=f.capacity||'';$('fEditId').value=f.id;
+  show('fields',null);
+  // فتح لوحة القاعات لهذا الحقل
+  openHallsPanel(id);
+}
+function deleteField(id){
+  if(!isAdmin())return;
+  if(confirm('حذف الحقل وكل قاعاته؟')){
+    data.fields=data.fields.filter(f=>f.id!==id);
+    data.halls=data.halls.filter(h=>h.fieldId!==id);
+    save();renderAll();
+  }
+}
 function fieldStatus(fn){let active=data.batches.filter(b=>!calc(b).completed&&b.field===fn&&b.transferDate);return{busy:active.length>0,batches:active}}
 function checkFieldOccupancy(){
   if(!$('transferField'))return;
   let fn=$('transferField').value;let warn=$('fieldWarn');
   if(!fn){warn.className='warnBox';return}
   let st=fieldStatus(fn);let f=data.fields.find(x=>x.name===fn);
+  // حساب السعة من القاعات إذا لم تكن محددة على الحقل
+  let cap=f&&f.capacity?f.capacity:data.halls.filter(h=>h.fieldId===f?.id).reduce((s,h)=>s+(+h.capacity||0),0);
   let info='';
-  if(f&&f.capacity){let used=data.batches.filter(b=>!calc(b).completed&&b.field===fn&&b.transferDate).reduce((s,b)=>s+calc(b).alive,0);if(used>0)info=` — الحي الحالي: ${used.toLocaleString()} من ${f.capacity.toLocaleString()}`}
+  if(cap){let used=data.batches.filter(b=>!calc(b).completed&&b.field===fn&&b.transferDate).reduce((s,b)=>s+calc(b).alive,0);if(used>0)info=` — الحي الحالي: ${used.toLocaleString()} من ${cap.toLocaleString()}`}
   if(st.busy){warn.className='warnBox busy';warn.innerHTML='⚠️ الحقل مشغول بـ: '+st.batches.map(b=>`<b>${b.name}</b>`).join('، ')+info+' — يمكنك المتابعة'}
   else{warn.className='warnBox free';warn.innerHTML='✅ الحقل متاح'+info}
 }
 function renderFields(){
   let el=$('fieldsTable');if(!el)return;
-  if(!data.fields.length){el.innerHTML='<tbody><tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:24px">لا توجد حقول مسجلة.</td></tr></tbody>';return}
+  if(!data.fields.length){el.innerHTML='<tbody><tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:24px">لا توجد حقول مسجلة.</td></tr></tbody>';return}
   let rows=data.fields.map(f=>{
     let st=fieldStatus(f.name);
+    let halls=data.halls.filter(h=>h.fieldId===f.id);
     let used=data.batches.filter(b=>!calc(b).completed&&b.field===f.name&&b.transferDate).reduce((s,b)=>s+calc(b).alive,0);
-    let capTxt=f.capacity?`${used.toLocaleString()} / ${f.capacity.toLocaleString()}`:'—';
+    let cap=f.capacity||halls.reduce((s,h)=>s+(+h.capacity||0),0);
+    let capTxt=cap?`${used.toLocaleString()} / ${cap.toLocaleString()}`:'—';
+    let hallsTxt=halls.length?`<span class="badge b-blue">${halls.length} قاعة</span>`:'<span class="badge b-gray">بلا قاعات</span>';
+    let typeBdg=f.type==='بياض'?'<span class="badge b-violet">🥚 بياض</span>':f.type==='تربية'?'<span class="badge b-amber">تربية</span>':'<span class="badge b-teal">لحم</span>';
     let statusBdg=st.busy?`<span class="badge b-amber">مشغول</span>`:`<span class="badge b-green">متاح</span>`;
-    return `<tr><td><b>${f.name}</b></td><td>${f.type}</td><td>${capTxt}</td><td>${statusBdg}${st.busy?' <span style="font-size:11px;color:var(--ink3)">('+st.batches.map(b=>b.name).join('، ')+')</span>':''}</td><td><button class="btn btn-secondary btn-sm" onclick="editField(${f.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="deleteField(${f.id})">حذف</button></td></tr>`;
+    return `<tr>
+      <td><b>${f.name}</b></td>
+      <td>${typeBdg}</td>
+      <td>${capTxt}</td>
+      <td>${hallsTxt}</td>
+      <td>${statusBdg}${st.busy?' <span style="font-size:11px;color:var(--ink3)">('+st.batches.map(b=>b.name).join('، ')+')</span>':''}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="editField(${f.id})">تعديل</button>
+        <button class="btn btn-secondary btn-sm" onclick="selectedBatchId=null;show('dash',null);setTimeout(()=>showFieldDetails('${String(f.name).replace(/'/g,"\\'")}'),0)">تفاصيل الحقل</button>
+        <button class="btn btn-primary btn-sm" onclick="addHallForField(${f.id})">➕ إضافة قاعة</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteField(${f.id})">حذف</button>
+      </td>
+    </tr>`;
   }).join('');
-  el.innerHTML='<thead><tr><th>اسم الحقل</th><th>النوع</th><th>الحي / السعة</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  el.innerHTML='<thead><tr><th>اسم الحقل</th><th>النوع</th><th>الحي / السعة</th><th>القاعات</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+}
+
+// ── HALLS ──
+function addHallForField(fieldId){
+  show('fields',null);
+  setTimeout(()=>{
+    openHallsPanel(fieldId);
+    if($('hName')){$('hName').focus();$('hName').scrollIntoView({behavior:'smooth',block:'center'});}
+  },0);
+}
+function openHallsPanel(fieldId){
+  let f=data.fields.find(x=>x.id===fieldId);if(!f)return;
+  if($('hallsCard'))$('hallsCard').style.display='';
+  if($('hallsFieldName'))$('hallsFieldName').textContent=f.name+' ('+f.type+')';
+  if($('hFieldId'))$('hFieldId').value=fieldId;
+  clearHallForm();
+  renderHalls(fieldId);
+}
+function clearHallForm(){
+  ['hName','hCapacity','hEditId'].forEach(id=>{if($(id))$(id).value=''});
+}
+function saveHall(){
+  if(!isAdmin())return;
+  let fieldId=+val('hFieldId');if(!fieldId)return alert('اختر الحقل أولاً');
+  let nm=(val('hName')||'').trim();if(!nm)return alert('أدخل اسم القاعة');
+  let eid=val('hEditId');
+  let hallData={
+    fieldId,name:nm,
+    capacity:num('hCapacity')||0,
+    
+  };
+  if(eid){
+    let h=data.halls.find(x=>x.id===+eid);
+    if(h)Object.assign(h,hallData);
+  }else{
+    if(data.halls.find(h=>h.fieldId===fieldId&&h.name===nm))return alert('يوجد قاعة بهذا الاسم في هذا الحقل');
+    data.halls.push({id:Date.now(),...hallData});
+  }
+  clearHallForm();save();renderHalls(fieldId);renderFields();msg('تم حفظ القاعة');
+}
+function editHall(id){
+  if(!isAdmin())return;
+  let h=data.halls.find(x=>x.id===id);if(!h)return;
+  $('hName').value=h.name;$('hCapacity').value=h.capacity||'';
+  if($('hChickWeight'))$('hChickWeight').value=h.chickWeight||'';
+  if($('hAvgWeight'))$('hAvgWeight').value=h.avgWeight||'';
+  if($('hTotalWeight'))$('hTotalWeight').value=h.totalWeight||'';
+  $('hEditId').value=h.id;
+}
+function deleteHall(id){
+  if(!isAdmin())return;
+  let h=data.halls.find(x=>x.id===id);
+  if(!h)return;
+  if(confirm('حذف القاعة؟')){
+    data.halls=data.halls.filter(x=>x.id!==id);
+    save();renderHalls(h.fieldId);renderFields();
+  }
+}
+function renderHalls(fieldId){
+  let el=$('hallsTable');if(!el)return;
+  let halls=data.halls.filter(h=>h.fieldId===fieldId);
+  if(!halls.length){el.innerHTML='<tbody><tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:16px">لا توجد قاعات — أضف أول قاعة.</td></tr></tbody>';return}
+  let rows=halls.map(h=>{
+    // حساب الوجبات النشطة في هذه القاعة
+    let activeBatches=data.batches.filter(b=>batchAllocatedToHall(b,h.id)>0&&!calc(b).completed&&b.transferDate);
+    let usedBirds=activeBatches.reduce((s,b)=>s+batchHallAlive(b,h.id),0);
+    let capTxt=h.capacity?`${usedBirds.toLocaleString()} / ${h.capacity.toLocaleString()}`:(usedBirds>0?usedBirds.toLocaleString():'—');
+    return `<tr>
+      <td><b>${h.name}</b></td>
+      <td>${capTxt}</td>
+      <td>${h.chickWeight?h.chickWeight+' غ':'—'}</td>
+      <td>${h.avgWeight?h.avgWeight+' كغ':'—'}</td>
+      <td>${h.totalWeight?h.totalWeight.toLocaleString()+' كغ':'—'}</td>
+      <td>${activeBatches.length?activeBatches.map(b=>`<span class="badge b-green" style="margin-left:3px">${b.name}</span>`).join(''):'<span class="badge b-gray">فارغة</span>'}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="editHall(${h.id})">تعديل</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteHall(${h.id})">حذف</button>
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>القاعة</th><th>الحي / السعة</th><th>وزن الصوص</th><th>معدل وزن الطير</th><th>وزن القاعة الكلي</th><th>الوجبات النشطة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
 // ── USERS MANAGEMENT ──
@@ -1289,7 +3239,7 @@ function renderUsers(){
 
 // ── SETTINGS ──
 function saveCreds(){if(!isAdmin())return;if(!val('newUser')||!val('newPass'))return alert('أدخل اسم المستخدم وكلمة المرور');data.user=val('newUser');data.pass=val('newPass');save();msg('تم حفظ بيانات الدخول')}
-function wipeAll(){if(!isAdmin())return;if(confirm('مسح كل البيانات نهائياً؟ لا يمكن التراجع.')){data.batches=[];data.morts=[];data.markets=[];data.fields=[];data.subUsers=[];selectedBatchId=null;save();renderAll()}}
+function wipeAll(){if(!isAdmin())return;if(confirm('مسح كل البيانات نهائياً؟ لا يمكن التراجع.')){data.batches=[];data.morts=[];data.markets=[];data.fields=[];data.halls=[];data.weights=[];data.subUsers=[];selectedBatchId=null;save();renderAll()}}
 
 // ── BOOT ──
 let _sess=sessionStorage.getItem('cf_logged');
@@ -1304,6 +3254,476 @@ if(_sess==='1'&&_user){
   if(sessionStorage.getItem('sideCollapsed')==='1')$('app').classList.add('collapsed');
   }
 }
+
+// Override: فحص إشغال القاعة في نقل الفقسة
+function checkFieldOccupancy(){
+  let warn=$('fieldWarn');if(!warn)return true;
+  let hallId=$('transferHall')&&$('transferHall').value?+$('transferHall').value:null;
+  let birds=num('fieldBirds')||num('transferHatched')||0;
+  if(!hallId){
+    warn.className='warnBox';
+    warn.textContent='';
+    return true;
+  }
+  let st=hallCapacityStatus(hallId,birds,null);
+  if(!st.cap){
+    warn.className='warnBox free';
+    warn.textContent='✅ القاعة بدون سعة محددة';
+    return true;
+  }
+  if(st.ok){
+    warn.className='warnBox free';
+    warn.textContent=`✅ متاح في القاعة: ${st.remaining.toLocaleString()} طير`;
+    return true;
+  }
+  warn.className='warnBox busy';
+  warn.textContent=`⚠️ العدد أكبر من طاقة القاعة. المشغول: ${st.used.toLocaleString()} / ${st.cap.toLocaleString()}، المتاح: ${st.remaining.toLocaleString()}`;
+  return false;
+}
+
+
+// V39.1 safe override: حساب القاعة حسب حصتها فقط بدون كسر الواجهة
+function batchAllocatedToHall(b,hallId){
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    let a=b.hallAllocations.find(x=>+x.hallId===+hallId);
+    return a?+a.birds||0:0;
+  }
+  return (+b.hallId===+hallId)?(+b.fieldBirds||0):0;
+}
+function batchHallAlive(b,hallId){
+  let alloc=batchAllocatedToHall(b,hallId);
+  let c=calc(b),base=c.fieldBirds||0;
+  if(!alloc||!base)return 0;
+  let ratio=alloc/base;
+  let loss=Math.round((c.mort+c.sold)*ratio);
+  return Math.max(0,alloc-loss);
+}
+function batchHallMort(b,hallId){
+  let alloc=batchAllocatedToHall(b,hallId),c=calc(b),base=c.fieldBirds||0;
+  return base?Math.round(c.mort*(alloc/base)):0;
+}
+function batchHallSold(b,hallId){
+  let alloc=batchAllocatedToHall(b,hallId),c=calc(b),base=c.fieldBirds||0;
+  return base?Math.round(c.sold*(alloc/base)):0;
+}
+function hallUsedBirds(hallId,ignoreBatchId=null){
+  return data.batches.filter(b=>b.id!==ignoreBatchId&&!calc(b).completed&&b.transferDate)
+    .reduce((s,b)=>s+batchAllocatedToHall(b,hallId),0);
+}
+
+
+// V40: حساب الحقل والقاعات والهلاك حسب القاعة
+function batchAllocatedToHall(b,hallId){
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    let a=b.hallAllocations.find(x=>+x.hallId===+hallId);
+    return a?+a.birds||0:0;
+  }
+  return (+b.hallId===+hallId)?(+b.fieldBirds||0):0;
+}
+function mortalityForBatchHall(batchId,hallId){
+  return (data.morts||[]).filter(m=>+m.batchId===+batchId&&(+m.hallId||0)===+hallId).reduce((s,m)=>s+(+m.count||0),0);
+}
+function mortalityForBatchUnassigned(batchId){
+  return (data.morts||[]).filter(m=>+m.batchId===+batchId&&!(+m.hallId||0)).reduce((s,m)=>s+(+m.count||0),0);
+}
+function marketForBatchHall(batchId,hallId){
+  return (data.markets||[]).filter(m=>+m.batchId===+batchId&&(+m.hallId||0)===+hallId).reduce((s,m)=>s+(+m.count||0),0);
+}
+function marketForBatchUnassigned(batchId){
+  return (data.markets||[]).filter(m=>+m.batchId===+batchId&&!(+m.hallId||0)).reduce((s,m)=>s+(+m.count||0),0);
+}
+function batchHallMort(b,hallId){
+  let assigned=mortalityForBatchHall(b.id,hallId);
+  let unassigned=mortalityForBatchUnassigned(b.id);
+  if(!unassigned)return assigned;
+  let alloc=batchAllocatedToHall(b,hallId),base=calc(b).fieldBirds||0;
+  return assigned+(base?Math.round(unassigned*(alloc/base)):0);
+}
+function batchHallSold(b,hallId){
+  let assigned=marketForBatchHall(b.id,hallId);
+  let unassigned=marketForBatchUnassigned(b.id);
+  if(!unassigned)return assigned;
+  let alloc=batchAllocatedToHall(b,hallId),base=calc(b).fieldBirds||0;
+  return assigned+(base?Math.round(unassigned*(alloc/base)):0);
+}
+function batchHallAlive(b,hallId){
+  let alloc=batchAllocatedToHall(b,hallId);
+  return Math.max(0,alloc-batchHallMort(b,hallId)-batchHallSold(b,hallId));
+}
+function hallUsedBirds(hallId,ignoreBatchId=null){
+  return data.batches.filter(b=>b.id!==ignoreBatchId&&!calc(b).completed&&b.transferDate)
+    .reduce((s,b)=>s+batchAllocatedToHall(b,hallId),0);
+}
+function fieldTotals(fieldName){
+  let f=data.fields.find(x=>x.name===fieldName);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&b.field===fieldName);
+  let allocated=0,alive=0,mort=0,sold=0,cap=0,totalWeight=0,weightCount=0,weightSum=0;
+  halls.forEach(h=>{
+    cap+=+h.capacity||0;
+    batches.forEach(b=>{
+      allocated+=batchAllocatedToHall(b,h.id);
+      alive+=batchHallAlive(b,h.id);
+      mort+=batchHallMort(b,h.id);
+      sold+=batchHallSold(b,h.id);
+    });
+  });
+  batches.forEach(b=>{
+    let lw=latestWeightForBatch(b.id);
+    if(lw){weightCount++;weightSum+=+lw.avgWeight||0;totalWeight+=+lw.totalWeight||0;}
+  });
+  return {field:f,halls,batches,allocated,alive,mort,sold,cap,avgWeight:weightCount?+(weightSum/weightCount).toFixed(2):0,totalWeight};
+}
+function renderBatchHallsPanel(b){
+  let el=$('batchHallsPanel');if(!el)return;
+  if(!b||!b.field){el.innerHTML='';return;}
+  let ft=fieldTotals(b.field);
+  let rows=ft.halls.map(h=>{
+    let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+    let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+    let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+    let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+    let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+    let cap=+h.capacity||0;
+    let remain=cap?Math.max(0,cap-allocated):'—';
+    let occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
+    let lwList=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+    let avg=lwList.length?+(lwList.reduce((s,w)=>s+(+w.avgWeight||0),0)/lwList.length).toFixed(2):'—';
+    return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
+      <td><b>${h.name}</b></td><td>${cap?cap.toLocaleString():'—'}</td><td>${allocated.toLocaleString()}</td>
+      <td><b>${alive.toLocaleString()}</b></td><td>${remain.toLocaleString?remain.toLocaleString():remain}</td><td>${occ}</td>
+      <td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td><td>${avg==='—'?'—':avg+' كغ'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showHallDetailsInBatch(${h.id})">تفاصيل</button></td>
+    </tr>`;
+  }).join('');
+  let summary=`<div class="detailPanel" style="margin-bottom:12px">
+    <div class="dp-head"><span class="dp-title">🏡 مجموع الحقل: ${b.field}</span></div>
+    <div class="detailGrid">
+      <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
+      <div class="dCell"><div class="dc-label">السعة الكلية</div><div class="dc-val">${ft.cap?ft.cap.toLocaleString():'—'}</div></div>
+      <div class="dCell"><div class="dc-label">مجموع الطيور</div><div class="dc-val">${ft.allocated.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">الحي الكلي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">المسوق</div><div class="dc-val">${ft.sold.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">معدل الوزن</div><div class="dc-val">${ft.avgWeight?ft.avgWeight+' كغ':'—'}</div></div>
+      <div class="dCell"><div class="dc-label">مجموع الوزن</div><div class="dc-val">${ft.totalWeight?ft.totalWeight.toLocaleString()+' كغ':'—'}</div></div>
+    </div>
+  </div>`;
+  el.innerHTML=`<div class="card"><div class="cardTitle">🚪 تفاصيل قاعات ${b.field}</div>${summary}
+    <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>عدد القاعة</th><th>الحي</th><th>المتاح</th><th>الإشغال</th><th>الهلاك</th><th>المسوق</th><th>آخر وزن</th><th>إجراء</th></tr></thead><tbody>${rows||'<tr><td colspan="10">لا توجد قاعات لهذا الحقل</td></tr>'}</tbody></table></div></div>`;
+}
+function showHallDetailsInBatch(hallId){
+  let h=data.halls.find(x=>x.id===+hallId);if(!h)return;
+  let f=data.fields.find(x=>x.id===h.fieldId);
+  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+  let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+  let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+  let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+  let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+  let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
+  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
+  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):'—';
+  let total=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  let cells=[
+    ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
+    ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['المتاح',remain.toLocaleString?remain.toLocaleString():remain],
+    ['هلاك القاعة',mort.toLocaleString()],['المسوق',sold.toLocaleString()],['آخر معدل وزن',avg==='—'?'—':avg+' كغ'],
+    ['الوزن المتوقع',expected==='—'?'—':expected+' كغ'],['مجموع الوزن',total?total.toLocaleString()+' كغ':'—']
+  ];
+  let rows=batches.map(x=>{let c=calc(x),lw=latestWeightForBatch(x.id);return `<tr><td>${x.name}</td><td>${fmt(c.entryDate)}</td><td>${c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'}</td><td>${batchAllocatedToHall(x,h.id).toLocaleString()}</td><td>${batchHallAlive(x,h.id).toLocaleString()}</td><td>${batchHallMort(x,h.id).toLocaleString()}</td><td>${batchHallSold(x,h.id).toLocaleString()}</td><td>${lw?lw.avgWeight+' كغ':'—'}</td></tr>`}).join('');
+  let detail=$('statsDetail');
+  if(detail)detail.innerHTML=`<div class="detailPanel">
+    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${h.name}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
+    <div class="detailGrid">${cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('')}</div>
+    <div class="dp-sub">الوجبات داخل القاعة</div>
+    <div class="tableWrap"><table><thead><tr><th>الوجبة</th><th>دخول الحقل</th><th>العمر</th><th>عدد القاعة</th><th>الحي</th><th>الهلاك</th><th>المسوق</th><th>آخر وزن</th></tr></thead><tbody>${rows||'<tr><td colspan="8">لا توجد وجبات نشطة داخل القاعة</td></tr>'}</tbody></table></div>
+  </div>`;
+}
+function restoreSelectedBatchDetails(){
+  let b=data.batches.find(x=>x.id===selectedBatchId);
+  if(b&&$('statsDetail'))$('statsDetail').innerHTML=selectedDetails(b);
+}
+function fillMortHalls(){
+  let id=+$('mortBatch').value,b=data.batches.find(x=>x.id===id);
+  let sel=$('mortHall');if(!sel)return;
+  if(!b){sel.innerHTML='';return;}
+  let arr=(Array.isArray(b.hallAllocations)&&b.hallAllocations.length)?b.hallAllocations:(b.hallId?[{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}]:[]);
+  sel.innerHTML=arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — عدد ${(+a.birds||0).toLocaleString()}</option>`).join('');
+}
+
+
+// V40.1 تثبيت خيار القاعة المستهدفة دائماً في نقل الفقسة
+function onTransferFieldChange(){
+  let fn=$('transferField')?$('transferField').value:'';
+  let f=data.fields.find(x=>x.name===fn);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  let grp=$('grpTransferHall'),sel=$('transferHall');
+
+  if(grp)grp.classList.remove('hidden');
+  if(!sel)return;
+
+  if(halls.length){
+    sel.innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}${h.capacity?' — سعة '+(+h.capacity).toLocaleString():''}</option>`).join('');
+  }else{
+    sel.innerHTML='<option value="">لا توجد قاعات لهذا الحقل</option>';
+  }
+
+  checkFieldOccupancy();
+  if(typeof renderTransferAllocationsSummary==='function')renderTransferAllocationsSummary();
+}
+
+
+// V40.2 ربط الهلاك بالقاعة المختارة
+function fillMortHalls(){
+  let id=$('mortBatch')?+$('mortBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let sel=$('mortHall');if(!sel)return;
+  if(!b){sel.innerHTML='<option value="">اختر الوجبة أولاً</option>';return;}
+  let arr=[];
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    arr=b.hallAllocations;
+  }else if(b.hallId){
+    arr=[{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}];
+  }
+  sel.innerHTML=arr.length
+    ?arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — عدد ${(+a.birds||0).toLocaleString()}</option>`).join('')
+    :'<option value="">لا توجد قاعات منقولة لهذه الوجبة</option>';
+}
+function addMort(){
+  let id=+$('mortBatch').value;
+  if(!id)return alert('اختر وجبة');
+  let b=data.batches.find(x=>x.id===id);
+  let hallId=$('mortHall')&&$('mortHall').value?+$('mortHall').value:null;
+  let hallObj=hallId?data.halls.find(h=>h.id===hallId):null;
+  if(b&&b.transferDate&&!hallId)return alert('اختر القاعة التي حدث بها الهلاك');
+  data.morts.push({
+    id:Date.now(),
+    batchId:id,
+    hallId:hallId,
+    hall:hallObj?hallObj.name:'',
+    date:val('mortDate')||today(),
+    count:num('mortCount'),
+    reason:val('mortReason')
+  });
+  save();renderAll();clearMortForm();
+}
+
+
+// V41: عرض العلف واللقاحات في داشبورد الحقل والقاعة
+function fieldTotals(fieldName){
+  let f=data.fields.find(x=>x.name===fieldName);
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id):[];
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&b.field===fieldName);
+  let allocated=0,alive=0,mort=0,sold=0,cap=0,totalWeight=0,weightCount=0,weightSum=0;
+  halls.forEach(h=>{
+    cap+=+h.capacity||0;
+    batches.forEach(b=>{
+      allocated+=batchAllocatedToHall(b,h.id);
+      alive+=batchHallAlive(b,h.id);
+      mort+=batchHallMort(b,h.id);
+      sold+=batchHallSold(b,h.id);
+    });
+  });
+  batches.forEach(b=>{let lw=latestWeightForBatch(b.id);if(lw){weightCount++;weightSum+=+lw.avgWeight||0;totalWeight+=+lw.totalWeight||0;}});
+  return {field:f,halls,batches,allocated,alive,mort,sold,cap,avgWeight:weightCount?+(weightSum/weightCount).toFixed(2):0,totalWeight,feedToday:feedTotalField(fieldName,today()),feedTotal:feedTotalField(fieldName),medsToday:medsCountField(fieldName,today()),medsTotal:medsCountField(fieldName)};
+}
+function renderBatchHallsPanel(b){
+  let el=$('batchHallsPanel');if(!el)return;
+  if(!b||!b.field){el.innerHTML='';return;}
+  let ft=fieldTotals(b.field);
+  let rows=ft.halls.map(h=>{
+    let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+    let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+    let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+    let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+    let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+    let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
+    let lwList=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+    let avg=lwList.length?+(lwList.reduce((s,w)=>s+(+w.avgWeight||0),0)/lwList.length).toFixed(2):'—';
+    let lm=lastMedHall(h.id);
+    return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
+      <td><b>${h.name}</b></td><td>${cap?cap.toLocaleString():'—'}</td><td>${allocated.toLocaleString()}</td><td><b>${alive.toLocaleString()}</b></td>
+      <td>${remain.toLocaleString?remain.toLocaleString():remain}</td><td>${occ}</td><td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td>
+      <td>${feedTotalHall(h.id,today()).toLocaleString()} / ${feedTotalHall(h.id).toLocaleString()} كغم</td>
+      <td>${medsCountHall(h.id,today()).toLocaleString()} اليوم</td>
+      <td>${lm?lm.name:'—'}</td>
+      <td>${avg==='—'?'—':avg+' كغ'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showHallDetailsInBatch(${h.id})">تفاصيل</button></td>
+    </tr>`;
+  }).join('');
+  let summary=`<div class="detailPanel" style="margin-bottom:12px">
+    <div class="dp-head"><span class="dp-title">🏡 مجموع الحقل: ${b.field}</span></div>
+    <div class="detailGrid">
+      <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
+      <div class="dCell"><div class="dc-label">مجموع الطيور</div><div class="dc-val">${ft.allocated.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">الحي الكلي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">علف اليوم</div><div class="dc-val">${ft.feedToday.toLocaleString()} كغم</div></div>
+      <div class="dCell"><div class="dc-label">مجموع العلف</div><div class="dc-val">${ft.feedTotal.toLocaleString()} كغم</div></div>
+      <div class="dCell"><div class="dc-label">لقاحات/أدوية اليوم</div><div class="dc-val">${ft.medsToday}</div></div>
+      <div class="dCell"><div class="dc-label">مجموع اللقاحات/الأدوية</div><div class="dc-val">${ft.medsTotal}</div></div>
+    </div>
+  </div>`;
+  el.innerHTML=`<div class="card"><div class="cardTitle">🚪 تفاصيل قاعات ${b.field}</div>${summary}
+    <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>عدد القاعة</th><th>الحي</th><th>المتاح</th><th>الإشغال</th><th>الهلاك</th><th>المسوق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>إجراء</th></tr></thead><tbody>${rows||'<tr><td colspan="13">لا توجد قاعات لهذا الحقل</td></tr>'}</tbody></table></div></div>`;
+}
+function showHallDetailsInBatch(hallId){
+  let h=data.halls.find(x=>x.id===+hallId);if(!h)return;
+  let f=data.fields.find(x=>x.id===h.fieldId);
+  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+  let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+  let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+  let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+  let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+  let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
+  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
+  let lm=lastMedHall(h.id);
+  let cells=[
+    ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
+    ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['هلاك القاعة',mort.toLocaleString()],
+    ['علف اليوم',feedTotalHall(h.id,today()).toLocaleString()+' كغم'],['مجموع العلف',feedTotalHall(h.id).toLocaleString()+' كغم'],
+    ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?lm.name:'—'],['آخر معدل وزن',avg==='—'?'—':avg+' كغ']
+  ];
+  let detail=$('statsDetail');
+  if(detail)detail.innerHTML=`<div class="detailPanel">
+    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${h.name}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
+    <div class="detailGrid">${cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('')}</div>
+  </div>`;
+}
+
+function fieldMorts(fieldName){
+  return (data.morts||[]).filter(m=>{
+    let b=data.batches.find(x=>x.id===m.batchId);
+    return b&&b.field===fieldName;
+  });
+}
+function fieldMarkets(fieldName){
+  return (data.markets||[]).filter(m=>{
+    let b=data.batches.find(x=>x.id===m.batchId);
+    return b&&b.field===fieldName;
+  });
+}
+function lastNDays(n=10){
+  let arr=[];
+  for(let i=n-1;i>=0;i--){
+    let d=new Date();
+    d.setDate(d.getDate()-i);
+    arr.push(d.toISOString().slice(0,10));
+  }
+  return arr;
+}
+function fieldWeightAvgOn(fieldName,date){
+  let ws=(data.weights||[]).filter(w=>w.field===fieldName&&w.date===date&&+w.avgWeight>0);
+  return ws.length?+(ws.reduce((s,w)=>s+(+w.avgWeight||0),0)/ws.length).toFixed(2):0;
+}
+function renderFieldChart(fieldName){
+  let el=$('fieldChartPanel');if(!el)return;
+  if(!fieldName){el.innerHTML='';return;}
+  let days=lastNDays(10);
+  let feeds=days.map(d=>feedTotalField(fieldName,d));
+  let morts=days.map(d=>fieldMorts(fieldName).filter(m=>m.date===d).reduce((s,m)=>s+(+m.count||0),0));
+  let weights=days.map(d=>fieldWeightAvgOn(fieldName,d));
+  let hasData=[...feeds,...morts,...weights].some(v=>+v>0);
+  let maxFeed=Math.max(1,...feeds),maxMort=Math.max(1,...morts),maxWeight=Math.max(1,...weights);
+  let W=680,H=220,pad=34,plotW=W-pad*2,plotH=150,base=178;
+  let x=i=>pad+(plotW/(days.length-1))*i;
+  let points=(arr,max)=>arr.map((v,i)=>`${x(i)},${base-(v/max)*plotH}`).join(' ');
+  let bars=feeds.map((v,i)=>{let h=(v/maxFeed)*plotH;return `<rect x="${x(i)-10}" y="${base-h}" width="20" height="${h}" rx="4" fill="#99f6e4"></rect>`}).join('');
+  let labels=days.map((d,i)=>`<text x="${x(i)}" y="208" text-anchor="middle" font-size="10" fill="#64748b">${d.slice(5)}</text>`).join('');
+  el.innerHTML=`<div class="card">
+    <div class="cardTitle">📈 حالة الحقل: ${fieldName} <span class="chartHint">آخر 10 أيام - العلف والهلاك والأوزان</span></div>
+    ${hasData?'':'<div class="warnBox free" style="display:block;margin-bottom:10px">لا توجد بيانات علف أو هلاك أو أوزان خلال آخر 10 أيام، لذلك يظهر الرسم بدون حركة.</div>'}
+    <div class="chartWrap"><svg class="fieldChartSvg" viewBox="0 0 ${W} ${H}" role="img">
+      <line x1="${pad}" y1="${base}" x2="${W-pad}" y2="${base}" stroke="#cbd5e1"></line>
+      <line x1="${pad}" y1="${base-plotH}" x2="${pad}" y2="${base}" stroke="#cbd5e1"></line>
+      ${bars}
+      <polyline points="${points(morts,maxMort)}" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${points(weights,maxWeight)}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      ${morts.map((v,i)=>`<circle cx="${x(i)}" cy="${base-(v/maxMort)*plotH}" r="4" fill="#ef4444"><title>هلاك ${v}</title></circle>`).join('')}
+      ${weights.map((v,i)=>`<circle cx="${x(i)}" cy="${base-(v/maxWeight)*plotH}" r="4" fill="#2563eb"><title>وزن ${v} كغ</title></circle>`).join('')}
+      ${labels}
+      <text x="${pad}" y="18" font-size="11" fill="#64748b">علف: ${maxFeed.toLocaleString()} كغم كحد أعلى</text>
+      <text x="${W-pad}" y="18" text-anchor="end" font-size="11" fill="#64748b">هلاك: ${maxMort.toLocaleString()} / وزن: ${maxWeight} كغ</text>
+    </svg></div>
+    <div class="chartLegend">
+      <span><i class="legendDot" style="background:#99f6e4"></i>العلف المستهلك</span>
+      <span><i class="legendDot" style="background:#ef4444"></i>الهلاك</span>
+      <span><i class="legendDot" style="background:#2563eb"></i>معدل الوزن</span>
+    </div>
+  </div>`;
+}
+
+function renderChartsPage(fieldName=''){
+  if($('chartField')){
+    let old=fieldName||$('chartField').value||selectedFieldName||'';
+    $('chartField').innerHTML='<option value="">اختر الحقل</option>'+data.fields.filter(f=>canSeeField(f.name)).map(f=>`<option value="${f.name}">${f.name}</option>`).join('');
+    if(old&&[...$('chartField').options].some(o=>o.value===old))$('chartField').value=old;
+    fieldName=$('chartField').value;
+  }
+  if(fieldName)renderFieldChart(fieldName);
+  else if($('fieldChartPanel'))$('fieldChartPanel').innerHTML='<div class="warnBox free" style="display:block">اختر حقلاً لعرض المخطط البياني.</div>';
+}
+function buildFieldsDashboard(){
+  let fields=data.fields.filter(f=>canSeeField(f.name));
+  if(!fields.length)return selectedDetails(null);
+  let rows=fields.map(f=>{
+    let ft=fieldTotals(f.name);
+    return `<tr class="selectable" onclick="showFieldDetails('${String(f.name).replace(/'/g,"\\'")}')">
+      <td><b>${f.name}</b></td>
+      <td>${ft.halls.length}</td>
+      <td>${ft.alive.toLocaleString()}</td>
+      <td>${ft.mort.toLocaleString()}</td>
+      <td>${ft.sold.toLocaleString()}</td>
+      <td>${ft.feedToday.toLocaleString()} / ${ft.feedTotal.toLocaleString()} كغم</td>
+      <td>${ft.medsToday} / ${ft.medsTotal}</td>
+      <td>${ft.avgWeight?ft.avgWeight+' كغ':'—'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showFieldDetails('${String(f.name).replace(/'/g,"\\'")}')">تفاصيل</button></td>
+    </tr>`;
+  }).join('');
+  return `<div class="card"><div class="cardTitle">🏡 نظرة الحقول <span style="font-size:11px;font-weight:500;color:var(--ink3)">اضغط على أي حقل لفتح ملخصه الذكي</span></div>
+    <div class="tableWrap"><table><thead><tr><th>الحقل</th><th>القاعات</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم/الكلي</th><th>معدل الوزن</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div>`;
+}
+function showFieldDetails(fieldName){
+  selectedFieldName=fieldName;
+  selectedBatchId=null;
+  let ft=fieldTotals(fieldName);
+  if(!ft.field)return;
+  let hallRows=ft.halls.map(h=>{
+    let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+    let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+    let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+    let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+    let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
+    let lm=lastMedHall(h.id);
+    return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
+      <td><b>${h.name}</b></td><td>${(+h.capacity||0)?(+h.capacity).toLocaleString():'—'}</td>
+      <td>${allocated.toLocaleString()}</td><td>${alive.toLocaleString()}</td><td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td>
+      <td>${feedTotalHall(h.id,today()).toLocaleString()} / ${feedTotalHall(h.id).toLocaleString()} كغم</td>
+      <td>${medsCountHall(h.id,today())}</td><td>${lm?lm.name:'—'}</td>
+    </tr>`;
+  }).join('');
+  let detail=$('statsDetail');
+  if(detail)detail.innerHTML=`<div class="detailPanel">
+    <div class="dp-head"><span class="dp-title">🏡 تفاصيل الحقل: ${fieldName}</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="show('charts',null);renderChartsPage('${String(fieldName).replace(/'/g,"\\'")}')">فتح المخطط البياني</button><button class="btn btn-secondary btn-sm" onclick="selectedFieldName=null;renderStats()">رجوع للحقول</button></div></div>
+    <div class="detailGrid">
+      <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
+      <div class="dCell"><div class="dc-label">الحي الحالي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
+      <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('mort','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">الهلاك</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
+      <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('market','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">التسويق</div><div class="dc-val">${ft.sold.toLocaleString()}</div></div>
+      <div class="dCell"><div class="dc-label">علف اليوم</div><div class="dc-val">${ft.feedToday.toLocaleString()} كغم</div></div>
+      <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('feed','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">مجموع العلف</div><div class="dc-val">${ft.feedTotal.toLocaleString()} كغم</div></div>
+      <div class="dCell"><div class="dc-label">لقاحات/أدوية اليوم</div><div class="dc-val">${ft.medsToday}</div></div>
+      <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('meds','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">مجموع اللقاحات/الأدوية</div><div class="dc-val">${ft.medsTotal}</div></div>
+      <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('weights','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">معدل الوزن</div><div class="dc-val">${ft.avgWeight?ft.avgWeight+' كغ':'—'}</div></div>
+    </div>
+  </div>
+  <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th></tr></thead><tbody>${hallRows||'<tr><td colspan="9">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
+  <div class="card"><div class="cardTitle">انتقال سريع لتفاصيل الحقل <span style="font-size:11px;font-weight:500;color:var(--ink3)">يفتح الصفحة المعنية لهذا الحقل فقط</span></div><div class="statsGrid">${smartShortcutCards(fieldName)}</div></div>`;
+}
+
 </script>
 </body>
 </html>
