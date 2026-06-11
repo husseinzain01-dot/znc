@@ -744,6 +744,15 @@ tbody tr:hover td{background:#f8fafc}
       </div>
     </section>
 
+    <!-- FIELD CYCLE -->
+    <section id="fieldCycle" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🔄 دورة الحقل</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">حالة كل حقل بناءً على دورة 40 يوم من تاريخ دخول الطير، و20 يوم صيانة بعد آخر تسويق.</p>
+        <div class="tableWrap"><table id="fieldCycleTable"></table></div>
+      </div>
+    </section>
+
     <!-- REPORTS -->
     <section id="reports" class="page hidden">
 
@@ -1129,6 +1138,7 @@ function buildNav(){
   html+=n('💉','الأدوية واللقاحات','meds');
   html+=n('⚖️','أوزان الطير','weights');
   html+=n('📖','دليل الكايد','guideRef');
+  html+=n('🔄','دورة الحقل','fieldCycle');
   html+=n('📈','مخطط بياني','charts');
   html+=n('📅','الروزنامة','cal');
   html+=n('📋','التقارير','reports');
@@ -1163,6 +1173,7 @@ function show(id,btn){
   if(id==='feed'){clearFeedForm();renderFeed();}
   if(id==='meds'){clearMedForm();renderMeds();}
   if(id==='weights'){clearWeightForm();renderWeights();}
+  if(id==='fieldCycle'){renderFieldCycle();}
   if(id==='guideRef'){
     if($('guideRefStrain')&&!$('guideRefStrain').options.length)onGuideRefTypeChange();
     else renderGuideRefTable();
@@ -1559,7 +1570,7 @@ function selectedDetails(b){
   let lw=latestWeightForBatch(b.id);
   let fieldCells=[
     ['الحقل',b.field||'—'],
-    ['القاعة',b.hall||'—'],
+    ['القاعة',b.hall?`<span style="cursor:pointer;text-decoration:underline" onclick="showFieldHallsList('${String(b.field).replace(/'/g,"\\'")}')">${b.hall}</span>`:'—'],
     ['دخول الحقل',fmt(c.entryDate)],
     ['عمر الطير',c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):(c.flockAge+'/40 يوم')):'—'],
     ['الصافي المنقول',(c.fieldBirds||0).toLocaleString(),'dc-accent'],
@@ -1636,14 +1647,12 @@ function buildHallTopDashboard(hallId){
     {l:'السعة',v:cap?cap.toLocaleString():'—',s:'طير'},
     {l:'المتاح',v:remain.toLocaleString?remain.toLocaleString():remain,s:'طير'},
     {l:'الإشغال',v:occ,s:'نسبة'},
-    {l:'الوجبات',v:batches.length,s:'نشطة'},
     {l:'الصافي المنقول',v:birds.toLocaleString(),s:'ثابت'},
     {l:'الحي الحالي',v:alive.toLocaleString(),s:'داخل القاعة'},
     {l:'الهلاك',v:mort.toLocaleString(),s:'داخل القاعة'},
     {l:'المسوق',v:sold.toLocaleString(),s:'داخل القاعة'},
     {l:'معدل الوزن (الفعلي)',v:avgWeight?avgWeight+' غم':'—',s:'فعلي'},
-    {l:'الكايد (المتوقع)',v:expected?expected+' غم':'—',s:'حسب العمر'},
-    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' غم':'—',s:'للقاعة'}
+    {l:'الكايد (المتوقع)',v:expected?expected+' غم':'—',s:'حسب العمر'}
   ];
   return `<div class="heroBanner"><div><h2>🚪 ${h.name}</h2><p>تفاصيل القاعة بدل ملخص الحقل. الحقل: ${f?f.name:'—'}</p></div><div class="hb-right">إشغال ${occ}</div></div>`+
     cards.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
@@ -2474,6 +2483,64 @@ function fillWeightDefaults(){
   calcWeightTotal();
 }
 // ── دليل الكايد المستقل (بدون ربط بوجبة) ──
+function lastMarketDateForBatch(batchId){
+  let ms=(data.markets||[]).filter(m=>+m.batchId===+batchId&&m.date);
+  if(!ms.length)return null;
+  return ms.reduce((a,m)=>String(m.date)>String(a)?m.date:a,ms[0].date);
+}
+function renderFieldCycle(){
+  let el=$('fieldCycleTable');if(!el)return;
+  let fields=data.fields.filter(f=>canSeeField(f.name));
+  let rows=fields.map(f=>{
+    let batches=visibleBatches().filter(b=>b.field===f.name&&b.transferDate);
+    let activeBatch=batches.filter(b=>calc(b).alive>0).sort((a,b)=>String(b.fieldEntryDate||b.transferDate).localeCompare(String(a.fieldEntryDate||a.transferDate)))[0]||null;
+    let badge,entryDate='—',cycleEnd='—',cycleInfo='—',currentBirds=0,lastMarket='—',mStart='—',mEnd='—',note='';
+    if(activeBatch){
+      entryDate=activeBatch.fieldEntryDate||activeBatch.transferDate;
+      cycleEnd=addDays(entryDate,40);
+      currentBirds=calc(activeBatch).alive;
+      let remain=diffDays(today(),cycleEnd);
+      let elapsed=diffDays(entryDate,today());
+      cycleInfo=today()<=cycleEnd?`متبقي ${remain} يوم`:`منقضي ${elapsed-40} يوم زيادة`;
+      badge='<span class="badge b-amber">🟡 مشغول</span>';
+    }else{
+      // ابحث عن آخر وجبة منتهية لهذا الحقل
+      let doneBatches=batches.filter(b=>calc(b).completed||calc(b).alive===0).sort((a,b)=>String(b.fieldEntryDate||b.transferDate).localeCompare(String(a.fieldEntryDate||a.transferDate)));
+      let lastBatch=doneBatches[0]||null;
+      let lm=lastBatch?lastMarketDateForBatch(lastBatch.id):null;
+      if(lastBatch)entryDate=lastBatch.fieldEntryDate||lastBatch.transferDate,cycleEnd=addDays(entryDate,40);
+      if(lm){
+        lastMarket=fmt(lm);
+        mStart=fmt(lm);
+        let mEndIso=addDays(lm,20);
+        mEnd=fmt(mEndIso);
+        let remain=diffDays(today(),mEndIso);
+        if(today()<=mEndIso){
+          badge='<span class="badge b-blue">🔧 صيانة</span>';
+          cycleInfo=`متبقي ${remain} يوم للصيانة`;
+        }else{
+          badge='<span class="badge b-green">✅ جاهز</span>';
+          note='جاهز لاستقبال فقسة جديدة';
+        }
+      }else{
+        badge='<span class="badge b-green">✅ جاهز</span>';
+        note='لا توجد وجبة حالية';
+      }
+    }
+    return `<tr>
+      <td><b>${f.name}</b></td>
+      <td>${activeBatch?activeBatch.name:'—'}</td>
+      <td>${entryDate&&entryDate!=='—'?fmt(entryDate):'—'}</td>
+      <td>${cycleEnd&&cycleEnd!=='—'?fmt(cycleEnd):'—'}</td>
+      <td>${currentBirds.toLocaleString()}</td>
+      <td>${lastMarket}</td>
+      <td>${mStart}</td>
+      <td>${mEnd}</td>
+      <td>${badge}${note?`<div style="font-size:11px;color:var(--ink3);margin-top:4px">${note}</div>`:''}${cycleInfo&&cycleInfo!=='—'?`<div style="font-size:11px;color:var(--ink3);margin-top:4px">${cycleInfo}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>الحقل</th><th>الوجبة الحالية</th><th>دخول الطير</th><th>نهاية دورة 40 يوم</th><th>الطير الحالي</th><th>آخر تسويق</th><th>بداية الصيانة</th><th>نهاية الصيانة</th><th>الحالة</th></tr></thead><tbody>'+(rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">لا توجد حقول</td></tr>')+'</tbody>';
+}
 function onGuideRefTypeChange(){
   let isLayer=$('guideRefType')&&$('guideRefType').value==='بياض';
   let strains=isLayer?Object.keys(LAYER_WEIGHT_GUIDES):Object.keys(BROILER_WEIGHT_GUIDES);
@@ -3189,7 +3256,6 @@ function renderReports(){
       let lm=lastMedHall(h.id);
       let lw=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
       let avgW=lw.length?+(lw.reduce((s,w)=>s+(+w.avgWeight||0),0)/lw.length).toFixed(2):'—';
-      let avgG=lw.length?Math.round(lw.reduce((s,w)=>s+weightGuideGrams(w),0)/lw.length):0;
       let fToday=feedTotalHall(h.id,today());
       let fTotal=feedTotalHall(h.id);
       let mToday=medsCountHall(h.id,today());
@@ -3202,7 +3268,6 @@ function renderReports(){
         <td>${mToday}</td>
         <td>${lm?`<span class="badge b-violet" style="font-size:10px">${lm.name}</span>`:'—'}</td>
         <td>${avgW==='—'?'—':avgW+' كغ'}</td>
-        <td>${avgG?avgG+' غم':'—'}</td>
         <td>${batches.map(x=>x.name).join(' / ')||'—'}</td>
       </tr>`;
     }).join('');
@@ -3211,7 +3276,7 @@ function renderReports(){
       {l:'إجمالي علف اليوم',v:halls.reduce((s,h)=>s+feedTotalHall(h.id,today()),0).toLocaleString()+' كغم'},
       {l:'إجمالي اللقاحات اليوم',v:halls.reduce((s,h)=>s+medsCountHall(h.id,today()),0).toLocaleString()},
     ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
-    el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>السعة</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>الإشغال</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>الكايد</th><th>الوجبات</th></tr></thead><tbody>'+rows+'</tbody>';
+    el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>السعة</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>الإشغال</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>الوجبات</th></tr></thead><tbody>'+rows+'</tbody>';
   }
 }
 
@@ -3362,6 +3427,9 @@ function showCalendarDayDetails(batchId,date){
   let feedRows=feeds.map(x=>`<tr><td>${x.hall||'—'}</td><td>${x.feedType||'—'}</td><td>${(+x.qty||0).toLocaleString()} كغم</td><td>${x.note||'—'}</td></tr>`).join('');
   let medRows=meds.map(x=>`<tr><td>${x.hall||'—'}</td><td>${x.type||'—'}</td><td>${x.name||'—'}</td><td>${x.dose||'—'}</td><td>${(+x.qty||0).toLocaleString()}</td></tr>`).join('');
   let mortRows=morts.map(x=>`<tr><td>${x.hall||'—'}</td><td>${(+x.count||0).toLocaleString()}</td><td>${x.reason||'—'}</td></tr>`).join('');
+  let dayWeight=(data.weights||[]).find(x=>x.date===date&&+x.batchId===b.id);
+  let actualG=dayWeight?weightActualGrams(dayWeight):0;
+  let guideG=dayWeight?weightGuideGrams(dayWeight):getGuideWeightByAge(c.flockAge||0);
   if($('calDayTitle'))$('calDayTitle').textContent=`${b.name} — ${fmt(date)}`;
   if($('calDayBody'))$('calDayBody').innerHTML=`
     <div class="calMiniGrid">
@@ -3369,6 +3437,8 @@ function showCalendarDayDetails(batchId,date){
       <div class="calMini"><div class="lbl">استهلاك العلف</div><div class="val">${feedTotal.toLocaleString()} كغم</div></div>
       <div class="calMini"><div class="lbl">الهلاك</div><div class="val">${mortTotal.toLocaleString()}</div></div>
       <div class="calMini"><div class="lbl">الأدوية واللقاحات</div><div class="val">${medCount.toLocaleString()}</div></div>
+      <div class="calMini"><div class="lbl">الوزن الفعلي</div><div class="val">${actualG?actualG+' غم':'—'}</div></div>
+      <div class="calMini"><div class="lbl">الكايد (المتوقع)</div><div class="val">${guideG?guideG+' غم':'—'}</div></div>
     </div>
     <div class="card" style="box-shadow:none;margin-bottom:10px"><div class="cardTitle">🌾 العلف في هذا اليوم</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>نوع العلف</th><th>الكمية</th><th>ملاحظة</th></tr></thead><tbody>${feedRows||'<tr><td colspan="4">لا يوجد علف مسجل لهذا اليوم</td></tr>'}</tbody></table></div></div>
     <div class="card" style="box-shadow:none;margin-bottom:10px"><div class="cardTitle">☠️ الهلاك في هذا اليوم</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>العدد</th><th>السبب</th></tr></thead><tbody>${mortRows||'<tr><td colspan="3">لا يوجد هلاك مسجل لهذا اليوم</td></tr>'}</tbody></table></div></div>
@@ -3475,7 +3545,6 @@ function renderFields(){
       <td>${statusBdg}${st.busy?' <span style="font-size:11px;color:var(--ink3)">('+st.batches.map(b=>b.name).join('، ')+')</span>':''}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="editField(${f.id})">تعديل</button>
-        <button class="btn btn-secondary btn-sm" onclick="selectedBatchId=null;show('dash',null);setTimeout(()=>showFieldDetails('${String(f.name).replace(/'/g,"\\'")}'),0)">تفاصيل الحقل</button>
         <button class="btn btn-primary btn-sm" onclick="addHallForField(${f.id})">➕ إضافة قاعة</button>
         <button class="btn btn-danger btn-sm" onclick="deleteField(${f.id})">حذف</button>
       </td>
@@ -4011,12 +4080,15 @@ function showHallDetailsInBatch(hallId){
   let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
   let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
   let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
+  let avgActual=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
+  let avgGuide=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
   let lm=lastMedHall(h.id);
   let cells=[
     ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
     ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['هلاك القاعة',mort.toLocaleString()],
     ['علف اليوم',feedTotalHall(h.id,today()).toLocaleString()+' كغم'],['مجموع العلف',feedTotalHall(h.id).toLocaleString()+' كغم'],
-    ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?lm.name:'—'],['آخر معدل وزن',avg==='—'?'—':avg+' كغ']
+    ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?lm.name:'—'],
+    ['الوزن الفعلي',avgActual?avgActual+' غم':'—'],['الكايد (المتوقع)',avgGuide?avgGuide+' غم':'—']
   ];
   let detail=$('statsDetail');
   if(detail)detail.innerHTML=`<div class="detailPanel">
@@ -4186,15 +4258,11 @@ function showFieldDetails(fieldName){
     let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
     let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
     let lm=lastMedHall(h.id);
-    let hallWeights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
-    let hAvg=hallWeights.length?Math.round(hallWeights.reduce((s,w)=>s+weightActualGrams(w),0)/hallWeights.length):0;
-    let hGuide=hallWeights.length?Math.round(hallWeights.reduce((s,w)=>s+weightGuideGrams(w),0)/hallWeights.length):0;
     return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
       <td><b>${h.name}</b></td><td>${(+h.capacity||0)?(+h.capacity).toLocaleString():'—'}</td>
       <td>${allocated.toLocaleString()}</td><td>${alive.toLocaleString()}</td><td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td>
       <td>${feedTotalHall(h.id,today()).toLocaleString()} / ${feedTotalHall(h.id).toLocaleString()} كغم</td>
       <td>${medsCountHall(h.id,today())}</td><td>${lm?lm.name:'—'}</td>
-      <td>${hAvg?hAvg+' غم':'—'}</td><td>${hGuide?hGuide+' غم':'—'}</td>
     </tr>`;
   }).join('');
   let detail=$('statsDetail');
@@ -4212,7 +4280,7 @@ function showFieldDetails(fieldName){
       <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('weights','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">معدل الوزن</div><div class="dc-val">${ft.avgWeight?ft.avgWeight+' كغ':'—'}</div></div>
     </div>
   </div>
-  <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>الوزن الفعلي</th><th>الكايد</th></tr></thead><tbody>${hallRows||'<tr><td colspan="11">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
+  <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th></tr></thead><tbody>${hallRows||'<tr><td colspan="9">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
   <div class="card"><div class="cardTitle">انتقال سريع لتفاصيل الحقل <span style="font-size:11px;font-weight:500;color:var(--ink3)">يفتح الصفحة المعنية لهذا الحقل فقط</span></div><div class="statsGrid">${smartShortcutCards(fieldName)}</div></div>`;
 }
 
