@@ -3189,6 +3189,7 @@ function renderReports(){
       let lm=lastMedHall(h.id);
       let lw=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
       let avgW=lw.length?+(lw.reduce((s,w)=>s+(+w.avgWeight||0),0)/lw.length).toFixed(2):'—';
+      let avgG=lw.length?Math.round(lw.reduce((s,w)=>s+weightGuideGrams(w),0)/lw.length):0;
       let fToday=feedTotalHall(h.id,today());
       let fTotal=feedTotalHall(h.id);
       let mToday=medsCountHall(h.id,today());
@@ -3201,6 +3202,7 @@ function renderReports(){
         <td>${mToday}</td>
         <td>${lm?`<span class="badge b-violet" style="font-size:10px">${lm.name}</span>`:'—'}</td>
         <td>${avgW==='—'?'—':avgW+' كغ'}</td>
+        <td>${avgG?avgG+' غم':'—'}</td>
         <td>${batches.map(x=>x.name).join(' / ')||'—'}</td>
       </tr>`;
     }).join('');
@@ -3209,7 +3211,7 @@ function renderReports(){
       {l:'إجمالي علف اليوم',v:halls.reduce((s,h)=>s+feedTotalHall(h.id,today()),0).toLocaleString()+' كغم'},
       {l:'إجمالي اللقاحات اليوم',v:halls.reduce((s,h)=>s+medsCountHall(h.id,today()),0).toLocaleString()},
     ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
-    el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>السعة</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>الإشغال</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>الوجبات</th></tr></thead><tbody>'+rows+'</tbody>';
+    el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>السعة</th><th>إجمالي الطيور</th><th>الحي</th><th>هلاك</th><th>مسوق</th><th>الإشغال</th><th>علف اليوم</th><th>إجمالي العلف</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>آخر وزن</th><th>الكايد</th><th>الوجبات</th></tr></thead><tbody>'+rows+'</tbody>';
   }
 }
 
