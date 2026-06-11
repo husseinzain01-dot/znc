@@ -4184,11 +4184,15 @@ function showFieldDetails(fieldName){
     let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
     let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
     let lm=lastMedHall(h.id);
+    let hallWeights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+    let hAvg=hallWeights.length?Math.round(hallWeights.reduce((s,w)=>s+weightActualGrams(w),0)/hallWeights.length):0;
+    let hGuide=hallWeights.length?Math.round(hallWeights.reduce((s,w)=>s+weightGuideGrams(w),0)/hallWeights.length):0;
     return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
       <td><b>${h.name}</b></td><td>${(+h.capacity||0)?(+h.capacity).toLocaleString():'—'}</td>
       <td>${allocated.toLocaleString()}</td><td>${alive.toLocaleString()}</td><td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td>
       <td>${feedTotalHall(h.id,today()).toLocaleString()} / ${feedTotalHall(h.id).toLocaleString()} كغم</td>
       <td>${medsCountHall(h.id,today())}</td><td>${lm?lm.name:'—'}</td>
+      <td>${hAvg?hAvg+' غم':'—'}</td><td>${hGuide?hGuide+' غم':'—'}</td>
     </tr>`;
   }).join('');
   let detail=$('statsDetail');
@@ -4206,7 +4210,7 @@ function showFieldDetails(fieldName){
       <div class="dCell" style="cursor:pointer;border-color:var(--p)" onclick="openSmartSection('weights','${String(fieldName).replace(/'/g,"\\'")}')"><div class="dc-label">معدل الوزن</div><div class="dc-val">${ft.avgWeight?ft.avgWeight+' كغ':'—'}</div></div>
     </div>
   </div>
-  <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th></tr></thead><tbody>${hallRows||'<tr><td colspan="9">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
+  <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th><th>الوزن الفعلي</th><th>الكايد</th></tr></thead><tbody>${hallRows||'<tr><td colspan="11">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
   <div class="card"><div class="cardTitle">انتقال سريع لتفاصيل الحقل <span style="font-size:11px;font-weight:500;color:var(--ink3)">يفتح الصفحة المعنية لهذا الحقل فقط</span></div><div class="statsGrid">${smartShortcutCards(fieldName)}</div></div>`;
 }
 
