@@ -382,7 +382,8 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">📈 مخطط بياني لحالة الحقل</div>
         <div class="formGrid" style="margin-bottom:12px">
-          <div class="formGroup"><label>الحقل</label><select id="chartField" onchange="renderChartsPage()"></select></div>
+          <div class="formGroup"><label>الحقل</label><select id="chartField" onchange="onChartFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="chartHall" onchange="renderChartsPage()"><option value="">كل القاعات</option></select></div>
         </div>
         <div id="fieldChartPanel"></div>
       </div>
@@ -398,7 +399,7 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>تاريخ استلام البيض</label><input id="eggReceiveDate" type="date"></div>
           <div class="formGroup"><label>تاريخ الترقيد *</label><input id="hatchDate" type="date"></div>
           <div class="formGroup"><label>النوع</label><select id="bType" onchange="toggleLayerFields()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
-          <div class="formGroup"><label>سلالة الطير</label><select id="birdStrain"><option>Ross 308</option><option>Cobb 500</option><option>Arbor Acres</option><option>Hubbard</option><option>Lohmann Brown</option><option>Lohmann LSL</option><option>Hy-Line Brown</option><option>Hy-Line W-36</option><option>ISA Brown</option><option>Bovans Brown</option><option>Dekalb White</option><option>بياض تجاري</option></select></div>
+          <div class="formGroup"><label>سلالة الطير</label><select id="birdStrain"><option>Ross 308</option><option>Ross 708</option><option>Cobb 500</option><option>Cobb 700</option><option>Arbor Acres</option><option>Hubbard</option><option>Indian River</option><option>Sasso (بلدي مطور)</option><option>Lohmann Brown</option><option>Lohmann LSL</option><option>Hy-Line Brown</option><option>Hy-Line W-36</option><option>ISA Brown</option><option>Bovans Brown</option><option>Bovans White</option><option>Dekalb White</option><option>Novogen Brown</option><option>H&N Brown</option><option>بياض تجاري</option></select></div>
           <div class="formGroup"><label>المورد</label><input id="batchSupplier" list="supplierList" placeholder="اسم المورد"></div>
           <div class="formGroup"><label>الشركة</label><input id="batchCompany" list="companyList" placeholder="اسم الشركة"></div>
           <datalist id="supplierList"></datalist>
@@ -708,12 +709,13 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>سلالة الطير</label><input id="wStrain" readonly></div>
           <div class="formGroup"><label>التاريخ</label><input id="wDate" type="date" onchange="fillWeightDefaults()"></div>
           <div class="formGroup"><label>عدد الطير الحي بالقاعة</label><input id="wAlive" type="number" min="0" readonly></div>
-          <div class="formGroup"><label>معدل الوزن الفعلي للطير (كغ)</label><input id="wAvg" type="number" min="0" step="0.01" oninput="calcWeightTotal()"></div>
-          <div class="formGroup"><label>الوزن المتوقع حسب العمر (كغ)</label><input id="wExpected" type="number" min="0" step="0.01"></div>
-          <div class="formGroup"><label>فرق الوزن (كغ)</label><input id="wDiff" type="text" readonly></div>
-          <div class="formGroup"><label>مجموع وزن القاعة (كغ)</label><input id="wTotal" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="wAgeDays" type="number" readonly></div>
+          <div class="formGroup"><label>الوزن الفعلي بالغرام</label><input id="wAvg" type="number" min="0" step="1" oninput="calcWeightTotal()"></div>
+          <div class="formGroup"><label>كايد الوزن حسب العمر (غرام)</label><input id="wExpected" type="number" min="0" step="1" readonly></div>
+          <div class="formGroup"><label>نسبة تحقيق الكايد %</label><input id="wDiff" type="text" readonly></div>
           <div class="formGroup"><label>ملاحظة</label><input id="wNote"></div>
         </div>
+        <div id="wGuideTable" style="margin-top:10px"></div>
         <div class="formActions">
           <button class="btn btn-primary" onclick="saveWeightRecord()">💾 حفظ الوزن</button>
           <button class="btn btn-secondary" onclick="clearWeightForm()">مسح</button>
@@ -725,6 +727,18 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>فرز حسب الوجبة</label><select id="weightBatchFilter" onchange="renderWeights()"></select></div>
         </div>
         <div class="tableWrap"><table id="weightsTable"></table></div>
+      </div>
+    </section>
+
+    <!-- GUIDE REFERENCE -->
+    <section id="guideRef" class="page hidden">
+      <div class="card" id="guideRefCard">
+        <div class="cardTitle">📖 دليل الكايد (الوزن القياسي حسب العمر)</div>
+        <div class="formGrid" style="margin-bottom:10px">
+          <div class="formGroup"><label>النوع</label><select id="guideRefType" onchange="onGuideRefTypeChange()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
+          <div class="formGroup"><label>السلالة</label><select id="guideRefStrain" onchange="renderGuideRefTable()"></select></div>
+        </div>
+        <div id="guideRefTable"></div>
       </div>
     </section>
 
@@ -880,6 +894,7 @@ async function pullCloud(){
       data.feeds=data.feeds||[];data.meds=data.meds||[];
       data.feeds=data.feeds||[];data.meds=data.meds||[];
       data.weights=data.weights||[];
+      migrateWeightsToGrams();
       data.subUsers=data.subUsers||[];
       localStorage.setItem(STORE,JSON.stringify(data));
       if($('dbState')) $('dbState').textContent='متصل بسوبابيس ✅';
@@ -981,6 +996,7 @@ function load(){
       data.fields=data.fields||[];
       data.halls=data.halls||[];
       data.weights=data.weights||[];
+      migrateWeightsToGrams();
       data.subUsers=data.subUsers||[];
     }
     let ls=localStorage.getItem(STORE+'_lastSave');
@@ -1109,7 +1125,8 @@ function buildNav(){
   }
   html+=n('🌾','العلف','feed');
   html+=n('💉','الأدوية واللقاحات','meds');
-  html+=n('⚖️','أوزان القاعات','weights');
+  html+=n('⚖️','أوزان الطير','weights');
+  html+=n('📖','دليل الكايد','guideRef');
   html+=n('📈','مخطط بياني','charts');
   html+=n('📅','الروزنامة','cal');
   html+=n('📋','التقارير','reports');
@@ -1144,6 +1161,10 @@ function show(id,btn){
   if(id==='feed'){clearFeedForm();renderFeed();}
   if(id==='meds'){clearMedForm();renderMeds();}
   if(id==='weights'){clearWeightForm();renderWeights();}
+  if(id==='guideRef'){
+    if($('guideRefStrain')&&!$('guideRefStrain').options.length)onGuideRefTypeChange();
+    else renderGuideRefTable();
+  }
   if(id==='charts'){renderChartsPage();}
   if(id==='reports'){
     // تهيئة فلاتر التقرير
@@ -1403,6 +1424,26 @@ function renderBatchRecordFilters(){
 function selectBatch(id){selectedBatchId=id;selectedFieldName=null;renderStats();renderBatches();msg('تم اختيار الوجبة')}
 
 
+// إرجاع الوزن الفعلي بالغرام لسجل وزن، مع التحويل من الكيلوغرام للسجلات القديمة
+function weightActualGrams(w){
+  if(!w)return 0;
+  if(w.actual_weight_grams!=null)return +w.actual_weight_grams||0;
+  let v=+w.avgWeight||0;
+  return Math.round(v<20?v*1000:v);
+}
+function weightGuideGrams(w){
+  if(!w)return 0;
+  if(w.guideWeightGrams!=null)return +w.guideWeightGrams||0;
+  return getGuideWeightByAge(w.ageDays!=null?+w.ageDays:0);
+}
+// تحويل سجلات الأوزان القديمة (المخزّنة بالكيلوغرام) إلى غرام دون حذف أي بيانات
+function migrateWeightsToGrams(){
+  (data.weights||[]).forEach(w=>{
+    if(w.actual_weight_grams==null)w.actual_weight_grams=weightActualGrams(w);
+    if(w.guideWeightGrams==null)w.guideWeightGrams=weightGuideGrams(w);
+    if(w.achievementPct==null)w.achievementPct=w.guideWeightGrams?+(w.actual_weight_grams/w.guideWeightGrams*100).toFixed(1):0;
+  });
+}
 function latestWeightForBatch(batchId){
   let list=(data.weights||[]).filter(w=>w.batchId===batchId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   return list[0]||null;
@@ -1418,9 +1459,13 @@ function hallCapacityStatus(hallId,addBirds=0,ignoreBatchId=null){
 }
 const BROILER_WEIGHT_GUIDES={
   'Ross 308':[[0,0.04],[7,0.19],[14,0.48],[21,0.93],[28,1.55],[35,2.28],[42,3.05],[49,3.75]],
+  'Ross 708':[[0,0.04],[7,0.19],[14,0.49],[21,0.96],[28,1.60],[35,2.36],[42,3.16],[49,3.90]],
   'Cobb 500':[[0,0.04],[7,0.18],[14,0.46],[21,0.89],[28,1.48],[35,2.18],[42,2.92],[49,3.58]],
+  'Cobb 700':[[0,0.04],[7,0.18],[14,0.47],[21,0.91],[28,1.51],[35,2.23],[42,2.99],[49,3.66]],
   'Arbor Acres':[[0,0.04],[7,0.18],[14,0.45],[21,0.87],[28,1.43],[35,2.10],[42,2.82],[49,3.45]],
-  'Hubbard':[[0,0.04],[7,0.17],[14,0.43],[21,0.82],[28,1.36],[35,2.02],[42,2.70],[49,3.32]]
+  'Hubbard':[[0,0.04],[7,0.17],[14,0.43],[21,0.82],[28,1.36],[35,2.02],[42,2.70],[49,3.32]],
+  'Indian River':[[0,0.04],[7,0.17],[14,0.44],[21,0.85],[28,1.40],[35,2.06],[42,2.76],[49,3.40]],
+  'Sasso (بلدي مطور)':[[0,0.04],[7,0.10],[14,0.25],[21,0.45],[28,0.70],[35,1.00],[42,1.35],[49,1.75],[56,2.10],[63,2.45]]
 };
 const LAYER_WEIGHT_GUIDES={
   'Lohmann Brown':[[0,0.04],[28,0.28],[56,0.68],[84,1.08],[112,1.40],[126,1.55],[140,1.68]],
@@ -1429,7 +1474,10 @@ const LAYER_WEIGHT_GUIDES={
   'Hy-Line W-36':[[0,0.04],[28,0.25],[56,0.60],[84,0.95],[112,1.23],[126,1.36],[140,1.48]],
   'ISA Brown':[[0,0.04],[28,0.28],[56,0.67],[84,1.06],[112,1.38],[126,1.53],[140,1.66]],
   'Bovans Brown':[[0,0.04],[28,0.28],[56,0.66],[84,1.05],[112,1.36],[126,1.51],[140,1.64]],
+  'Bovans White':[[0,0.04],[28,0.25],[56,0.60],[84,0.94],[112,1.22],[126,1.35],[140,1.47]],
   'Dekalb White':[[0,0.04],[28,0.25],[56,0.61],[84,0.96],[112,1.25],[126,1.39],[140,1.52]],
+  'Novogen Brown':[[0,0.04],[28,0.28],[56,0.69],[84,1.09],[112,1.41],[126,1.56],[140,1.69]],
+  'H&N Brown':[[0,0.04],[28,0.28],[56,0.68],[84,1.07],[112,1.39],[126,1.54],[140,1.67]],
   'بياض تجاري':[[0,0.04],[28,0.27],[56,0.65],[84,1.02],[112,1.32],[126,1.46],[140,1.58]]
 };
 function guideWeightFromTable(ageDays,table){
@@ -1440,6 +1488,20 @@ function guideWeightFromTable(ageDays,table){
     if(ageDays<=b[0]){
       let ratio=(ageDays-a[0])/(b[0]-a[0]);
       return +(a[1]+(b[1]-a[1])*ratio).toFixed(2);
+    }
+  }
+  return table[table.length-1][1];
+}
+// كايد وزن ثابت حسب عمر الطير بالأيام (بالغرام) - لا يعتمد على الوزن الفعلي
+const GUIDE_WEIGHT_BY_AGE_GRAMS=[[0,42],[7,180],[14,450],[21,850],[28,1350],[35,1950],[42,2600],[49,3200]];
+function getGuideWeightByAge(ageDays){
+  let table=GUIDE_WEIGHT_BY_AGE_GRAMS;
+  if(ageDays<=table[0][0])return table[0][1];
+  for(let i=1;i<table.length;i++){
+    let a=table[i-1],b=table[i];
+    if(ageDays<=b[0]){
+      let ratio=(ageDays-a[0])/(b[0]-a[0]);
+      return Math.round(a[1]+(b[1]-a[1])*ratio);
     }
   }
   return table[table.length-1][1];
@@ -1502,9 +1564,9 @@ function selectedDetails(b){
     ['المسوق',c.sold.toLocaleString()],
     ['الحي المتبقي',c.alive.toLocaleString(),'dc-accent'],
     ['نسبة النجاح',successRate(b)+'%','dc-accent'],
-    ['آخر وزن',lw?(lw.avgWeight+' كغ'):'—','dc-accent'],
-    ['الوزن المتوقع',lw?(lw.expectedWeight+' كغ'):'—'],
-    ['فرق الوزن',lw?((+lw.avgWeight-+lw.expectedWeight).toFixed(2)+' كغ'):'—'],
+    ['آخر وزن (الفعلي)',lw?(weightActualGrams(lw)+' غم'):'—','dc-accent'],
+    ['الوزن المتوقع (الكايد)',lw?(weightGuideGrams(lw)+' غم'):'—'],
+    ['فرق الوزن',lw?((weightActualGrams(lw)-weightGuideGrams(lw))+' غم'):'—'],
     ['الحالة',c.completed?'منتهية':(b.status||'نشطة')],
   ];
   let mkCells=c=>c.map(x=>`<div class="dCell${x[2]?' '+x[2]:''}"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('');
@@ -1527,7 +1589,8 @@ function buildFieldTopDashboard(fieldName,selectedBatch=null){
   let mort=batches.reduce((s,b)=>s+batchHallMort(b,h.id),0);
   let sold=batches.reduce((s,b)=>s+batchHallSold(b,h.id),0);
   let weights=batches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
-  let avgWeight=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):0;
+  let avgWeight=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
+  let avgGuide=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
   let totalWeight=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
   let cap=halls.reduce((s,h)=>s+(+h.capacity||0),0);
   let occ=cap?((alive/cap)*100).toFixed(1)+'%':'—';
@@ -1541,8 +1604,9 @@ function buildFieldTopDashboard(fieldName,selectedBatch=null){
     {l:'هلاك الحقل',v:mort.toLocaleString(),s:'متراكم'},
     {l:'المسوق',v:sold.toLocaleString(),s:'متراكم'},
     {l:'الإشغال',v:occ,s:'من السعة'},
-    {l:'معدل الوزن',v:avgWeight?avgWeight+' كغ':'—',s:'آخر قراءات'},
-    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' كغ':'—',s:'كل القاعات'}
+    {l:'معدل الوزن (الفعلي)',v:avgWeight?avgWeight+' غم':'—',s:'آخر قراءات'},
+    {l:'الكايد (المتوقع)',v:avgGuide?avgGuide+' غم':'—',s:'حسب العمر'},
+    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' غم':'—',s:'كل القاعات'}
   ];
   return `<div class="heroBanner"><div><h2>${title}</h2><p>الواجهة العليا تعرض مجموع الحقل. اضغط على قاعة بالأسفل حتى تتحول الواجهة العليا إلى تفاصيل القاعة.</p></div><div class="hb-right">${f?f.type:'حقل'}</div></div>`+
     cards.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
@@ -1556,8 +1620,8 @@ function buildHallTopDashboard(hallId){
   let mort=batches.reduce((s,b)=>s+batchHallMort(b,h.id),0);
   let sold=batches.reduce((s,b)=>s+batchHallSold(b,h.id),0);
   let weights=batches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
-  let avgWeight=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):(+h.avgWeight||0);
-  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):0;
+  let avgWeight=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
+  let expected=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
   let totalWeight=weights.reduce((s,w)=>s+(+w.totalWeight||0),0)||(+h.totalWeight||0);
   let cap=+h.capacity||0;
   let remain=cap?Math.max(0,cap-alive):'—';
@@ -1573,9 +1637,9 @@ function buildHallTopDashboard(hallId){
     {l:'الحي الحالي',v:alive.toLocaleString(),s:'داخل القاعة'},
     {l:'الهلاك',v:mort.toLocaleString(),s:'داخل القاعة'},
     {l:'المسوق',v:sold.toLocaleString(),s:'داخل القاعة'},
-    {l:'معدل الوزن',v:avgWeight?avgWeight+' كغ':'—',s:'فعلي'},
-    {l:'المتوقع',v:expected?expected+' كغ':'—',s:'حسب العمر'},
-    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' كغ':'—',s:'للقاعة'}
+    {l:'معدل الوزن (الفعلي)',v:avgWeight?avgWeight+' غم':'—',s:'فعلي'},
+    {l:'الكايد (المتوقع)',v:expected?expected+' غم':'—',s:'حسب العمر'},
+    {l:'مجموع الوزن',v:totalWeight?totalWeight.toLocaleString()+' غم':'—',s:'للقاعة'}
   ];
   return `<div class="heroBanner"><div><h2>🚪 ${h.name}</h2><p>تفاصيل القاعة بدل ملخص الحقل. الحقل: ${f?f.name:'—'}</p></div><div class="hb-right">إشغال ${occ}</div></div>`+
     cards.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('');
@@ -1734,7 +1798,7 @@ function renderStats(){
       {l:'المسوق',v:c.sold.toLocaleString(),s:'إجمالي'},
       {l:'الحي المتبقي',v:c.alive.toLocaleString(),s:'صافي'},
       {l:'نسبة النجاح',v:successRate(b)+'%',s:''},
-      {l:'آخر وزن',v:lw?(lw.avgWeight+' كغ'):'—',s:lw?('متوقع '+lw.expectedWeight):''},
+      {l:'آخر وزن (الفعلي)',v:lw?(weightActualGrams(lw)+' غم'):'—',s:lw?('الكايد '+weightGuideGrams(lw)+' غم'):''},
     ];
     cardsEl.innerHTML=
       `<div class="heroBanner"><div><h2>${b.name}</h2><p>${b.type||'وجبة'} — ${fmt(b.hatchDate)} — ${b.field||'لم تُنقل'}</p></div></div>`+
@@ -1788,7 +1852,16 @@ function renderBatches(){
 function toggleLayerFields(){
   let isLayer=$('bType').value==='بياض';
   ['grpLayerSource'].forEach(id=>{if($(id))$(id).classList.toggle('hidden',!isLayer)});
+  updateBirdStrainOptions();
   toggleLayerAge();
+}
+function updateBirdStrainOptions(){
+  let sel=$('birdStrain');if(!sel)return;
+  let isLayer=$('bType')&&$('bType').value==='بياض';
+  let old=sel.value;
+  let strains=isLayer?Object.keys(LAYER_WEIGHT_GUIDES):Object.keys(BROILER_WEIGHT_GUIDES);
+  sel.innerHTML=strains.map(s=>`<option>${s}</option>`).join('');
+  if(strains.includes(old))sel.value=old;
 }
 function toggleLayerAge(){
   let isLayer=$('bType')&&$('bType').value==='بياض';
@@ -2324,7 +2397,8 @@ function renderLayerPurchase(){
 function clearWeightForm(){
   if($('wField'))$('wField').selectedIndex=0;
   if($('wDate'))$('wDate').value=today();
-  ['wAvg','wExpected','wTotal','wNote','wAlive','wDiff','wStrain'].forEach(id=>{if($(id))$(id).value=''});
+  ['wAvg','wExpected','wNote','wAlive','wDiff','wStrain','wAgeDays'].forEach(id=>{if($(id))$(id).value=''});
+  if($('wGuideTable'))$('wGuideTable').innerHTML='';
   onWeightFieldChange();
 }
 function onWeightFieldChange(){
@@ -2345,20 +2419,75 @@ function calcWeightTotal(){
   let b=data.batches.find(x=>x.id===id);
   if(!b)return;
   let c=calc(b,val('wDate')||today());
-  let avg=+($('wAvg').value||0);
-  let expected=+($('wExpected').value||expectedWeightForBatch(b,c.flockAge));
+  let actual=+($('wAvg').value||0);
+  let guide=getGuideWeightByAge(c.flockAge);
   if($('wAlive'))$('wAlive').value=c.alive||0;
-  if($('wTotal'))$('wTotal').value=avg?+(avg*(c.alive||c.fieldBirds||0)).toFixed(2):'';
-  if($('wDiff'))$('wDiff').value=avg?((avg-expected).toFixed(2)+' كغ'):'';
+  if($('wAgeDays'))$('wAgeDays').value=c.flockAge;
+  if($('wExpected'))$('wExpected').value=guide;
+  if($('wDiff'))$('wDiff').value=actual?((actual/guide*100).toFixed(1)+'%'):'';
 }
 function fillWeightDefaults(){
   let id=$('wBatch')?+$('wBatch').value:0;
-  let b=data.batches.find(x=>x.id===id);if(!b)return;
+  let b=data.batches.find(x=>x.id===id);
+  if(!b){if($('wGuideTable'))$('wGuideTable').innerHTML='';return;}
   let c=calc(b,val('wDate')||today());
   if($('wAlive'))$('wAlive').value=c.alive||0;
   if($('wStrain'))$('wStrain').value=b.type==='بياض'?(b.birdStrain||'بياض تجاري'):(b.birdStrain||'Ross 308');
-  if($('wExpected'))$('wExpected').value=expectedWeightForBatch(b,c.flockAge);
+  if($('wAgeDays'))$('wAgeDays').value=c.flockAge;
+  if($('wExpected'))$('wExpected').value=getGuideWeightByAge(c.flockAge);
+  renderGuideTable(b,c.flockAge);
   calcWeightTotal();
+}
+// ── دليل الكايد المستقل (بدون ربط بوجبة) ──
+function onGuideRefTypeChange(){
+  let isLayer=$('guideRefType')&&$('guideRefType').value==='بياض';
+  let strains=isLayer?Object.keys(LAYER_WEIGHT_GUIDES):Object.keys(BROILER_WEIGHT_GUIDES);
+  if($('guideRefStrain'))$('guideRefStrain').innerHTML=strains.map(s=>`<option value="${s}">${s}</option>`).join('');
+  renderGuideRefTable();
+}
+function renderGuideRefTable(){
+  let el=$('guideRefTable');if(!el)return;
+  let isLayer=$('guideRefType')&&$('guideRefType').value==='بياض';
+  let strain=$('guideRefStrain')?$('guideRefStrain').value:'';
+  let table=isLayer?(LAYER_WEIGHT_GUIDES[strain]||LAYER_WEIGHT_GUIDES['بياض تجاري']):(BROILER_WEIGHT_GUIDES[strain]||BROILER_WEIGHT_GUIDES['Ross 308']);
+  let maxG=Math.round(table[table.length-1][1]*1000);
+  let cards=table.map(([age,kg],i)=>{
+    let grams=Math.round(kg*1000);
+    let prev=i>0?table[i-1]:null;
+    let gain=prev?Math.round((kg-prev[1])*1000):grams;
+    let days=prev?(age-prev[0]):(age||1);
+    let dailyGain=days?Math.round(gain/days):0;
+    let pct=Math.min(100,Math.round(grams/maxG*100));
+    return `<div class="statCard" style="overflow:visible">
+      <div class="sc-label">📅 العمر ${age} يوم</div>
+      <div class="sc-val">${grams.toLocaleString()} <span style="font-size:11px;font-weight:600;color:var(--ink3)">غم</span></div>
+      <div style="background:var(--bg2,#eef2f7);border-radius:6px;height:6px;margin:8px 0 6px;overflow:hidden">
+        <div style="background:linear-gradient(90deg,var(--p2),var(--p));height:100%;width:${pct}%"></div>
+      </div>
+      <div class="sc-sub" style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap">
+        <span>${i>0?`<span class="badge b-green">+${gain.toLocaleString()} غم</span>`:'<span class="badge b-gray">البداية</span>'}</span>
+        <span>${i>0?dailyGain.toLocaleString()+' غم/يوم':'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="cardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">${cards}</div>
+  <p style="font-size:11px;color:var(--ink3);margin-top:10px">📊 الشريط يعبّر عن نسبة الوزن من أقصى وزن مستهدف (${maxG.toLocaleString()} غم) — والشارة الخضراء توضح مقدار الزيادة عن المرحلة السابقة، ومعدل الزيادة اليومية بالغرام.</p>`;
+}
+// عرض دليل الكايد (الوزن القياسي حسب العمر) لسلالة الوجبة المختارة، مع تمييز العمر الحالي
+function renderGuideTable(b,currentAge){
+  let el=$('wGuideTable');if(!el)return;
+  let isLayer=b&&b.type==='بياض';
+  let strain=b?(b.birdStrain||(isLayer?'بياض تجاري':'Ross 308')):'Ross 308';
+  let table=isLayer?(LAYER_WEIGHT_GUIDES[strain]||LAYER_WEIGHT_GUIDES['بياض تجاري']):(BROILER_WEIGHT_GUIDES[strain]||BROILER_WEIGHT_GUIDES['Ross 308']);
+  let cells=table.map(([age,kg])=>{
+    let grams=Math.round(kg*1000);
+    let active=currentAge!=null&&Math.abs(+currentAge-age)<=(table[1]?Math.abs(table[1][0]-table[0][0])/2:3.5);
+    return `<div class="dCell${active?' dc-accent':''}"><div class="dc-label">${age} يوم</div><div class="dc-val">${grams.toLocaleString()} غم</div></div>`;
+  }).join('');
+  el.innerHTML=`<div class="detailPanel" style="margin-top:6px">
+    <div class="dp-sub">📖 دليل الكايد (الوزن القياسي) — ${strain}</div>
+    <div class="detailGrid">${cells}</div>
+  </div>`;
 }
 function saveWeightRecord(){
   let field=$('wField')?$('wField').value:'';
@@ -2368,14 +2497,16 @@ function saveWeightRecord(){
   if(!field||!hallId)return alert('اختر الحقل والقاعة');
   if(!b)return alert('اختر الوجبة داخل القاعة');
   if(!isAdmin()&&!canSeeField(b.field))return alert('لا تملك صلاحية لهذه القاعة');
-  let avg=+($('wAvg').value||0);if(avg<=0)return alert('أدخل معدل الوزن الفعلي');
+  let actual=+($('wAvg').value||0);if(actual<=0)return alert('أدخل الوزن الفعلي بالغرام');
   let c=calc(b,val('wDate')||today());
-  let expected=+($('wExpected').value||expectedWeightForBatch(b,c.flockAge));
-  let total=+($('wTotal').value||0)||+(avg*(c.alive||c.fieldBirds||0)).toFixed(2);
+  let guide=getGuideWeightByAge(c.flockAge);
+  let total=Math.round(actual*(c.alive||c.fieldBirds||0));
+  let achievementPct=guide?+(actual/guide*100).toFixed(1):0;
   let rec={id:Date.now(),batchId:b.id,field:field,hallId:hallId,hall:hall?hall.name:(b.hall||''),date:val('wDate')||today(),
-    alive:c.alive,avgWeight:avg,expectedWeight:expected,totalWeight:total,diff:+(avg-expected).toFixed(2),note:val('wNote')};
+    alive:c.alive,ageDays:c.flockAge,actual_weight_grams:actual,guideWeightGrams:guide,achievementPct:achievementPct,
+    avgWeight:+(actual/1000).toFixed(3),expectedWeight:+(guide/1000).toFixed(3),totalWeight:total,diff:+(achievementPct-100).toFixed(1),note:val('wNote')};
   data.weights=data.weights||[];data.weights.push(rec);
-  if(hall){hall.avgWeight=avg;hall.totalWeight=total;}
+  if(hall){hall.avgWeight=rec.avgWeight;hall.totalWeight=total;}
   save();renderAll();clearWeightForm();msg('تم حفظ وزن القاعة');
 }
 function renderWeights(){
@@ -2387,26 +2518,26 @@ function renderWeights(){
   let rows=fields.map((field,i)=>{
     let fieldWeights=weights.filter(w=>w.field===field);
     let latest=fieldWeights[0]||{};
-    let avgCount=fieldWeights.filter(w=>+w.avgWeight>0).length;
-    let avgWeight=avgCount?+(fieldWeights.reduce((s,w)=>s+(+w.avgWeight||0),0)/avgCount).toFixed(2):0;
-    let totalWeight=fieldWeights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+    let avgCount=fieldWeights.filter(w=>weightActualGrams(w)>0).length;
+    let avgWeight=avgCount?Math.round(fieldWeights.reduce((s,w)=>s+weightActualGrams(w),0)/avgCount):0;
     let halls=[...new Set(fieldWeights.map(w=>w.hall||'—'))];
     let hallRows=halls.map(hall=>{
       let hallWeights=fieldWeights.filter(w=>(w.hall||'—')===hall);
       let last=hallWeights[0]||{};
       let b=data.batches.find(x=>x.id===last.batchId);
-      let diff=(+last.avgWeight-(+last.expectedWeight||0)).toFixed(2);
-      let badge=diff>=0?'<span class="badge b-green">جيد</span>':'<span class="badge b-amber">أقل من المتوقع</span>';
+      let actualG=weightActualGrams(last),guideG=weightGuideGrams(last);
+      let pct=guideG?+(actualG/guideG*100).toFixed(1):0;
+      let badge=pct>=100?'<span class="badge b-green">جيد</span>':'<span class="badge b-amber">أقل من الكايد</span>';
       let delBtns=hallWeights.map(w=>`<button class="btn btn-danger btn-sm" title="${fmt(w.date)}" onclick="deleteWeight(${w.id})">حذف</button>`).join(' ');
       return `<tr>
         <td><b>${hall}</b></td>
         <td>${fmt(last.date)}</td>
         <td>${b?b.name:'—'}</td>
+        <td>${last.ageDays!=null?last.ageDays:'—'}</td>
         <td>${(+last.alive||0).toLocaleString()}</td>
-        <td>${last.avgWeight||'—'} كغ</td>
-        <td>${last.expectedWeight||'—'} كغ</td>
-        <td>${last.avgWeight?diff+' كغ '+badge:'—'}</td>
-        <td>${(+last.totalWeight||0).toLocaleString()} كغ</td>
+        <td>${actualG||'—'} غم</td>
+        <td>${guideG||'—'} غم</td>
+        <td>${actualG?pct+'% '+badge:'—'}</td>
         <td>${hallWeights.length.toLocaleString()}</td>
         <td>${last.note||'—'}</td>
         <td>${isAdmin()?delBtns:'—'}</td>
@@ -2416,16 +2547,15 @@ function renderWeights(){
       <td><b>🏡 ${field}</b></td>
       <td>${fmt(latest.date)}</td>
       <td>${halls.length.toLocaleString()} قاعة</td>
-      <td>${avgWeight?avgWeight+' كغ':'—'}</td>
-      <td><b>${totalWeight.toLocaleString()} كغ</b></td>
+      <td>${avgWeight?avgWeight+' غم':'—'}</td>
       <td>${fieldWeights.length.toLocaleString()}</td>
       <td colspan="4">اضغط لعرض القاعات</td>
     </tr>
-    <tr id="weightDetail${i}" class="hidden"><td colspan="10">
-      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>الوجبة</th><th>الطير الحي</th><th>الفعلي</th><th>المتوقع</th><th>الفرق</th><th>مجموع وزن القاعة</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+    <tr id="weightDetail${i}" class="hidden"><td colspan="9">
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>الوجبة</th><th>العمر (يوم)</th><th>الطير الحي</th><th>الفعلي (غم)</th><th>الكايد (غم)</th><th>نسبة تحقيق الكايد</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
-  el.innerHTML='<thead><tr><th>الحقل</th><th>آخر تاريخ</th><th>القاعات</th><th>معدل الوزن</th><th>مجموع الوزن</th><th>السجلات</th><th colspan="4">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان</td></tr>')+'</tbody>';
+  el.innerHTML='<thead><tr><th>الحقل</th><th>آخر تاريخ</th><th>القاعات</th><th>معدل الوزن</th><th>السجلات</th><th colspan="4">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان</td></tr>')+'</tbody>';
 }
 
 function deleteWeight(id){
@@ -3335,12 +3465,14 @@ function renderHalls(fieldId){
     let activeBatches=data.batches.filter(b=>batchAllocatedToHall(b,h.id)>0&&!calc(b).completed&&b.transferDate);
     let usedBirds=activeBatches.reduce((s,b)=>s+batchHallAlive(b,h.id),0);
     let capTxt=h.capacity?`${usedBirds.toLocaleString()} / ${h.capacity.toLocaleString()}`:(usedBirds>0?usedBirds.toLocaleString():'—');
+    let hallLws=activeBatches.map(b=>latestWeightForBatch(b.id)).filter(Boolean).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    let hallLw=hallLws[0];
     return `<tr>
       <td><b>${h.name}</b></td>
       <td>${capTxt}</td>
       <td>${h.chickWeight?h.chickWeight+' غ':'—'}</td>
-      <td>${h.avgWeight?h.avgWeight+' كغ':'—'}</td>
-      <td>${h.totalWeight?h.totalWeight.toLocaleString()+' كغ':'—'}</td>
+      <td>${hallLw?weightActualGrams(hallLw)+' غم':'—'}</td>
+      <td>${hallLw?weightGuideGrams(hallLw)+' غم':'—'}</td>
       <td>${activeBatches.length?activeBatches.map(b=>`<span class="badge b-green" style="margin-left:3px">${b.name}</span>`).join(''):'<span class="badge b-gray">فارغة</span>'}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="editHall(${h.id})">تعديل</button>
@@ -3348,7 +3480,7 @@ function renderHalls(fieldId){
       </td>
     </tr>`;
   }).join('');
-  el.innerHTML='<thead><tr><th>القاعة</th><th>الحي / السعة</th><th>وزن الصوص</th><th>معدل وزن الطير</th><th>وزن القاعة الكلي</th><th>الوجبات النشطة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
+  el.innerHTML='<thead><tr><th>القاعة</th><th>الحي / السعة</th><th>وزن الصوص</th><th>معدل وزن الطير (الفعلي)</th><th>الكايد (المتوقع)</th><th>الوجبات النشطة</th><th>إجراء</th></tr></thead><tbody>'+rows+'</tbody>';
 }
 
 // ── USERS MANAGEMENT ──
@@ -3576,7 +3708,6 @@ function renderBatchHallsPanel(b){
       <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
       <div class="dCell"><div class="dc-label">المسوق</div><div class="dc-val">${ft.sold.toLocaleString()}</div></div>
       <div class="dCell"><div class="dc-label">معدل الوزن</div><div class="dc-val">${ft.avgWeight?ft.avgWeight+' كغ':'—'}</div></div>
-      <div class="dCell"><div class="dc-label">مجموع الوزن</div><div class="dc-val">${ft.totalWeight?ft.totalWeight.toLocaleString()+' كغ':'—'}</div></div>
     </div>
   </div>`;
   el.innerHTML=`<div class="card"><div class="cardTitle">🚪 تفاصيل قاعات ${b.field}</div>${summary}
@@ -3733,8 +3864,17 @@ function fieldTotals(fieldName){
       sold+=batchHallSold(b,h.id);
     });
   });
-  batches.forEach(b=>{let lw=latestWeightForBatch(b.id);if(lw){weightCount++;weightSum+=+lw.avgWeight||0;totalWeight+=+lw.totalWeight||0;}});
-  return {field:f,halls,batches,allocated,alive,mort,sold,cap,avgWeight:weightCount?+(weightSum/weightCount).toFixed(2):0,totalWeight,feedToday:feedTotalField(fieldName,today()),feedTotal:feedTotalField(fieldName),medsToday:medsCountField(fieldName,today()),medsTotal:medsCountField(fieldName)};
+  // معدل الوزن والكايد للحقل = متوسط آخر قراءة لكل قاعة (وليس لكل وجبة)
+  let hallWeightCount=0,hallWeightSum=0,hallGuideSum=0;
+  halls.forEach(h=>{
+    let hallBatches=batches.filter(b=>(+b.hallId||0)===h.id);
+    let lws=hallBatches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
+    lws.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    let lw=lws[0];
+    if(lw){hallWeightCount++;hallWeightSum+=weightActualGrams(lw);hallGuideSum+=weightGuideGrams(lw);}
+    hallBatches.forEach(b=>{let blw=latestWeightForBatch(b.id);if(blw){weightCount++;weightSum+=weightActualGrams(blw);totalWeight+=+blw.totalWeight||0;}});
+  });
+  return {field:f,halls,batches,allocated,alive,mort,sold,cap,avgWeight:hallWeightCount?Math.round(hallWeightSum/hallWeightCount):0,guideWeight:hallWeightCount?Math.round(hallGuideSum/hallWeightCount):0,totalWeight,feedToday:feedTotalField(fieldName,today()),feedTotal:feedTotalField(fieldName),medsToday:medsCountField(fieldName,today()),medsTotal:medsCountField(fieldName)};
 }
 function renderBatchHallsPanel(b){
   let el=$('batchHallsPanel');if(!el)return;
@@ -3822,17 +3962,17 @@ function lastNDays(n=10){
   }
   return arr;
 }
-function fieldWeightAvgOn(fieldName,date){
-  let ws=(data.weights||[]).filter(w=>w.field===fieldName&&w.date===date&&+w.avgWeight>0);
+function fieldWeightAvgOn(fieldName,date,hallId){
+  let ws=(data.weights||[]).filter(w=>w.field===fieldName&&w.date===date&&+w.avgWeight>0&&(!hallId||+w.hallId===+hallId));
   return ws.length?+(ws.reduce((s,w)=>s+(+w.avgWeight||0),0)/ws.length).toFixed(2):0;
 }
-function renderFieldChart(fieldName){
+function renderFieldChart(fieldName,hallId){
   let el=$('fieldChartPanel');if(!el)return;
   if(!fieldName){el.innerHTML='';return;}
   let days=lastNDays(10);
   let feeds=days.map(d=>feedTotalField(fieldName,d));
   let morts=days.map(d=>fieldMorts(fieldName).filter(m=>m.date===d).reduce((s,m)=>s+(+m.count||0),0));
-  let weights=days.map(d=>fieldWeightAvgOn(fieldName,d));
+  let weights=days.map(d=>fieldWeightAvgOn(fieldName,d,hallId));
   let hasData=[...feeds,...morts,...weights].some(v=>+v>0);
   let maxFeed=Math.max(1,...feeds),maxMort=Math.max(1,...morts),maxWeight=Math.max(1,...weights);
   let W=680,H=220,pad=34,plotW=W-pad*2,plotH=150,base=178;
@@ -3860,9 +4000,54 @@ function renderFieldChart(fieldName){
       <span><i class="legendDot" style="background:#ef4444"></i>الهلاك</span>
       <span><i class="legendDot" style="background:#2563eb"></i>معدل الوزن</span>
     </div>
+  </div>
+  ${renderWeightGuideChartHtml(fieldName,hallId)}`;
+}
+
+// مخطط: الوزن الفعلي مقابل الوزن القياسي (الكايد) حسب عمر الطير
+function renderWeightGuideChartHtml(fieldName,hallId){
+  let recs=(data.weights||[])
+    .filter(w=>w.field===fieldName&&w.ageDays!=null&&weightActualGrams(w)>0&&(!hallId||+w.hallId===+hallId))
+    .sort((a,b)=>(+a.ageDays)-(+b.ageDays));
+  if(!recs.length){
+    return `<div class="card" style="margin-top:16px">
+      <div class="cardTitle">⚖️ معدل الوزن الفعلي مقابل الكايد</div>
+      <div class="warnBox free" style="display:block">لا توجد سجلات أوزان بها عمر للطير في هذا الحقل${hallId?' لهذه القاعة':''} بعد.</div>
+    </div>`;
+  }
+  let actuals=recs.map(weightActualGrams);
+  let guides=recs.map(weightGuideGrams);
+  let ages=recs.map(w=>+w.ageDays);
+  let W=680,H=240,pad=40,plotW=W-pad*2,plotH=160,base=198;
+  let maxV=Math.max(1,...actuals,...guides);
+  let n=recs.length;
+  let x=i=>n>1?pad+(plotW/(n-1))*i:pad+plotW/2;
+  let y=v=>base-(v/maxV)*plotH;
+  let bw=Math.min(22,plotW/Math.max(n,1)/2.5);
+  let guideBars=guides.map((v,i)=>{let h=(v/maxV)*plotH;return `<rect x="${x(i)-bw-2}" y="${base-h}" width="${bw}" height="${h}" rx="3" fill="#fde68a"><title>الكايد: ${v} غم</title></rect>`}).join('');
+  let actualBars=actuals.map((v,i)=>{let h=(v/maxV)*plotH;return `<rect x="${x(i)+2}" y="${base-h}" width="${bw}" height="${h}" rx="3" fill="#16a34a"><title>الفعلي: ${v} غم</title></rect>`}).join('');
+  let labels=ages.map((a,i)=>`<text x="${x(i)}" y="${base+18}" text-anchor="middle" font-size="10" fill="#64748b">${a}ي</text>`).join('');
+  return `<div class="card" style="margin-top:16px">
+    <div class="cardTitle">⚖️ معدل الوزن الفعلي مقابل الكايد <span class="chartHint">حسب عمر الطير (يوم) - بالغرام</span></div>
+    <div class="chartWrap"><svg class="fieldChartSvg" viewBox="0 0 ${W} ${H}" role="img">
+      <line x1="${pad}" y1="${base}" x2="${W-pad}" y2="${base}" stroke="#cbd5e1"></line>
+      <line x1="${pad}" y1="${base-plotH}" x2="${pad}" y2="${base}" stroke="#cbd5e1"></line>
+      ${guideBars}
+      ${actualBars}
+      ${labels}
+      <text x="${pad}" y="18" font-size="11" fill="#64748b">أعلى قيمة: ${maxV.toLocaleString()} غم</text>
+    </svg></div>
+    <div class="chartLegend">
+      <span><i class="legendDot" style="background:#16a34a"></i>الوزن الفعلي (غم)</span>
+      <span><i class="legendDot" style="background:#fde68a"></i>الوزن القياسي (الكايد) (غم)</span>
+    </div>
   </div>`;
 }
 
+function onChartFieldChange(){
+  if($('chartHall'))$('chartHall').value='';
+  renderChartsPage();
+}
 function renderChartsPage(fieldName=''){
   if($('chartField')){
     let old=fieldName||$('chartField').value||selectedFieldName||'';
@@ -3870,7 +4055,17 @@ function renderChartsPage(fieldName=''){
     if(old&&[...$('chartField').options].some(o=>o.value===old))$('chartField').value=old;
     fieldName=$('chartField').value;
   }
-  if(fieldName)renderFieldChart(fieldName);
+  if($('chartHall')){
+    let oldHall=$('chartHall').value||'';
+    let halls=(data.halls||[]).filter(h=>{
+      let f=data.fields.find(ff=>ff.id===h.fieldId);
+      return f&&f.name===fieldName;
+    });
+    $('chartHall').innerHTML='<option value="">كل القاعات</option>'+halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+    if(oldHall&&[...$('chartHall').options].some(o=>o.value===oldHall))$('chartHall').value=oldHall;
+  }
+  let hallId=$('chartHall')?$('chartHall').value:'';
+  if(fieldName)renderFieldChart(fieldName,hallId);
   else if($('fieldChartPanel'))$('fieldChartPanel').innerHTML='<div class="warnBox free" style="display:block">اختر حقلاً لعرض المخطط البياني.</div>';
 }
 function buildFieldsDashboard(){
@@ -3886,12 +4081,13 @@ function buildFieldsDashboard(){
       <td>${ft.sold.toLocaleString()}</td>
       <td>${ft.feedToday.toLocaleString()} / ${ft.feedTotal.toLocaleString()} كغم</td>
       <td>${ft.medsToday} / ${ft.medsTotal}</td>
-      <td>${ft.avgWeight?ft.avgWeight+' كغ':'—'}</td>
+      <td>${ft.avgWeight?ft.avgWeight+' غم':'—'}</td>
+      <td>${ft.guideWeight?ft.guideWeight+' غم':'—'}</td>
       <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showFieldDetails('${String(f.name).replace(/'/g,"\\'")}')">تفاصيل</button></td>
     </tr>`;
   }).join('');
   return `<div class="card"><div class="cardTitle">🏡 نظرة الحقول <span style="font-size:11px;font-weight:500;color:var(--ink3)">اضغط على أي حقل لفتح ملخصه الذكي</span></div>
-    <div class="tableWrap"><table><thead><tr><th>الحقل</th><th>القاعات</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم/الكلي</th><th>معدل الوزن</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tableWrap"><table><thead><tr><th>الحقل</th><th>القاعات</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم/الكلي</th><th>معدل الوزن</th><th>الكايد</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody></table></div>
   </div>`;
 }
 function showFieldDetails(fieldName){
