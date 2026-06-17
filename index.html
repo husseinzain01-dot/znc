@@ -107,6 +107,15 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;background:var(--bg);color:
 main{padding:20px;overflow-x:hidden;min-width:0}
 .pageHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .pageHeader h1{font-size:18px;font-weight:700;color:var(--ink)}
+
+/* ── INNER PAGE WRAPPER ── */
+.innerPageWrap{animation:slideInPage .22s cubic-bezier(.4,0,.2,1)}
+@keyframes slideInPage{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+.innerPageBar{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+.innerPageBar .ipb-back{background:transparent;border:0;cursor:pointer;padding:4px 8px;border-radius:8px;color:var(--p);font-family:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;transition:background .15s}
+.innerPageBar .ipb-back:hover{background:var(--p3)}
+.innerPageBar .ipb-sep{color:var(--ink3);font-size:13px}
+.innerPageBar .ipb-title{font-size:14px;font-weight:700;color:var(--ink);flex:1}
 #dbState{font-size:11px;color:var(--ink3)}
 #dash{background:linear-gradient(180deg,#f8fafc 0%,#eefdfa 48%,#f8fafc 100%);border-radius:18px;padding:2px}
 #dash .card{border-color:#d9f3ee;box-shadow:0 10px 26px rgba(15,23,42,.06)}
@@ -361,6 +370,12 @@ tbody tr:hover td{background:#f8fafc}
         <h1 id="title">لوحة المعلومات</h1>
       </div>
       <div id="dbState" style="display:none"></div>
+    </div>
+    <!-- INNER PAGE BREADCRUMB BAR -->
+    <div id="innerPageBar" class="innerPageBar hidden">
+      <button class="ipb-back" onclick="show('dash',null)">📊 الرئيسية</button>
+      <span class="ipb-sep">›</span>
+      <span class="ipb-title" id="innerPageTitle"></span>
     </div>
 
     <!-- DASHBOARD -->
@@ -1149,16 +1164,31 @@ function buildNav(){
   $('sideNav').innerHTML=html;
 }
 
-function show(id,btn){
+function show(id,btn,skipHistory){
   const adminOnly=['batch','transfer','layerPurchase','fields','suppliers','users','archive','settings'];
   if(adminOnly.includes(id)&&!isAdmin()){
     document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
     $('dash').classList.remove('hidden');return;
   }
   document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));
-  $(id).classList.remove('hidden');
+  let pg=$(id);pg.classList.remove('hidden');
+  // inner-page animation
+  pg.classList.remove('innerPageWrap');void pg.offsetWidth;pg.classList.add('innerPageWrap');
   document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));
-  if(btn){btn.classList.add('active');$('title').textContent=btn.textContent.trim()}
+  let pageTitle='';
+  // تفعيل زر السايدبار المناسب
+  let matchBtn=btn||document.querySelector(`.nav[onclick*="'${id}'"]`);
+  if(matchBtn){matchBtn.classList.add('active');pageTitle=matchBtn.textContent.trim();$('title').textContent=pageTitle}
+  // breadcrumb bar
+  let bar=$('innerPageBar'),ipt=$('innerPageTitle');
+  if(id==='dash'){bar.classList.add('hidden')}
+  else{bar.classList.remove('hidden');if(ipt)ipt.textContent=pageTitle||$('title').textContent}
+  // History API — زر الرجوع بالمتصفح
+  if(!skipHistory){
+    let state={page:id,title:pageTitle};
+    if(history.state&&history.state.page===id){}
+    else history.pushState(state,'',window.location.pathname+'#'+id);
+  }
   // أغلق drawer الموبايل عند التنقل
   if(window.innerWidth<=768){
     $('app').classList.remove('sideOpen');
@@ -1948,7 +1978,7 @@ function editBatch(id){
   toggleLayerFields();
   show('batch',null);
 }
-function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=data.morts.filter(m=>m.batchId!==id);data.markets=data.markets.filter(m=>m.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll()}}
+function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها (أعلاف، أدوية، أوزان، هلاك، تسويق) نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=(data.morts||[]).filter(m=>m.batchId!==id);data.markets=(data.markets||[]).filter(m=>m.batchId!==id);data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);data.meds=(data.meds||[]).filter(m=>m.batchId!==id);data.weights=(data.weights||[]).filter(w=>w.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll();msg('تم حذف الوجبة وجميع سجلاتها')}}
 
 
 function clearTransferForm(keepBatch=false){
@@ -2652,6 +2682,7 @@ function renderWeights(){
           <td>${(+w.alive||0).toLocaleString()}</td>
           <td>${aG||'—'} غم</td>
           <td>${gG||'—'} غم</td>
+          <td>${(aG&&gG)?(aG-gG)+' غم':'—'}</td>
           <td>${aG?p+'% '+bd:'—'}</td>
           <td>${w.note||'—'}</td>
           <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteWeight(${w.id})">حذف</button>`:'—'}</td>
@@ -2665,13 +2696,14 @@ function renderWeights(){
         <td>${(+last.alive||0).toLocaleString()}</td>
         <td>${actualG||'—'} غم</td>
         <td>${guideG||'—'} غم</td>
+        <td>${(actualG&&guideG)?(actualG-guideG)+' غم':'—'}</td>
         <td>${actualG?pct+'% '+badge:'—'}</td>
         <td>${hallWeights.length.toLocaleString()}</td>
         <td>${last.note||'—'}</td>
         <td>اضغط لعرض السجلات اليومية</td>
       </tr>
-      <tr id="weightHallDetail${i}_${j}" class="hidden"><td colspan="11">
-        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>العمر (يوم)</th><th>الطير الحي</th><th>الفعلي (غم)</th><th>الكايد (غم)</th><th>نسبة تحقيق الكايد</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      <tr id="weightHallDetail${i}_${j}" class="hidden"><td colspan="12">
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>العمر (يوم)</th><th>الطير الحي</th><th>الفعلي (غم)</th><th>الكايد (غم)</th><th>فرق الوزن</th><th>نسبة تحقيق الكايد</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('weightDetail${i}')" style="background:var(--bg)">
@@ -2683,7 +2715,7 @@ function renderWeights(){
       <td colspan="4">اضغط لعرض القاعات</td>
     </tr>
     <tr id="weightDetail${i}" class="hidden"><td colspan="9">
-      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>الوجبة</th><th>العمر (يوم)</th><th>الطير الحي</th><th>الفعلي (غم)</th><th>الكايد (غم)</th><th>نسبة تحقيق الكايد</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>الوجبة</th><th>العمر (يوم)</th><th>الطير الحي</th><th>الفعلي (غم)</th><th>الكايد (غم)</th><th>فرق الوزن</th><th>نسبة تحقيق الكايد</th><th>السجلات</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${hallRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   el.innerHTML='<thead><tr><th>الحقل</th><th>آخر تاريخ</th><th>القاعات</th><th>معدل الوزن</th><th>السجلات</th><th colspan="4">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان</td></tr>')+'</tbody>';
@@ -3707,6 +3739,12 @@ if(_sess==='1'&&_user){
     load();buildNav();updateUserChip();
   // استرجاع حالة الشريط الجانبي
   if(sessionStorage.getItem('sideCollapsed')==='1')$('app').classList.add('collapsed');
+  // زر الرجوع بالمتصفح
+  history.replaceState({page:'dash',title:'لوحة المعلومات'},'',window.location.pathname+'#dash');
+  window.addEventListener('popstate',function(e){
+    let pg=(e.state&&e.state.page)||'dash';
+    show(pg,null,true);
+  });
   }
 }
 
@@ -4088,7 +4126,8 @@ function showHallDetailsInBatch(hallId){
     ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['هلاك القاعة',mort.toLocaleString()],
     ['علف اليوم',feedTotalHall(h.id,today()).toLocaleString()+' كغم'],['مجموع العلف',feedTotalHall(h.id).toLocaleString()+' كغم'],
     ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?lm.name:'—'],
-    ['الوزن الفعلي',avgActual?avgActual+' غم':'—'],['الكايد (المتوقع)',avgGuide?avgGuide+' غم':'—']
+    ['الوزن الفعلي',avgActual?avgActual+' غم':'—'],['الكايد (المتوقع)',avgGuide?avgGuide+' غم':'—'],
+    ['فرق الوزن',(avgActual&&avgGuide)?((avgActual-avgGuide)+' غم'):'—']
   ];
   let detail=$('statsDetail');
   if(detail)detail.innerHTML=`<div class="detailPanel">
