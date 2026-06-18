@@ -536,7 +536,8 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>الحقل</label><select id="mortField" onchange="onMortFieldChange()"></select></div>
           <div class="formGroup"><label>الوجبة</label><select id="mortBatch" onchange="onMortBatchChange()"></select></div>
           <div class="formGroup"><label>القاعة التي حدث بها الهلاك</label><select id="mortHall"></select></div>
-          <div class="formGroup"><label>التاريخ</label><input id="mortDate" type="date"></div>
+          <div class="formGroup"><label>التاريخ</label><input id="mortDate" type="date" oninput="updateMortAge()" onchange="updateMortAge()"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="mortAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
           <div class="formGroup"><label>العدد</label><input id="mortCount" type="number" min="1"></div>
           <div class="formGroup"><label>السبب</label><input id="mortReason"></div>
         </div>
@@ -2501,6 +2502,7 @@ function clearMortForm(){
   if($('mortBatch')) $('mortBatch').selectedIndex=0;
   if($('mortHall')) $('mortHall').innerHTML='';
   if($('mortDate')) $('mortDate').value=today();
+  if($('mortAge')) $('mortAge').value='';
   if($('mortCount')) $('mortCount').value='';
   if($('mortReason')) $('mortReason').value='';
   onMortFieldChange();
@@ -3051,6 +3053,7 @@ function renderMort(){
         return `<tr>
           <td>${fmt(m.date)}</td>
           <td>${mb?mb.name:'—'}</td>
+          <td>${m.ageDays!=null?m.ageDays+' يوم':'—'}</td>
           <td>${(+m.count||0).toLocaleString()}</td>
           <td>${m.reason||'—'}</td>
           <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMort(${m.id})">حذف</button>`:'—'}</td>
@@ -3065,7 +3068,7 @@ function renderMort(){
         <td>اضغط لعرض السجلات اليومية</td>
       </tr>
       <tr id="mortHallDetail${i}_${j}" class="hidden"><td colspan="6">
-        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>العدد</th><th>السبب</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>عمر الطير</th><th>العدد</th><th>السبب</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('mortDetail${i}')" style="background:var(--bg)">
@@ -4123,7 +4126,7 @@ function onMortBatchChange(syncField=true){
   let id=$('mortBatch')?+$('mortBatch').value:0;
   let b=data.batches.find(x=>x.id===id);
   let sel=$('mortHall');if(!sel)return;
-  if(!b){sel.innerHTML='<option value="">اختر الوجبة أولاً</option>';return;}
+  if(!b){sel.innerHTML='<option value="">اختر الوجبة أولاً</option>';updateMortAge();return;}
   if(syncField&&$('mortField')&&b.field&&$('mortField').value!==b.field){
     $('mortField').value=b.field;
   }
@@ -4132,8 +4135,19 @@ function onMortBatchChange(syncField=true){
   sel.innerHTML=arr.length
     ?arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — عدد ${(+a.birds||0).toLocaleString()}</option>`).join('')
     :'<option value="">لا توجد قاعات منقولة لهذه الوجبة</option>';
+  updateMortAge();
 }
 function fillMortHalls(){onMortBatchChange(true);}
+function updateMortAge(){
+  let id=$('mortBatch')?+$('mortBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let el=$('mortAge');if(!el)return;
+  let entryDate=b?(b.fieldEntryDate||b.transferDate||''):'';
+  if(!entryDate){el.value='';return;}
+  let date=val('mortDate')||today();
+  let diff=Math.max(0,Math.round((new Date(date)-new Date(entryDate))/(1000*60*60*24)));
+  el.value=diff;
+}
 function addMort(){
   let id=+$('mortBatch').value;
   if(!id)return alert('اختر وجبة');
@@ -4146,12 +4160,14 @@ function addMort(){
   let allowedHalls=new Set(fieldHallsByName(field).map(h=>+h.id));
   if(hallId&&!allowedHalls.has(hallId))return alert('القاعة لا تتبع الحقل المختار');
   if(b&&b.transferDate&&!hallId)return alert('اختر القاعة التي حدث بها الهلاك');
+  let ageDays=$('mortAge')&&$('mortAge').value!==''?+$('mortAge').value:null;
   data.morts.push({
     id:Date.now(),
     batchId:id,
     hallId:hallId,
     hall:hallObj?hallObj.name:'',
     date:val('mortDate')||today(),
+    ageDays:ageDays,
     count:num('mortCount'),
     reason:val('mortReason')
   });
