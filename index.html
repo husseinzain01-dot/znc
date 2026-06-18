@@ -1662,12 +1662,12 @@ function buildFieldTopDashboard(fieldName,selectedBatch=null){
 function buildHallTopDashboard(hallId){
   let h=data.halls.find(x=>x.id===+hallId);if(!h)return '';
   let f=data.fields.find(x=>x.id===h.fieldId);
-  let batches=visibleBatches().filter(b=>!calc(b).completed&&b.transferDate&&(+b.hallId||0)===h.id);
+  let batches=visibleBatches().filter(b=>!calc(b).completed&&b.transferDate&&batchAllocatedToHall(b,h.id)>0);
   let alive=batches.reduce((s,b)=>s+batchHallAlive(b,h.id),0);
   let birds=batches.reduce((s,b)=>s+batchAllocatedToHall(b,h.id),0);
   let mort=batches.reduce((s,b)=>s+batchHallMort(b,h.id),0);
   let sold=batches.reduce((s,b)=>s+batchHallSold(b,h.id),0);
-  let weights=batches.map(b=>latestWeightForBatch(b.id)).filter(Boolean);
+  let weights=batches.map(b=>(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===h.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]).filter(Boolean);
   let avgWeight=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
   let expected=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
   let totalWeight=weights.reduce((s,w)=>s+(+w.totalWeight||0),0)||(+h.totalWeight||0);
@@ -1733,25 +1733,30 @@ function renderBatchHallsPanel(b){
 function showHallDetailsInBatch(hallId){
   let h=data.halls.find(x=>x.id===+hallId);if(!h)return;
   let f=data.fields.find(x=>x.id===h.fieldId);
-  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&(+x.hallId||0)===h.id);
-  let alive=batches.reduce((s,x)=>s+calc(x).alive,0);
-  let birds=batches.reduce((s,x)=>s+(calc(x).fieldBirds||0),0);
-  let mort=batches.reduce((s,x)=>s+calc(x).mort,0);
-  let sold=batches.reduce((s,x)=>s+calc(x).sold,0);
+  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+  let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
+  let birds=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
+  let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
+  let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
   let cap=+h.capacity||0;
   let remain=cap?Math.max(0,cap-alive):'—';
   let occ=cap?((alive/cap)*100).toFixed(1)+'%':'—';
-  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
-  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
-  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):'—';
-  let total=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  // أوزان خاصة بهذه القاعة فقط
+  let hallWeightRecs=batches.map(x=>(data.weights||[]).filter(w=>w.batchId===x.id&&+w.hallId===h.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]).filter(Boolean);
+  let avgActualG=hallWeightRecs.length?Math.round(hallWeightRecs.reduce((s,w)=>s+weightActualGrams(w),0)/hallWeightRecs.length):0;
+  let avgGuideG=hallWeightRecs.length?Math.round(hallWeightRecs.reduce((s,w)=>s+weightGuideGrams(w),0)/hallWeightRecs.length):0;
   let cells=[
     ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
-    ['الصافي المنقول',birds.toLocaleString()],['الحي المتبقي',alive.toLocaleString()],['المتاح',remain.toLocaleString?remain.toLocaleString():remain],
-    ['هلاك القاعة',mort.toLocaleString()],['المسوق',sold.toLocaleString()],['آخر معدل وزن',avg==='—'?'—':avg+' كغ'],
-    ['الوزن المتوقع',expected==='—'?'—':expected+' كغ'],['مجموع الوزن',total?total.toLocaleString()+' كغ':'—']
+    ['الصافي المنقول',birds.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['المتاح',remain.toLocaleString?remain.toLocaleString():remain],
+    ['هلاك القاعة',mort.toLocaleString()],['المسوق',sold.toLocaleString()],
+    ['الوزن الفعلي',avgActualG?avgActualG+' غم':'—'],['الكايد (المتوقع)',avgGuideG?avgGuideG+' غم':'—'],
+    ['فرق الوزن',(avgActualG&&avgGuideG)?(avgActualG-avgGuideG)+' غم':'—']
   ];
-  let rows=batches.map(x=>{let c=calc(x),lw=latestWeightForBatch(x.id);return `<tr><td>${x.name}</td><td>${fmt(c.entryDate)}</td><td>${c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'}</td><td>${batchAllocatedToHall(x,h.id).toLocaleString()}</td><td>${batchHallAlive(x,h.id).toLocaleString()}</td><td>${batchHallMort(x,h.id).toLocaleString()}</td><td>${batchHallSold(x,h.id).toLocaleString()}</td><td>${lw?lw.avgWeight+' كغ':'—'}</td></tr>`}).join('');
+  let rows=batches.map(x=>{
+    let lw=(data.weights||[]).filter(w=>w.batchId===x.id&&+w.hallId===h.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
+    let c=calc(x);
+    return `<tr><td>${x.name}</td><td>${fmt(c.entryDate)}</td><td>${c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'}</td><td>${batchAllocatedToHall(x,h.id).toLocaleString()}</td><td>${batchHallAlive(x,h.id).toLocaleString()}</td><td>${batchHallMort(x,h.id).toLocaleString()}</td><td>${batchHallSold(x,h.id).toLocaleString()}</td><td>${lw?weightActualGrams(lw)+' غم':'—'}</td></tr>`;
+  }).join('');
   let detail=$('statsDetail');
   if(detail)detail.innerHTML=`<div class="detailPanel">
     <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${h.name}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
@@ -2081,7 +2086,7 @@ function distributeToAllHalls(){
   b.netHatch=readyNet;
   b.fixedHatchRate=eggs?+((readyNet/eggs)*100).toFixed(2):0;
   b.candle=transferCandleRate(net,b,examined);
-  b.isolationRate=transferIsolationRate(readyNet,b);
+  b.isolationRate=transferIsolationRate(net,b);
   b.damagedAfterCandle=transferDamagedCount(net,examined);
   if(!b.transferDate)b.transferDate=date;
   if(!b.fieldEntryDate)b.fieldEntryDate=date;
@@ -2387,7 +2392,7 @@ function updateTransferIsolation(){
   let net=num('transferNet'),unfit=num('unfitBirds');
   let readyNet=Math.max(0,net-unfit);
   if($('transferReadyNet'))$('transferReadyNet').textContent=readyNet?readyNet.toLocaleString():'—';
-  if($('transferIsolationRate'))$('transferIsolationRate').value=transferIsolationRate(readyNet)?(+transferIsolationRate(readyNet)).toFixed(2):'';
+  if($('transferIsolationRate'))$('transferIsolationRate').value=transferIsolationRate(net)?(+transferIsolationRate(net)).toFixed(2):'';
 }
 function fillTransferPreview(showMsg=true){
   if(!$('transferBatch'))return;
@@ -2452,7 +2457,7 @@ function saveTransfer(){
   b.fertileEggs=readyNet;
   b.damagedAfterCandle=transferDamagedCount(net,examined);
   b.candle=transferCandleRate(net,b,examined);
-  b.isolationRate=transferIsolationRate(readyNet,b);
+  b.isolationRate=transferIsolationRate(net,b);
   b.vaccineDeaths=vac;
   b.isolatedBirds=iso;
   b.unfitBirds=unfit;
@@ -2578,7 +2583,7 @@ function onWeightFieldChange(){
 function onWeightHallChange(){
   let hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
   let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&batchAllocatedToHall(b,hallId)>0);
-  if($('wBatch'))$('wBatch').innerHTML=batches.map(b=>`<option value="${b.id}">${b.name} — حي ${calc(b).alive.toLocaleString()}</option>`).join('');
+  if($('wBatch'))$('wBatch').innerHTML=batches.map(b=>`<option value="${b.id}">${b.name} — حي ${batchHallAlive(b,hallId).toLocaleString()}</option>`).join('');
   fillWeightDefaults();
 }
 function calcWeightTotal(){
@@ -2586,9 +2591,10 @@ function calcWeightTotal(){
   let b=data.batches.find(x=>x.id===id);
   if(!b)return;
   let c=calc(b,val('wDate')||today());
+  let hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
   let actual=+($('wAvg').value||0);
   let guide=getGuideWeightByAge(c.flockAge);
-  if($('wAlive'))$('wAlive').value=c.alive||0;
+  if($('wAlive'))$('wAlive').value=(hallId?batchHallAlive(b,hallId):c.alive)||0;
   if($('wAgeDays'))$('wAgeDays').value=c.flockAge;
   if($('wExpected'))$('wExpected').value=guide;
   if($('wDiff'))$('wDiff').value=actual?((actual/guide*100).toFixed(1)+'%'):'';
@@ -2598,7 +2604,8 @@ function fillWeightDefaults(){
   let b=data.batches.find(x=>x.id===id);
   if(!b){if($('wGuideTable'))$('wGuideTable').innerHTML='';return;}
   let c=calc(b,val('wDate')||today());
-  if($('wAlive'))$('wAlive').value=c.alive||0;
+  let _hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
+  if($('wAlive'))$('wAlive').value=(_hallId?batchHallAlive(b,_hallId):c.alive)||0;
   if($('wStrain'))$('wStrain').value=b.type==='بياض'?(b.birdStrain||'بياض تجاري'):(b.birdStrain||'Ross 308');
   if($('wAgeDays'))$('wAgeDays').value=c.flockAge;
   if($('wExpected'))$('wExpected').value=getGuideWeightByAge(c.flockAge);
@@ -2735,10 +2742,11 @@ function saveWeightRecord(){
   let actual=+($('wAvg').value||0);if(actual<=0)return alert('أدخل الوزن الفعلي بالغرام');
   let c=calc(b,val('wDate')||today());
   let guide=getGuideWeightByAge(c.flockAge);
-  let total=Math.round(actual*(c.alive||c.fieldBirds||0));
+  let hallAlive=hallId?batchHallAlive(b,hallId):c.alive;
+  let total=Math.round(actual*(hallAlive||c.fieldBirds||0));
   let achievementPct=guide?+(actual/guide*100).toFixed(1):0;
   let rec={id:Date.now(),batchId:b.id,field:field,hallId:hallId,hall:hall?hall.name:(b.hall||''),date:val('wDate')||today(),
-    alive:c.alive,ageDays:c.flockAge,actual_weight_grams:actual,guideWeightGrams:guide,achievementPct:achievementPct,
+    alive:hallAlive,ageDays:c.flockAge,actual_weight_grams:actual,guideWeightGrams:guide,achievementPct:achievementPct,
     avgWeight:+(actual/1000).toFixed(3),expectedWeight:+(guide/1000).toFixed(3),totalWeight:total,diff:+(achievementPct-100).toFixed(1),note:val('wNote')};
   data.weights=data.weights||[];data.weights.push(rec);
   if(hall){hall.avgWeight=rec.avgWeight;hall.totalWeight=total;}
@@ -2768,11 +2776,12 @@ function renderWeights(){
         let aG=weightActualGrams(w),gG=weightGuideGrams(w);
         let p=gG?+(aG/gG*100).toFixed(1):0;
         let bd=p>=100?'<span class="badge b-green">جيد</span>':'<span class="badge b-amber">أقل من الكايد</span>';
+        let hallAliveW=wb&&w.hallId?batchHallAlive(wb,+w.hallId):(+w.alive||0);
         return `<tr>
           <td>${fmt(w.date)}</td>
           <td>${wb?wb.name:'—'}</td>
           <td>${w.ageDays!=null?w.ageDays:'—'}</td>
-          <td>${(+w.alive||0).toLocaleString()}</td>
+          <td>${hallAliveW.toLocaleString()}</td>
           <td>${aG||'—'} غم</td>
           <td>${gG||'—'} غم</td>
           <td>${(aG&&gG)?(aG-gG)+' غم':'—'}</td>
@@ -2786,7 +2795,7 @@ function renderWeights(){
         <td>${fmt(last.date)}</td>
         <td>${b?b.name:'—'}</td>
         <td>${last.ageDays!=null?last.ageDays:'—'}</td>
-        <td>${(+last.alive||0).toLocaleString()}</td>
+        <td>${(b&&last.hallId?batchHallAlive(b,+last.hallId):(+last.alive||0)).toLocaleString()}</td>
         <td>${actualG||'—'} غم</td>
         <td>${guideG||'—'} غم</td>
         <td>${(actualG&&guideG)?(actualG-guideG)+' غم':'—'}</td>
@@ -4209,8 +4218,7 @@ function showHallDetailsInBatch(hallId){
   let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
   let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
   let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
-  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
-  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
+  let weights=batches.map(x=>(data.weights||[]).filter(w=>w.batchId===x.id&&+w.hallId===h.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]).filter(Boolean);
   let avgActual=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
   let avgGuide=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
   let lm=lastMedHall(h.id);
