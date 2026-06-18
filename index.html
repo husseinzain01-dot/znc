@@ -1981,7 +1981,39 @@ function editBatch(id){
   toggleLayerFields();
   show('batch',null);
 }
-function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها (أعلاف، أدوية، أوزان، هلاك، تسويق) نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=(data.morts||[]).filter(m=>m.batchId!==id);data.markets=(data.markets||[]).filter(m=>m.batchId!==id);data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);data.meds=(data.meds||[]).filter(m=>m.batchId!==id);data.weights=(data.weights||[]).filter(w=>w.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll();msg('تم حذف الوجبة وجميع سجلاتها')}}
+function deleteBatch(id){
+  if(!isAdmin())return;
+  let b=data.batches.find(x=>x.id===id);if(!b)return;
+  if(b.transferDate){
+    // الوجبة منقولة — اسأل هل يعيدها للمفقس أو يحذفها كلياً
+    let choice=confirm('هذه الوجبة منقولة إلى الحقل.\nاضغط موافق لإعادتها إلى المفقس\nاضغط إلغاء لحذفها نهائياً مع كل سجلاتها');
+    if(choice===null)return;
+    if(choice){
+      // إعادة للمفقس
+      b.transferDate='';b.fieldEntryDate='';b.field='';b.hallId=null;b.hall='';
+      b.hallAllocations=[];b.fieldBirds=0;b.transferBirdWeight=0;
+      b.hatched='';b.vaccineDeaths=0;b.isolatedBirds=0;b.unfitBirds=0;
+      b.netHatch=0;b.fixedHatchRate=0;b.status='نشطة';
+      data.morts=(data.morts||[]).filter(m=>m.batchId!==id);
+      data.markets=(data.markets||[]).filter(m=>m.batchId!==id);
+      data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);
+      data.meds=(data.meds||[]).filter(m=>m.batchId!==id);
+      data.weights=(data.weights||[]).filter(w=>w.batchId!==id);
+      if(selectedBatchId===id)selectedBatchId=null;
+      save();renderAll();msg('تمت إعادة الوجبة إلى المفقس');
+      return;
+    }
+  }
+  if(!confirm('حذف الوجبة وكل سجلاتها (أعلاف، أدوية، أوزان، هلاك، تسويق) نهائياً؟'))return;
+  data.batches=data.batches.filter(x=>x.id!==id);
+  data.morts=(data.morts||[]).filter(m=>m.batchId!==id);
+  data.markets=(data.markets||[]).filter(m=>m.batchId!==id);
+  data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);
+  data.meds=(data.meds||[]).filter(m=>m.batchId!==id);
+  data.weights=(data.weights||[]).filter(w=>w.batchId!==id);
+  if(selectedBatchId===id)selectedBatchId=null;
+  save();renderAll();msg('تم حذف الوجبة وجميع سجلاتها');
+}
 
 
 function clearTransferForm(keepBatch=false){
@@ -2048,9 +2080,9 @@ function distributeToAllHalls(){
   b.unfitBirds=unfit;
   b.netHatch=readyNet;
   b.fixedHatchRate=eggs?+((readyNet/eggs)*100).toFixed(2):0;
-  b.candle=transferCandleRate(readyNet,b,examined);
+  b.candle=transferCandleRate(net,b,examined);
   b.isolationRate=transferIsolationRate(readyNet,b);
-  b.damagedAfterCandle=transferDamagedCount(readyNet,examined);
+  b.damagedAfterCandle=transferDamagedCount(net,examined);
   if(!b.transferDate)b.transferDate=date;
   if(!b.fieldEntryDate)b.fieldEntryDate=date;
   b.field=fieldName;
@@ -2418,8 +2450,8 @@ function saveTransfer(){
   b.hatched=hat;
   b.examinedEggs=examined;
   b.fertileEggs=readyNet;
-  b.damagedAfterCandle=transferDamagedCount(readyNet,examined);
-  b.candle=transferCandleRate(readyNet,b,examined);
+  b.damagedAfterCandle=transferDamagedCount(net,examined);
+  b.candle=transferCandleRate(net,b,examined);
   b.isolationRate=transferIsolationRate(readyNet,b);
   b.vaccineDeaths=vac;
   b.isolatedBirds=iso;
