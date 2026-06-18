@@ -503,7 +503,7 @@ tbody tr:hover td{background:#f8fafc}
           <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
           <div class="formGroup"><label>الطير العزل داخل المفقس</label><input id="isolatedBirds" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
           <div class="formGroup"><label>الطير غير صالح للتربية</label><input id="unfitBirds" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
-          <div class="formGroup"><label>الطير الجاهز للنقل</label><div id="transferReadyNet" style="font-size:1rem;font-weight:700;color:var(--green,#16a34a);background:var(--green2,#dcfce7);border-radius:var(--r2,8px);padding:6px 10px;text-align:center">—</div></div>
+          <div class="formGroup"><label>الطير الجاهز للنقل</label><div style="display:flex;gap:8px;align-items:center"><div id="transferReadyNet" style="flex:1;font-size:1rem;font-weight:700;color:var(--green,#16a34a);background:var(--green2,#dcfce7);border-radius:var(--r2,8px);padding:6px 10px;text-align:center">—</div><button type="button" class="btn btn-secondary" style="white-space:nowrap;font-size:12px" onclick="distributeToAllHalls()" title="توزيع الطير بالتساوي على جميع قاعات الحقل">⚖️ وزّع على القاعات</button></div></div>
           <div class="formGroup"><label>نسبة العزل الضوئي %</label><input id="transferIsolationRate" type="number" min="0" max="100" step="0.01" readonly placeholder="تحسب تلقائياً"></div>
           <div class="formGroup"><label>عدد الطير المراد نقله الآن</label><input id="fieldBirds" type="number" min="0" oninput="checkFieldOccupancy()"></div>
           <div class="formGroup"><label>وزن الطير عند النقل (غرام)</label><input id="transferBirdWeight" type="number" min="0" placeholder="مثال: 42"></div>
@@ -2018,6 +2018,58 @@ function onTransferFieldChange(){
   renderHallAllocationRows();
   renderTransferAllocationsSummary();
 }
+function distributeToAllHalls(){
+  if(!isAdmin())return;
+  let batchId=+($('transferBatch')&&$('transferBatch').value)||0;
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!b)return alert('اختر وجبة أولاً');
+  let fieldName=$('transferField')&&$('transferField').value;
+  if(!fieldName)return alert('اختر الحقل المستهدف أولاً');
+  let net=num('transferNet'),unfit=num('unfitBirds'),readyNet=Math.max(0,net-unfit);
+  if(readyNet<=0)return alert('أدخل صافي الطير الجاهز للنقل أولاً');
+  let f=data.fields.find(x=>x.name===fieldName);
+  let halls=data.halls.filter(h=>h.fieldId===(f?f.id:null));
+  if(!halls.length)return alert('لا توجد قاعات في هذا الحقل');
+  if(!confirm('توزيع '+readyNet.toLocaleString()+' طير على '+halls.length+' قاعة بالتساوي؟'))return;
+
+  let base=Math.floor(readyNet/halls.length);
+  let remainder=readyNet%halls.length;
+
+  let vac=num('vaccineDeaths'),iso=num('isolatedBirds'),eggs=+b.eggs||0;
+  let hat=readyNet+vac+iso+unfit;
+  let examined=num('transferExamined');
+  let date=val('transferDate')||today();
+
+  b.hatched=hat;
+  b.examinedEggs=examined;
+  b.fertileEggs=readyNet;
+  b.vaccineDeaths=vac;
+  b.isolatedBirds=iso;
+  b.unfitBirds=unfit;
+  b.netHatch=readyNet;
+  b.fixedHatchRate=eggs?+((readyNet/eggs)*100).toFixed(2):0;
+  b.candle=transferCandleRate(readyNet,b,examined);
+  b.isolationRate=transferIsolationRate(readyNet,b);
+  b.damagedAfterCandle=transferDamagedCount(readyNet,examined);
+  if(!b.transferDate)b.transferDate=date;
+  if(!b.fieldEntryDate)b.fieldEntryDate=date;
+  b.field=fieldName;
+  if(!b.targetField)b.targetField=fieldName;
+  b.transferBirdWeight=num('transferBirdWeight')||b.transferBirdWeight||0;
+  if(num('transferAlertAge')>0)b.alertAge=num('transferAlertAge');
+  if(num('transferMarketAge')>0)b.marketAge=num('transferMarketAge');
+
+  b.hallAllocations=halls.map((h,i)=>({hallId:h.id,hall:h.name,birds:base+(i<remainder?1:0)}));
+  b.fieldBirds=transferredBirdsFromBatch(b);
+  let first=b.hallAllocations[0];
+  b.hallId=first?+first.hallId:null;
+  b.hall=first?first.hall:'';
+  b.status=hatchAvailableForTransfer(b)>0?'نقل جزئي':'نشطة';
+
+  save();renderAll();
+  msg('تم توزيع '+readyNet.toLocaleString()+' طير على '+halls.length+' قاعة ('+base+' لكل قاعة'+(remainder?' والباقي '+remainder+' على أول قاعات)':')'));
+}
+
 function editTransferBatch(id){
   if(!isAdmin())return alert('تعديل النقل بصلاحية المدير فقط');
   let b=data.batches.find(x=>x.id===id);
