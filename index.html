@@ -420,6 +420,8 @@ tbody tr:hover td{background:#f8fafc}
           <datalist id="supplierList"></datalist>
           <datalist id="companyList"></datalist>
           <div class="formGroup"><label>الحقل المراد النقل إليه</label><select id="batchTargetField"></select></div>
+          <div class="formGroup"><label>معدل وزن البيضة (غم)</label><input id="eggWeight" type="number" min="0" step="0.1" placeholder="مثال: 62.5"></div>
+          <div class="formGroup"><label>عمر الأم (أسبوع)</label><input id="motherAge" type="number" min="0" placeholder="مثال: 35"></div>
           <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0" oninput="updateSetEggs()"></div>
           <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0" oninput="updateSetEggs()"></div>
           <div class="formGroup"><label>عدد البيض المرقد</label><input id="setEggs" type="number" min="0" readonly></div>
@@ -1584,6 +1586,8 @@ function selectedDetails(b){
     ['استلام البيض',fmt(b.eggReceiveDate)],
     ['تاريخ الترقيد',fmt(b.hatchDate)],
     ['سلالة الطير',b.birdStrain||'—'],
+    ['معدل وزن البيضة',(+b.eggWeight||0)?b.eggWeight+' غم':'—'],
+    ['عمر الأم',(+b.motherAge||0)?b.motherAge+' أسبوع':'—'],
     ['المورد',b.supplier||'—'],
     ['الشركة',b.company||'—'],
     ['عمر التفقيس',c.hatchAge+'/21'],
@@ -1926,7 +1930,7 @@ function updateSetEggs(){
   if($('setEggs'))$('setEggs').value=set;
 }
 function clearForm(){
-  ['editId','bName','eggReceiveDate','hatchDate','eggs','setEggs','note'].forEach(id=>$(id)&&($(id).value=''));
+  ['editId','bName','eggReceiveDate','hatchDate','eggs','setEggs','note','eggWeight','motherAge'].forEach(id=>$(id)&&($(id).value=''));
   if($('batchTargetField'))$('batchTargetField').value='';
   if($('birdStrain'))$('birdStrain').value='Ross 308';
   if($('batchSupplier'))$('batchSupplier').value='';
@@ -1948,6 +1952,8 @@ function formBatch(){
     company:val('batchCompany'),
     type:$('bType').value,
     eggs:num('eggs'),badEggs:num('badEggs'),setEggs:Math.max(0,num('eggs')-num('badEggs')),
+    eggWeight:+($('eggWeight')&&$('eggWeight').value)||0,
+    motherAge:+($('motherAge')&&$('motherAge').value)||0,
     alertAge:35,marketAge:35,note:val('note'),
     layerSource:$('layerSource')?$('layerSource').value:'مفقس',
     layerInitWeeks:$('layerInitWeeks')?num('layerInitWeeks'):0,
@@ -1980,6 +1986,8 @@ function editBatch(id){
   $('bType').value=b.type||'لحم';$('eggs').value=b.eggs||0;$('badEggs').value=b.badEggs||0;
   updateSetEggs();
   $('note').value=b.note||'';
+  if($('eggWeight'))$('eggWeight').value=b.eggWeight||'';
+  if($('motherAge'))$('motherAge').value=b.motherAge||'';
   if($('layerSource'))$('layerSource').value=b.layerSource||'مفقس';
   if($('layerInitWeeks'))$('layerInitWeeks').value=b.layerInitWeeks||0;
   if($('layerInitDays'))$('layerInitDays').value=b.layerInitDays||0;
