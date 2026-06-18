@@ -559,7 +559,8 @@ tbody tr:hover td{background:#f8fafc}
         <div class="formGrid">
           <div class="formGroup"><label>الوجبة</label><select id="marketBatch" onchange="fillMarketHalls()"></select></div>
           <div class="formGroup"><label>القاعة التي تم تسويقها</label><select id="marketHall"></select></div>
-          <div class="formGroup"><label>التاريخ</label><input id="marketDate" type="date"></div>
+          <div class="formGroup"><label>التاريخ</label><input id="marketDate" type="date" oninput="updateMarketAge()" onchange="updateMarketAge()"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="marketAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
           <div class="formGroup"><label>العدد</label><input id="marketCount" type="number" min="0"></div>
           <div class="formGroup"><label>نوع العملية</label><select id="marketStatus"><option>بيعت جزئياً</option><option>تسويق إلى المجزرة</option><option>منتهية</option><option>منقولة</option></select></div>
           <div class="formGroup"><label>ملاحظة</label><input id="marketNote"></div>
@@ -670,9 +671,10 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">🌾 استهلاك العلف لكل قاعة</div>
         <div class="formGrid">
-          <div class="formGroup"><label>التاريخ</label><input id="feedDate" type="date"></div>
+          <div class="formGroup"><label>التاريخ</label><input id="feedDate" type="date" oninput="updateFeedAge()" onchange="updateFeedAge()"></div>
           <div class="formGroup"><label>الحقل</label><select id="feedField" onchange="onFeedFieldChange()"></select></div>
-          <div class="formGroup"><label>القاعة</label><select id="feedHall"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="feedHall" onchange="updateFeedAge()"></select></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="feedAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
           <div class="formGroup"><label>نوع العلف</label><input id="feedType" placeholder="بادئ / نامي / ناهي"></div>
           <div class="formGroup"><label>الكمية كغم</label><input id="feedQty" type="number" min="0" step="0.01"></div>
           <div class="formGroup"><label>ملاحظة</label><input id="feedNote"></div>
@@ -696,9 +698,10 @@ tbody tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardTitle">💉 الأدوية واللقاحات لكل قاعة</div>
         <div class="formGrid">
-          <div class="formGroup"><label>التاريخ</label><input id="medDate" type="date"></div>
+          <div class="formGroup"><label>التاريخ</label><input id="medDate" type="date" oninput="updateMedAge()" onchange="updateMedAge()"></div>
           <div class="formGroup"><label>الحقل</label><select id="medField" onchange="onMedFieldChange()"></select></div>
-          <div class="formGroup"><label>القاعة</label><select id="medHall"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="medHall" onchange="updateMedAge()"></select></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="medAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
           <div class="formGroup"><label>النوع</label><select id="medType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
           <div class="formGroup"><label>اسم المادة</label><input id="medName" placeholder="مثال: نيوكاسل / AD3E"></div>
           <div class="formGroup"><label>الجرعة</label><input id="medDose"></div>
@@ -2864,20 +2867,59 @@ function lastMedHall(hallId){
   let list=(data.meds||[]).filter(x=>(+x.hallId||0)===+hallId).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   return list[0]||null;
 }
+function activeBatchForHall(hallId){
+  if(!hallId)return null;
+  return (data.batches||[]).find(b=>batchAllocatedToHall(b,+hallId)>0&&b.status==='في الحقل')||
+         (data.batches||[]).find(b=>batchAllocatedToHall(b,+hallId)>0);
+}
+function calcBirdAge(entryDate,date){
+  if(!entryDate||!date)return null;
+  return Math.max(0,Math.round((new Date(date)-new Date(entryDate))/(1000*60*60*24)));
+}
+function updateFeedAge(){
+  let el=$('feedAge');if(!el)return;
+  let hallId=$('feedHall')&&$('feedHall').value?+$('feedHall').value:0;
+  let b=activeBatchForHall(hallId);
+  let entryDate=b?(b.fieldEntryDate||b.transferDate||''):'';
+  let date=val('feedDate')||today();
+  let age=calcBirdAge(entryDate,date);
+  el.value=age!==null?age:'';
+}
+function updateMedAge(){
+  let el=$('medAge');if(!el)return;
+  let hallId=$('medHall')&&$('medHall').value?+$('medHall').value:0;
+  let b=activeBatchForHall(hallId);
+  let entryDate=b?(b.fieldEntryDate||b.transferDate||''):'';
+  let date=val('medDate')||today();
+  let age=calcBirdAge(entryDate,date);
+  el.value=age!==null?age:'';
+}
+function updateMarketAge(){
+  let el=$('marketAge');if(!el)return;
+  let id=$('marketBatch')?+$('marketBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let entryDate=b?(b.fieldEntryDate||b.transferDate||''):'';
+  let date=val('marketDate')||today();
+  let age=calcBirdAge(entryDate,date);
+  el.value=age!==null?age:'';
+}
 function onFeedFieldChange(){
   let field=val('feedField');
   let halls=fieldHallsByName(field);
   if($('feedHall'))$('feedHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+  updateFeedAge();
 }
 function onMedFieldChange(){
   let field=val('medField');
   let halls=fieldHallsByName(field);
   if($('medHall'))$('medHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+  updateMedAge();
 }
 function clearFeedForm(){
   if($('feedDate'))$('feedDate').value=today();
   if($('feedField'))$('feedField').selectedIndex=0;
   ['feedType','feedQty','feedNote'].forEach(id=>{if($(id))$(id).value=''});
+  if($('feedAge'))$('feedAge').value='';
   onFeedFieldChange();
 }
 function clearMedForm(){
@@ -2885,6 +2927,7 @@ function clearMedForm(){
   if($('medField'))$('medField').selectedIndex=0;
   if($('medType'))$('medType').selectedIndex=0;
   ['medName','medDose','medQty','medNote'].forEach(id=>{if($(id))$(id).value=''});
+  if($('medAge'))$('medAge').value='';
   onMedFieldChange();
 }
 function saveFeed(){
@@ -3097,6 +3140,7 @@ function fillMarketHalls(){
   sel.innerHTML=arr.length
     ?arr.map(a=>`<option value="${a.hallId}">${a.hall||'قاعة'} — حي ${batchHallAlive(b,+a.hallId).toLocaleString()}</option>`).join('')
     :'<option value="">لا توجد قاعات لهذه الوجبة</option>';
+  updateMarketAge();
 }
 function addMarket(){
   let id=+$('marketBatch').value;if(!id)return alert('اختر وجبة');
