@@ -547,6 +547,29 @@ tbody tr:hover td{background:#f8fafc}
       </div>
     </section>
 
+    <!-- UNFIT BIRDS -->
+    <section id="unfit" class="page hidden">
+      <div class="card">
+        <div class="cardTitle">🚫 تسجيل طير غير صالح للتربية</div>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="unfitField" onchange="onUnfitFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="unfitBatch" onchange="onUnfitBatchChange()"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="unfitHall"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="unfitDate" type="date"></div>
+          <div class="formGroup"><label>العدد</label><input id="unfitCount" type="number" min="1"></div>
+          <div class="formGroup"><label>السبب</label><input id="unfitReason" placeholder="مثال: ضعف نمو، تشوه..."></div>
+        </div>
+        <div class="formActions"><button class="btn btn-danger" onclick="addUnfit()">تسجيل غير صالح</button></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">📋 سجل الطير غير الصالح</div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="unfitBatchFilter" onchange="renderUnfit()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="unfitTable"></table></div>
+      </div>
+    </section>
+
     <!-- MARKET -->
     <section id="market" class="page hidden">
       <div class="card">
@@ -975,6 +998,7 @@ let data={
   weights:[],          // [{id,batchId,field,hallId,hall,date,avgWeight,expectedWeight,totalWeight,note}]
   feeds:[],            // [{id,date,field,hallId,hall,feedType,qty,note}]
   meds:[],             // [{id,date,field,hallId,hall,type,name,dose,qty,note}]
+  unfit:[],            // [{id,batchId,hallId,hall,field,date,count,reason}]
   subUsers:[],          // [{id,name,pass,role,fields:[fieldName,...]}]
   user:'admin',pass:'1234'  // المدير الرئيسي
 };
@@ -1142,6 +1166,7 @@ function buildNav(){
     html+=`<div class="navLabel">العمليات</div>`;
   }
   html+=n('📉','الهلاكات','mort');
+  html+=n('🚫','غير صالح للتربية','unfit');
   html+=n('💰','التسويق','market');
   html+=`<div class="navLabel">الإدارة</div>`;
   if(admin){
@@ -1197,6 +1222,7 @@ function show(id,btn,skipHistory){
   renderAll();
   if(id==='transfer'){clearTransferForm();renderTransferredBatches();renderTransferAllocationsSummary();}
   if(id==='mort'){clearMortForm();}
+  if(id==='unfit'){$('unfitDate').value=today();}
   if(id==='market'){clearMarketForm();}
   if(id==='layerPurchase'){clearLayerPurchaseForm();renderLayerPurchase();}
   if(id==='suppliers'){renderSuppliers();}
@@ -1299,10 +1325,11 @@ function calc(b,on=today()){
   let fieldBirds=Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.reduce((s,a)=>s+(+a.birds||0),0):((+b.fieldBirds||0)>0?+b.fieldBirds:(transferred?netHatch:0));
   let mort=data.morts.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
   let sold=data.markets.filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
-  let alive=transferred?Math.max(0,fieldBirds-mort-sold):0;
+  let unfit=(data.unfit||[]).filter(m=>m.batchId===b.id).reduce((s,m)=>s+(+m.count||0),0);
+  let alive=transferred?Math.max(0,fieldBirds-mort-sold-unfit):0;
   let completed=transferred&&fieldBirds>0&&alive<=0;
   let alertFlag=transferred&&(isLayer?flockAge>=(+b.alertAge||980):flockAge>=(+b.alertAge||35))&&!completed;
-  return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,alive,completed,alert:alertFlag,est,isLayer,layerInitDays,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
+  return{rawHatchAge,hatchAge,hatchComplete,hatchLate,expectedTransfer,transferred,entryDate,rawFlockAge,flockAge,hatched,vaccineDeaths,isolated,hatchLoss,netHatch,fieldBirds,mort,sold,unfit,alive,completed,alert:alertFlag,est,isLayer,layerInitDays,marketDate:transferred?addDays(entryDate,(+b.marketAge||35)):''};
 }
 function hatchRate(b){let eggs=+b.eggs||0;if(!eggs)return '0.00';let c=calc(b);return ((c.netHatch/eggs)*100).toFixed(2);}
 function successRate(b){let c=calc(b),base=c.fieldBirds||0;return base?((Math.max(0,base-c.mort)/base)*100).toFixed(2):'0.00'}
@@ -1331,7 +1358,7 @@ function visibleBatches(){
 function renderAll(){
   if(typeof updateArchiveStatuses==='function')updateArchiveStatuses();
   renderSelectors();renderStats();renderBatches();
-  renderMort();renderMarket();renderReports();
+  renderMort();renderUnfit();renderMarket();renderReports();
   renderArchive();renderCalendar();renderTransferredBatches();renderFields();renderSuppliers();
   renderUsers();renderUserFieldsList();renderLayerPurchase();renderWeights();renderFeed();renderMeds();
   fillTransferPreview(false);
@@ -1361,6 +1388,7 @@ function renderSelectors(){
   if($('feedField'))$('feedField').innerHTML=fOpts;
   if($('medField'))$('medField').innerHTML=fOpts;
   if($('mortField')){$('mortField').innerHTML=fOpts;onMortFieldChange();}
+  if($('unfitField')){$('unfitField').innerHTML=fOpts;onUnfitFieldChange();}
 
   renderBatchRecordFilters();
   renderArchiveFilters();
@@ -1456,7 +1484,7 @@ function allVisibleBatchesForFilters(){
 function renderBatchRecordFilters(){
   let all=allVisibleBatchesForFilters();
   let opts='<option value="">كل الوجبات</option>'+all.map(b=>`<option value="${b.id}">${b.name}${b.field?' — '+b.field:''}</option>`).join('');
-  ['feedBatchFilter','mortBatchFilter','marketBatchFilter','medBatchFilter','weightBatchFilter'].forEach(id=>{
+  ['feedBatchFilter','mortBatchFilter','unfitBatchFilter','marketBatchFilter','medBatchFilter','weightBatchFilter'].forEach(id=>{
     let el=$(id);if(!el)return;
     let old=el.value;
     el.innerHTML=opts;
@@ -1978,7 +2006,7 @@ function editBatch(id){
   toggleLayerFields();
   show('batch',null);
 }
-function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها (أعلاف، أدوية، أوزان، هلاك، تسويق) نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=(data.morts||[]).filter(m=>m.batchId!==id);data.markets=(data.markets||[]).filter(m=>m.batchId!==id);data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);data.meds=(data.meds||[]).filter(m=>m.batchId!==id);data.weights=(data.weights||[]).filter(w=>w.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll();msg('تم حذف الوجبة وجميع سجلاتها')}}
+function deleteBatch(id){if(!isAdmin())return;if(confirm('حذف الوجبة وكل سجلاتها (أعلاف، أدوية، أوزان، هلاك، تسويق) نهائياً؟')){data.batches=data.batches.filter(b=>b.id!==id);data.morts=(data.morts||[]).filter(m=>m.batchId!==id);data.markets=(data.markets||[]).filter(m=>m.batchId!==id);data.feeds=(data.feeds||[]).filter(f=>f.batchId!==id);data.meds=(data.meds||[]).filter(m=>m.batchId!==id);data.weights=(data.weights||[]).filter(w=>w.batchId!==id);data.unfit=(data.unfit||[]).filter(u=>u.batchId!==id);if(selectedBatchId===id)selectedBatchId=null;save();renderAll();msg('تم حذف الوجبة وجميع سجلاتها')}}
 
 
 function clearTransferForm(keepBatch=false){
@@ -2959,6 +2987,77 @@ function renderMort(){
   $('mortTable').innerHTML='<thead><tr><th>الحقل</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th colspan="2">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات هلاك</td></tr>')+'</tbody>';
 }
 function deleteMort(id){if(!isAdmin())return;if(confirm('حذف سجل الهلاك؟')){let old=data.morts.find(m=>m.id===id);data.morts=data.morts.filter(m=>m.id!==id);if(old)updateBatchArchiveStatus(data.batches.find(b=>b.id===old.batchId));save();renderAll()}}
+
+// ── UNFIT BIRDS ──
+function onUnfitFieldChange(){
+  let field=val('unfitField');
+  let batches=(isAdmin()?data.batches:visibleBatches()).filter(b=>b.field===field&&b.transferDate);
+  if($('unfitBatch'))$('unfitBatch').innerHTML=batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  onUnfitBatchChange();
+}
+function onUnfitBatchChange(){
+  let id=+($('unfitBatch')&&$('unfitBatch').value)||0;
+  let b=data.batches.find(x=>x.id===id);
+  let halls=b&&Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.map(a=>data.halls.find(h=>h.id===a.hallId)).filter(Boolean):(b&&b.hallId?[data.halls.find(h=>h.id===b.hallId)].filter(Boolean):[]);
+  if($('unfitHall'))$('unfitHall').innerHTML=halls.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+}
+function addUnfit(){
+  let id=+($('unfitBatch')&&$('unfitBatch').value)||0;
+  if(!id)return alert('اختر وجبة');
+  let b=data.batches.find(x=>x.id===id);
+  let hallId=$('unfitHall')&&$('unfitHall').value?+$('unfitHall').value:null;
+  if(!hallId)return alert('اختر القاعة');
+  let hallObj=data.halls.find(h=>h.id===hallId);
+  let count=num('unfitCount');
+  if(!count||count<1)return alert('أدخل عدداً صحيحاً');
+  if(!data.unfit)data.unfit=[];
+  data.unfit.push({id:Date.now(),batchId:id,hallId:hallId,hall:hallObj?hallObj.name:'',field:b?b.field:'',date:val('unfitDate')||today(),count:count,reason:val('unfitReason')});
+  save();renderAll();
+  $('unfitCount').value='';$('unfitReason').value='';
+  msg('تم تسجيل الطير غير الصالح');
+}
+function renderUnfit(){
+  let el=$('unfitTable');if(!el)return;
+  let list=(data.unfit||[]).filter(u=>{let b=data.batches.find(x=>x.id===u.batchId);return isAdmin()||(b&&canSeeField(b.field));}).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let filterBatchId=$('unfitBatchFilter')&&$('unfitBatchFilter').value?+$('unfitBatchFilter').value:0;
+  if(filterBatchId)list=list.filter(u=>+u.batchId===filterBatchId);
+  let halls=[...new Set(list.map(u=>u.hall||'—'))];
+  let rows=halls.map((hall,i)=>{
+    let hallList=list.filter(u=>(u.hall||'—')===hall);
+    let total=hallList.reduce((s,u)=>s+(+u.count||0),0);
+    let todayCount=hallList.filter(u=>u.date===today()).reduce((s,u)=>s+(+u.count||0),0);
+    let batches=[...new Set(hallList.map(u=>(data.batches.find(b=>b.id===u.batchId)||{}).name).filter(Boolean))];
+    let detailRows=hallList.map(u=>{
+      let b=data.batches.find(x=>x.id===u.batchId);
+      return `<tr>
+        <td>${fmt(u.date)}</td>
+        <td>${b?b.name:'—'}</td>
+        <td>${(+u.count||0).toLocaleString()}</td>
+        <td>${u.reason||'—'}</td>
+        <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteUnfit(${u.id})">حذف</button>`:'—'}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="selectable" onclick="toggleInlineDetails('unfitDetail${i}')" style="background:var(--bg)">
+      <td><b>${hall}</b></td>
+      <td>${todayCount.toLocaleString()}</td>
+      <td><b>${total.toLocaleString()}</b></td>
+      <td>${hallList.length.toLocaleString()}</td>
+      <td>${batches.join(' / ')||'—'}</td>
+      <td>اضغط لعرض التفاصيل</td>
+    </tr>
+    <tr id="unfitDetail${i}" class="hidden"><td colspan="6">
+      <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>العدد</th><th>السبب</th><th>حذف</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+    </td></tr>`;
+  }).join('');
+  el.innerHTML='<thead><tr><th>القاعة</th><th>اليوم</th><th>المجموع</th><th>السجلات</th><th>الوجبات</th><th>تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات طير غير صالح</td></tr>')+'</tbody>';
+}
+function deleteUnfit(id){
+  if(!isAdmin())return;
+  if(confirm('حذف سجل الطير غير الصالح؟')){
+    data.unfit=(data.unfit||[]).filter(u=>u.id!==id);
+    save();renderAll();msg('تم الحذف');
+  }
+}
 
 // ── MARKET ──
 function marketHallOptionsForBatch(b){
