@@ -3041,29 +3041,38 @@ function renderMort(){
     let total=fieldMorts.reduce((s,m)=>s+(+m.count||0),0);
     let todayCount=fieldMorts.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
     let halls=[...new Set(fieldMorts.map(m=>m.hall||'—'))];
-    let detailRows=halls.map(hall=>{
+    let detailRows=halls.map((hall,j)=>{
       let hallMorts=fieldMorts.filter(m=>(m.hall||'—')===hall);
       let latest=hallMorts[0]||{};
       let hTotal=hallMorts.reduce((s,m)=>s+(+m.count||0),0);
       let hToday=hallMorts.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
-      let batches=[...new Set(hallMorts.map(m=>(data.batches.find(b=>b.id===m.batchId)||{}).name).filter(Boolean))];
-      let delBtns=hallMorts.map(m=>`<button class="btn btn-danger btn-sm" title="${fmt(m.date)}" onclick="deleteMort(${m.id})">حذف</button>`).join(' ');
-      return `<tr>
+      let dailyRows=hallMorts.map(m=>{
+        let mb=data.batches.find(b=>b.id===m.batchId);
+        return `<tr>
+          <td>${fmt(m.date)}</td>
+          <td>${mb?mb.name:'—'}</td>
+          <td>${(+m.count||0).toLocaleString()}</td>
+          <td>${m.reason||'—'}</td>
+          <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMort(${m.id})">حذف</button>`:'—'}</td>
+        </tr>`;
+      }).join('');
+      return `<tr class="selectable" onclick="toggleInlineDetails('mortHallDetail${i}_${j}')">
         <td><b>${hall}</b></td>
         <td>${fmt(latest.date)}</td>
         <td>${hToday.toLocaleString()}</td>
         <td><b>${hTotal.toLocaleString()}</b></td>
         <td>${hallMorts.length.toLocaleString()}</td>
-        <td>${batches.join(' / ')||'—'}</td>
-        <td>${latest.reason||'—'}</td>
-        <td>${isAdmin()?delBtns:'—'}</td>
-      </tr>`;
+        <td>اضغط لعرض السجلات اليومية</td>
+      </tr>
+      <tr id="mortHallDetail${i}_${j}" class="hidden"><td colspan="6">
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>الوجبة</th><th>العدد</th><th>السبب</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('mortDetail${i}')" style="background:var(--bg)">
       <td><b>🏡 ${field}</b></td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMorts.length.toLocaleString()}</td><td colspan="2">اضغط لعرض التفاصيل</td>
     </tr>
     <tr id="mortDetail${i}" class="hidden"><td colspan="6">
-      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th>الوجبات</th><th>آخر سبب</th><th>حذف</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>القاعة</th><th>آخر تاريخ</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th>تفاصيل</th></tr></thead><tbody>${detailRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   $('mortTable').innerHTML='<thead><tr><th>الحقل</th><th>هلاك اليوم</th><th>مجموع الهلاك</th><th>السجلات</th><th colspan="2">تفاصيل</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات هلاك</td></tr>')+'</tbody>';
