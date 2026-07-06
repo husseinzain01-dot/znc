@@ -983,6 +983,7 @@ async function pullCloud(){
       data.feeds=data.feeds||[];data.meds=data.meds||[];
       data.weights=data.weights||[];
       migrateWeightsToGrams();
+      _applyGuideWeights();
       data.subUsers=data.subUsers||[];
       localStorage.setItem(STORE,JSON.stringify(data));
       if($('dbState')) $('dbState').textContent=t('dbConnected');
@@ -1085,6 +1086,7 @@ function load(){
       data.halls=data.halls||[];
       data.weights=data.weights||[];
       migrateWeightsToGrams();
+      _applyGuideWeights();
       data.subUsers=data.subUsers||[];
     }
     let ls=localStorage.getItem(STORE+'_lastSave');
@@ -1797,7 +1799,7 @@ function migrateWeightsToGrams(){
     if(w.achievementPct==null)w.achievementPct=w.guideWeightGrams?+(w.actual_weight_grams/w.guideWeightGrams*100).toFixed(1):0;
   });
 }
-function recalcAllGuideWeights(){
+function _applyGuideWeights(){
   (data.weights||[]).forEach(w=>{
     let b=(data.batches||[]).find(x=>x.id===w.batchId);
     let guide=Math.round(expectedWeightForBatch(b,w.ageDays!=null?+w.ageDays:0)*1000);
@@ -1807,6 +1809,9 @@ function recalcAllGuideWeights(){
     w.achievementPct=w.actual_weight_grams?+(w.actual_weight_grams/guide*100).toFixed(1):0;
     w.diff=+(w.achievementPct-100).toFixed(1);
   });
+}
+function recalcAllGuideWeights(){
+  _applyGuideWeights();
   save();renderAll();msg('تم إعادة حساب الكايد لجميع السجلات');
 }
 function latestWeightForBatch(batchId){
