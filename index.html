@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -160,6 +160,23 @@ main{padding:20px;overflow-x:hidden;min-width:0}
 .heroBanner h2{font-size:19px;font-weight:700;margin-bottom:3px}
 .heroBanner p{font-size:12px;color:#ccfbf1;margin:0}
 .heroBanner .hb-right{font-size:10px;color:#5eead4;white-space:nowrap}
+
+/* KPI DASHBOARD */
+.kpi-dash{display:grid;grid-template-columns:290px 1fr;gap:14px;align-items:start}
+.kpi-sec{background:var(--surface);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:14px}
+.kpi-sec:last-child{margin-bottom:0}
+.kpi-hdr{background:#e8735a;color:#fff;padding:8px 14px;font-weight:700;font-size:13px}
+.kpi-hdr.blue{background:#2563eb}
+.kpi-hdr.dark{background:#1e293b}
+.kpi-body{padding:12px 14px}
+.kpi-prog{height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin:4px 0}
+.kpi-prog-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.kpi-num-row{display:grid;gap:0;border-top:1px solid #f1f5f9}
+.kpi-num-cell{padding:14px 12px;border-left:1px solid #f1f5f9}
+.kpi-num-cell:last-child{border-left:none}
+.kpi-big{font-size:26px;font-weight:800;line-height:1;margin:4px 0}
+.kpi-sub{font-size:10px;color:var(--ink3);margin-top:4px}
+@media(max-width:900px){.kpi-dash{grid-template-columns:1fr}}
 
 /* DETAIL PANEL — أفقي دائماً */
 .detailPanel{background:linear-gradient(135deg,#f0fdfa,#fff);border:1px solid #99f6e4;border-radius:var(--r);padding:12px 14px;margin-top:10px}
@@ -564,6 +581,8 @@ tbody tr:active td{background:#ccfbf1}
           <div class="formGroup"><label>وزن الطير عند النقل (غرام)</label><input id="transferBirdWeight" type="number" min="0" placeholder="مثال: 42"></div>
           <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="transferAlertAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
           <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="transferMarketAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
+          <div class="formGroup"><label>مسؤول الوجبة / المشرف</label><input id="transferSupervisor" placeholder="اسم المشرف المسؤول"></div>
+          <div class="formGroup"><label>الدكتور البيطري</label><input id="transferVet" placeholder="اسم الدكتور البيطري"></div>
 
         </div>
         <div class="formActions">
@@ -584,7 +603,7 @@ tbody tr:active td{background:#ccfbf1}
     <!-- MORTALITY -->
     <section id="mort" class="page hidden">
       <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> <span data-i18n="ctLogMort">تسجيل هلاك</span></div>
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> <span data-i18n="ctLogMort">تسجيل هلاك — قاعة واحدة</span></div>
         <div class="formGrid">
           <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="mortField" onchange="onMortFieldChange()"></select></div>
           <div class="formGroup"><label data-i18n="lblBatch">الوجبة</label><select id="mortBatch" onchange="onMortBatchChange()"></select></div>
@@ -595,6 +614,22 @@ tbody tr:active td{background:#ccfbf1}
           <div class="formGroup"><label data-i18n="lblReason">السبب</label><input id="mortReason"></div>
         </div>
         <div class="formActions"><button class="btn btn-danger" onclick="addMort()">تسجيل الهلاك</button></div>
+      </div>
+      <!-- هلاك جماعي لكل القاعات -->
+      <div class="card" style="border-top:3px solid #dc2626">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> تسجيل هلاك جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">اختر الوجبة والتاريخ — أدخل عدد الهلاك لكل قاعة ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="mortBulkField" onchange="onMortBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="mortBulkBatch" onchange="buildMortHallsGrid()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="mortBulkDate" type="date" onchange="buildMortHallsGrid()"></div>
+          <div class="formGroup"><label>السبب العام</label><input id="mortBulkReason" placeholder="اختياري — يُطبّق على كل القاعات"></div>
+        </div>
+        <div id="mortHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-danger" onclick="saveAllMorts()">💾 حفظ هلاك جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearMortBulkForm()">مسح</button>
+        </div>
       </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">clinical_notes</span> <span data-i18n="ctMortLog">سجل الهلاكات</span></div>
@@ -722,7 +757,7 @@ tbody tr:active td{background:#ccfbf1}
     <!-- FEED -->
     <section id="feed" class="page hidden">
       <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">grass</span> <span data-i18n="ctFeedHalls">استهلاك العلف لكل قاعة</span></div>
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">grass</span> <span data-i18n="ctFeedHalls">استهلاك العلف — قاعة واحدة</span></div>
         <div class="formGrid">
           <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="feedDate" type="date" oninput="updateFeedAge()" onchange="updateFeedAge()"></div>
           <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="feedField" onchange="onFeedFieldChange()"></select></div>
@@ -737,6 +772,23 @@ tbody tr:active td{background:#ccfbf1}
           <button class="btn btn-secondary" onclick="clearFeedForm()">مسح</button>
         </div>
       </div>
+      <!-- علف جماعي لكل القاعات -->
+      <div class="card" style="border-top:3px solid #16a34a">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">grass</span> تسجيل علف جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل نوع العلف المشترك ثم كمية كل قاعة، ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="feedBulkField" onchange="onFeedBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="feedBulkBatch" onchange="buildFeedHallsGrid()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="feedBulkDate" type="date" onchange="buildFeedHallsGrid()"></div>
+          <div class="formGroup"><label>نوع العلف</label><input id="feedBulkType" placeholder="بادئ / نامي / ناهي"></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="feedBulkNote" placeholder="اختياري"></div>
+        </div>
+        <div id="feedHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllFeeds()">💾 حفظ علف جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearFeedBulkForm()">مسح</button>
+        </div>
+      </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">format_list_bulleted</span> <span data-i18n="ctFeedLog">سجل العلف</span></div>
         <div class="formGrid" style="margin-bottom:12px">
@@ -749,7 +801,7 @@ tbody tr:active td{background:#ccfbf1}
     <!-- MEDS -->
     <section id="meds" class="page hidden">
       <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">vaccines</span> <span data-i18n="ctMedsHalls">الأدوية واللقاحات لكل قاعة</span></div>
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">vaccines</span> <span data-i18n="ctMedsHalls">الأدوية واللقاحات — قاعة واحدة</span></div>
         <div class="formGrid">
           <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="medDate" type="date" oninput="updateMedAge()" onchange="updateMedAge()"></div>
           <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="medField" onchange="onMedFieldChange()"></select></div>
@@ -766,6 +818,25 @@ tbody tr:active td{background:#ccfbf1}
           <button class="btn btn-secondary" onclick="clearMedForm()">مسح</button>
         </div>
       </div>
+      <!-- أدوية/لقاحات جماعية لكل القاعات -->
+      <div class="card" style="border-top:3px solid #7c3aed">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">vaccines</span> تطبيق دواء / لقاح على جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل بيانات المادة مرة واحدة — ستُطبَّق على جميع القاعات المختارة. يمكن تخصيص الكمية لكل قاعة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="medBulkField" onchange="onMedBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="medBulkBatch" onchange="buildMedHallsGrid()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="medBulkDate" type="date" onchange="buildMedHallsGrid()"></div>
+          <div class="formGroup"><label>النوع</label><select id="medBulkType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
+          <div class="formGroup"><label>اسم المادة *</label><input id="medBulkName" placeholder="مثال: نيوكاسل / AD3E"></div>
+          <div class="formGroup"><label>الجرعة</label><input id="medBulkDose" placeholder="مثال: 1 مل / طير"></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="medBulkNote" placeholder="اختياري"></div>
+        </div>
+        <div id="medHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllMeds()">💾 حفظ المادة لجميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearMedBulkForm()">مسح</button>
+        </div>
+      </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">medication</span> <span data-i18n="ctMedsLog">سجل الأدوية واللقاحات</span></div>
         <div class="formGrid" style="margin-bottom:12px">
@@ -777,8 +848,9 @@ tbody tr:active td{background:#ccfbf1}
 
     <!-- WEIGHTS -->
     <section id="weights" class="page hidden">
+      <!-- الفورم الأساسي — قاعة واحدة -->
       <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">scale</span> <span data-i18n="ctWeightHalls">أوزان القاعات</span></div>
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">scale</span> <span data-i18n="ctWeightHalls">تسجيل وزن قاعة</span></div>
         <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">سجل وزن القاعة والوزن المتوقع. يظهر آخر وزن في لوحة المعلومات وتفاصيل الوجبة.</p>
         <div class="formGrid">
           <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="wField" onchange="onWeightFieldChange()"></select></div>
@@ -797,6 +869,22 @@ tbody tr:active td{background:#ccfbf1}
         <div class="formActions">
           <button class="btn btn-primary" onclick="saveWeightRecord()">💾 حفظ الوزن</button>
           <button class="btn btn-secondary" onclick="clearWeightForm()">مسح</button>
+        </div>
+      </div>
+      <!-- فورم جديد — إدخال جميع القاعات مرة واحدة -->
+      <div class="card" style="border-top:3px solid #2563eb">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">table_rows</span> إدخال أوزان جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">اختر الوجبة والتاريخ — ستظهر جميع القاعات مع حقل وزن لكل قاعة. أدخل الأوزان ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="wBulkField" onchange="onBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="wBulkBatch" onchange="buildWeightHallsGrid()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="wBulkDate" type="date" onchange="buildWeightHallsGrid()"></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="wBulkNote" placeholder="اختياري — تُطبّق على كل القاعات"></div>
+        </div>
+        <div id="wHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllWeights()">💾 حفظ أوزان جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearBulkWeightForm()">مسح</button>
         </div>
       </div>
       <div class="card">
@@ -840,10 +928,14 @@ tbody tr:active td{background:#ccfbf1}
             <label>نوع التقرير</label>
             <select id="rptType" onchange="renderReports()">
               <option value="batches">الوجبات</option>
+              <option value="mort">الهلاك</option>
+              <option value="weights">الأوزان</option>
               <option value="feed">استهلاك العلف</option>
               <option value="meds">الأدوية واللقاحات</option>
               <option value="fields">تقرير الحقول</option>
               <option value="halls">تقرير القاعات</option>
+              <option value="supervisor">تقرير المشرفين</option>
+              <option value="vet">تقرير الأطباء البيطريين</option>
             </select>
           </div>
           <div class="formGroup">
@@ -905,6 +997,47 @@ tbody tr:active td{background:#ccfbf1}
 
     </section>
 
+    <!-- AI ANALYSIS -->
+    <section id="aiAnalysis" class="page hidden">
+      <!-- ══ بطاقة الإدخال ══ -->
+      <div class="card" style="margin-bottom:14px;border-top:3px solid #7c3aed">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon" style="color:#7c3aed">psychology</span> <span style="background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800">مستشار الدواجن الذكي</span></div>
+        <div class="formGrid" style="margin-bottom:10px">
+          <div class="formGroup">
+            <label>اختر الوجبة</label>
+            <select id="aiaBatch" onchange="onAiaBatchChange()"><option value="">-- اختر --</option></select>
+          </div>
+          <div class="formGroup">
+            <label>وزن البيضة المرقدة (غم) <span style="font-size:10px;color:#7c3aed">🥚 أساس التوقع</span></label>
+            <input id="aiaEggWeight" type="number" min="40" max="80" placeholder="مثال: 62" oninput="runAiAnalysis()">
+          </div>
+          <div class="formGroup">
+            <label>وزن الطير عند النقل (غم) <span style="font-size:10px;color:#2563eb">🐣 نقطة البداية</span></label>
+            <input id="aiaTransferWeight" type="number" min="30" max="100" placeholder="مثال: 42" oninput="runAiAnalysis()">
+          </div>
+          <div class="formGroup">
+            <label>الهدف عند التسويق (غم)</label>
+            <input id="aiaTargetWeight" type="number" min="1000" max="5000" placeholder="مثال: 2500" value="2500" oninput="runAiAnalysis()">
+          </div>
+          <div class="formGroup">
+            <label>Groq API Key <span style="font-size:10px;color:var(--ink3)">مجاني — console.groq.com</span></label>
+            <input id="aiaApiKey" type="password" placeholder="gsk_..." oninput="localStorage.setItem('groqApiKey',this.value)" style="font-family:monospace;font-size:12px">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button onclick="runAiAnalysis();runGroqAnalysis()" style="background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:0;border-radius:9px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit">
+            <span class="material-symbols-outlined" style="font-size:20px">psychology</span> تحليل الوجبة
+          </button>
+          <button onclick="runAiAnalysis()" style="background:var(--card2,#f3f4f6);color:var(--ink1);border:1px solid var(--border);border-radius:9px;padding:10px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            📐 تحليل رياضي فقط
+          </button>
+          <span id="aiaClaudeStatus" style="font-size:13px;color:var(--ink3)"></span>
+        </div>
+      </div>
+      <div id="aiaClaudeResult"></div>
+      <div id="aiaResults"></div>
+    </section>
+
     <!-- ARCHIVE -->
     <section id="archive" class="page hidden">
       <div class="card">
@@ -917,6 +1050,23 @@ tbody tr:active td{background:#ccfbf1}
           <div class="formGroup"><label>اختيار القاعة</label><select id="archiveHallFilter" onchange="renderArchive()"></select></div>
         </div>
         <div class="tableWrap"><table id="archiveTable"></table></div>
+      </div>
+    </section>
+
+    <!-- COMPARE BATCHES -->
+    <section id="compare" class="page hidden">
+      <div class="pageHeader"><h1>📊 مقارنة بين الوجبات</h1></div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="formGrid">
+          <div class="formGroup"><label>نوع الوجبات</label><select id="cmpType" onchange="renderCompare()"><option value="all">الكل</option><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
+          <div class="formGroup"><label>الحقل</label><select id="cmpField" onchange="renderCompare()"></select></div>
+          <div class="formGroup"><label>الحالة</label><select id="cmpStatus" onchange="renderCompare()"><option value="all">الكل</option><option value="active">نشطة</option><option value="done">منتهية</option></select></div>
+          <div class="formGroup"><label>ترتيب حسب</label><select id="cmpSort" onchange="renderCompare()"><option value="success">نسبة النجاح</option><option value="alive">الحي</option><option value="mort">الهلاك</option><option value="weight">الوزن</option><option value="hatch">نسبة الفقس</option><option value="date">تاريخ الترقيد</option></select></div>
+        </div>
+      </div>
+      <div id="cmpSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
+      <div class="card">
+        <div class="tableWrap"><table id="cmpTable"></table></div>
       </div>
     </section>
 
@@ -1467,6 +1617,8 @@ function buildNav(){
   html+=n('bar_chart','navCharts','charts');
   html+=n('calendar_month','navCal','cal');
   html+=n('summarize','navReports','reports');
+  html+=`<button class="nav" onclick="show('compare',this);renderCompare()"><span class="navIcon">${mi('compare_arrows')}</span><span class="navText">مقارنة الوجبات</span></button>`;
+  html+=`<button class="nav" onclick="show('aiAnalysis',this)" style="background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(168,85,247,.12));border-right:3px solid #7c3aed"><span class="navIcon">${mi('psychology')}</span><span class="navText">🤖 تحليل ذكي</span></button>`;
   if(admin){
     html+=n('inventory_2','navArchive','archive');
     html+=n('settings','navSettings','settings');
@@ -1647,6 +1799,7 @@ function renderAll(){
   renderMort();renderMarket();renderReports();
   renderArchive();renderCalendar();renderTransferredBatches();renderFields();renderSuppliers();
   renderUsers();renderUserFieldsList();renderLayerPurchase();renderWeights();renderFeed();renderMeds();
+  renderAiAnalysis();
   fillTransferPreview(false);
   // تحديث لوحة القاعات إذا كانت مفتوحة
   let openFieldId=+val('hFieldId');
@@ -1672,9 +1825,13 @@ function renderSelectors(){
   if($('transferBatch'))fillTransferPreview(false);
   if($('lpField'))$('lpField').innerHTML=fOpts;
   if($('wField'))$('wField').innerHTML=fOpts;
+  if($('wBulkField'))$('wBulkField').innerHTML=fOpts;
   if($('feedField'))$('feedField').innerHTML=fOpts;
+  if($('feedBulkField'))$('feedBulkField').innerHTML=fOpts;
   if($('medField'))$('medField').innerHTML=fOpts;
+  if($('medBulkField'))$('medBulkField').innerHTML=fOpts;
   if($('mortField')){$('mortField').innerHTML=fOpts;onMortFieldChange();}
+  if($('mortBulkField'))$('mortBulkField').innerHTML=fOpts;
 
   renderBatchRecordFilters();
   renderArchiveFilters();
@@ -1913,6 +2070,8 @@ function selectedDetails(b){
     ['عمر الأم',(+b.motherAge||0)?b.motherAge+' أسبوع':'—'],
     ['المورد',b.supplier||'—'],
     ['الشركة',b.company||'—'],
+    ['مسؤول الوجبة / المشرف',b.supervisor||'—'],
+    ['الدكتور البيطري',b.vet||'—'],
     ['عمر التفقيس',c.hatchAge+'/21'],
     ['موعد النقل',fmt(c.expectedTransfer)],
     ['الحقل المراد نقله إليه',b.targetField||'—'],
@@ -2158,13 +2317,107 @@ function openSmartSection(section,fieldName=''){
   },0);
 }
 
+function renderCompare(){
+  // populate field filter
+  let fSel=$('cmpField');
+  if(fSel){
+    let fields=data.fields.filter(f=>canSeeField(f.name));
+    fSel.innerHTML='<option value="all">كل الحقول</option>'+fields.map(f=>`<option value="${f.name}">${f.name}</option>`).join('');
+  }
+  let typeF=$('cmpType')&&$('cmpType').value||'all';
+  let fieldF=$('cmpField')&&$('cmpField').value||'all';
+  let statusF=$('cmpStatus')&&$('cmpStatus').value||'all';
+  let sortF=$('cmpSort')&&$('cmpSort').value||'success';
+
+  let batches=visibleBatches().filter(b=>{
+    if(typeF!=='all'&&b.type!==typeF)return false;
+    if(fieldF!=='all'&&b.field!==fieldF)return false;
+    let c=calc(b);
+    if(statusF==='active'&&c.completed)return false;
+    if(statusF==='done'&&!c.completed)return false;
+    return true;
+  });
+
+  // sort
+  batches.sort((a,b)=>{
+    let ca=calc(a),cb=calc(b);
+    let lwa=latestWeightForBatch(a.id),lwb=latestWeightForBatch(b.id);
+    if(sortF==='success')return +successRate(b)- +successRate(a);
+    if(sortF==='alive')return cb.alive-ca.alive;
+    if(sortF==='mort')return ca.mort-cb.mort;
+    if(sortF==='weight')return (weightActualGrams(lwb)||0)-(weightActualGrams(lwa)||0);
+    if(sortF==='hatch')return +hatchRate(b)- +hatchRate(a);
+    if(sortF==='date')return String(b.hatchDate).localeCompare(String(a.hatchDate));
+    return 0;
+  });
+
+  // summary chips
+  let sumEl=$('cmpSummary');
+  if(sumEl&&batches.length){
+    let avgSuccess=Math.round(batches.reduce((s,b)=>s+(+successRate(b)),0)/batches.length);
+    let avgHatch=Math.round(batches.reduce((s,b)=>s+(+hatchRate(b)),0)/batches.length);
+    let totalAlive=batches.reduce((s,b)=>s+calc(b).alive,0);
+    let totalMort=batches.reduce((s,b)=>s+calc(b).mort,0);
+    let bestB=batches.reduce((best,b)=>+successRate(b)>+successRate(best)?b:best,batches[0]);
+    let chips=[
+      {l:'عدد الوجبات',v:batches.length,c:'#2563eb',bg:'#eff6ff'},
+      {l:'متوسط النجاح',v:avgSuccess+'%',c:avgSuccess>=90?'#16a34a':'#d97706',bg:'#f0fdf4'},
+      {l:'متوسط الفقس',v:avgHatch+'%',c:'#0891b2',bg:'#ecfeff'},
+      {l:'إجمالي الحي',v:totalAlive.toLocaleString(),c:'#16a34a',bg:'#f0fdf4'},
+      {l:'إجمالي الهلاك',v:totalMort.toLocaleString(),c:'#dc2626',bg:'#fef2f2'},
+      {l:'أفضل وجبة',v:bestB.name,c:'#7c3aed',bg:'#f5f3ff'},
+    ];
+    sumEl.innerHTML=chips.map(x=>`<div class="statCard" style="background:${x.bg};border:none;padding:12px 14px"><div style="font-size:10px;color:var(--ink3);margin-bottom:3px">${x.l}</div><div style="font-size:16px;font-weight:800;color:${x.c}">${x.v}</div></div>`).join('');
+  }else if(sumEl){sumEl.innerHTML='';}
+
+  // table
+  let tEl=$('cmpTable');
+  if(!tEl)return;
+  if(!batches.length){
+    tEl.innerHTML='<tbody><tr><td colspan="14" style="text-align:center;padding:20px;color:var(--ink3)">لا توجد وجبات تطابق الفلاتر</td></tr></tbody>';
+    return;
+  }
+  let rows=batches.map((b,i)=>{
+    let c=calc(b);
+    let lw=latestWeightForBatch(b.id);
+    let actualG=lw?weightActualGrams(lw):0;
+    let guideG=lw?weightGuideGrams(lw):0;
+    let wDiff=actualG&&guideG?((actualG/guideG-1)*100).toFixed(1):null;
+    let wCol=wDiff!=null?(+wDiff>=0?'#16a34a':'#dc2626'):'#64748b';
+    let sr=+successRate(b);
+    let srCol=sr>=90?'#16a34a':sr>=80?'#d97706':'#dc2626';
+    let rank=i+1;
+    let rankStyle=rank===1?'background:#fbbf24;color:#fff':rank===2?'background:#94a3b8;color:#fff':rank===3?'background:#b45309;color:#fff':'background:var(--bg);color:var(--ink3)';
+    return `<tr class="selectable" onclick="selectBatch(${b.id});show('dash',document.querySelectorAll('.nav')[0])">
+      <td style="text-align:center"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:11px;font-weight:800;${rankStyle}">${rank}</span></td>
+      <td><b>${b.name}</b><div style="font-size:10px;color:var(--ink3)">${fmt(b.hatchDate)}</div></td>
+      <td>${b.type||'—'}</td>
+      <td>${b.field||'—'}</td>
+      <td>${b.supervisor||'—'}</td>
+      <td>${b.vet||'—'}</td>
+      <td>${c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):'يوم '+c.flockAge):'مفقس'}</td>
+      <td>${hatchRate(b)}%</td>
+      <td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td>
+      <td style="color:#dc2626">${c.mort.toLocaleString()}</td>
+      <td style="color:#16a34a;font-weight:700">${c.alive.toLocaleString()}</td>
+      <td style="color:${wCol};font-weight:700">${actualG?actualG+'غم':'—'}${wDiff!=null?` <span style="font-size:10px">(${+wDiff>0?'+':''}${wDiff}%)</span>`:''}</td>
+      <td style="color:${srCol};font-weight:800">${sr}%</td>
+      <td>${c.completed?'<span style="color:#64748b">منتهية</span>':'<span style="color:#16a34a">نشطة</span>'}</td>
+    </tr>`;
+  }).join('');
+  tEl.innerHTML=`<thead><tr>
+    <th>#</th><th>الوجبة</th><th>النوع</th><th>الحقل</th><th>المشرف</th><th>الدكتور البيطري</th>
+    <th>العمر</th><th>نسبة الفقس</th><th>المنقول</th><th>الهلاك</th><th>الحي</th>
+    <th>الوزن/الكايد</th><th>النجاح%</th><th>الحالة</th>
+  </tr></thead><tbody>${rows}</tbody>`;
+}
+
 function renderStats(){
   let b=data.batches.find(x=>x.id===selectedBatchId);
   if(b&&!canSeeField(b.field))b=null;
-  let last=localStorage.getItem(STORE+'_lastSave');
-  let lastTxt=last?new Date(last).toLocaleString('ar-IQ',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
   let cardsEl=$('statsCards');let detailEl=$('statsDetail');
   if(!cardsEl)return;
+
   if(b){
     let c=calc(b);
     let lw=latestWeightForBatch(b.id);
@@ -2186,6 +2439,7 @@ function renderStats(){
     renderBatchHallsPanel(b);
     return;
   }
+
   let vis=visibleBatches();
   let activeB=vis.filter(b=>!calc(b).completed);
   let arch=vis.filter(b=>calc(b).completed);
@@ -2203,7 +2457,6 @@ function renderStats(){
     detailEl.innerHTML=buildFieldsDashboard();
     if(selectedFieldName&&data.fields.some(f=>f.name===selectedFieldName)&&canSeeField(selectedFieldName)){
       showFieldDetails(selectedFieldName);
-    }else{
     }
   }
   if($('batchHallsPanel'))$('batchHallsPanel').innerHTML='';
@@ -2221,11 +2474,10 @@ function renderBatches(){
   let rows=batches.map(b=>{
     let c=calc(b),sel=b.id===selectedBatchId?' selectedRow':'';
     let ageDisp=c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—';
-    let ageMax=c.isLayer?'140أسبوع':'40';
     let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button>`:'—';
     return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${b.name}</b></td><td>${fmt(b.eggReceiveDate)||'—'}</td><td>${fmt(b.hatchDate)}</td><td>${b.targetField||'—'}</td><td>${b.type||'—'}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${b.field||'—'}</td><td>${b.hall||'—'}</td><td>${ageDisp}</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${((latestWeightForBatch(b.id)||{}).avgWeight)||'—'}</td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
   }).join('');
-  $('batchTable').innerHTML=`<thead><tr><th>${t('thBatch')}</th><th>${t('thEggReceive')}</th><th>${t('thEntryDate')}</th><th>${t('thTargetField')}</th><th>${t('thType')}</th><th>${t('thStatus')}</th><th>${t('thHatching')}</th><th>${t('thEntryDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thAge')}</th><th>${t('thHatchRate')}</th><th>${t('thNet')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thAlive')}</th><th>${t('thLastWeight')}</th><th>${t('thSuccess')}</th><th>${t('thAction')}</th></tr></thead><tbody>${rows||'<tr><td colspan="19" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات مطابقة للبحث</td></tr>'}</tbody>`;
+  $('batchTable').innerHTML=`<thead><tr><th>${t('thBatch')}</th><th>${t('thEggReceive')}</th><th>${t('thEntryDate')}</th><th>${t('thTargetField')}</th><th>${t('thType')}</th><th>${t('thStatus')}</th><th>${t('thHatching')}</th><th>${t('thEntryDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thAge')}</th><th>${t('thHatchRate')}</th><th>${t('thNet')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thAlive')}</th><th>${t('thLastWeight')}</th><th>${t('thSuccess')}</th><th>${t('thAction')}</th></tr></thead><tbody>${rows||'<tr><td colspan="19" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات نشطة</td></tr>'}</tbody>`;
 }
 
 // ── BATCH CRUD ──
@@ -2354,7 +2606,7 @@ function deleteBatch(id){
 
 function clearTransferForm(keepBatch=false){
   if(!keepBatch&&$('transferBatch')) $('transferBatch').selectedIndex=0;
-  ['transferDate','transferCandle','transferDamaged','transferExamined','vaccineDeaths','isolatedBirds','unfitBirds','transferNet','transferIsolationRate','fieldBirds','transferBirdWeight'].forEach(id=>{if($(id))$(id).value=''});
+  ['transferDate','transferCandle','transferDamaged','transferExamined','vaccineDeaths','isolatedBirds','unfitBirds','transferNet','transferIsolationRate','fieldBirds','transferBirdWeight','transferSupervisor','transferVet'].forEach(id=>{if($(id))$(id).value=''});
   if($('transferReadyNet'))$('transferReadyNet').textContent='—';
   if($('transferAlertAge'))$('transferAlertAge').value=35;
   if($('transferMarketAge'))$('transferMarketAge').value=35;
@@ -2810,6 +3062,8 @@ function saveTransfer(){
   b.status=hatchAvailableForTransfer(b)>0?'نقل جزئي':'نشطة';
   if($('transferAlertAge')&&num('transferAlertAge')>0)b.alertAge=num('transferAlertAge');
   if($('transferMarketAge')&&num('transferMarketAge')>0)b.marketAge=num('transferMarketAge');
+  if(val('transferSupervisor'))b.supervisor=val('transferSupervisor');
+  if(val('transferVet'))b.vet=val('transferVet');
 
   selectedBatchId=b.id;
   save();
@@ -2898,6 +3152,7 @@ function renderLayerPurchase(){
 
 // ── WEIGHTS ──
 
+// ── فورم القاعة الواحدة (الأصلي) ──
 function clearWeightForm(){
   if($('wField'))$('wField').selectedIndex=0;
   if($('wDate'))$('wDate').value=today();
@@ -2943,6 +3198,125 @@ function fillWeightDefaults(){
   if($('wExpected'))$('wExpected').value=getGuideWeightByAge(c.flockAge);
   renderGuideTable(b,c.flockAge);
   calcWeightTotal();
+}
+function saveWeightRecord(){
+  let field=$('wField')?$('wField').value:'';
+  let hallId=$('wHall')&&$('wHall').value?+$('wHall').value:null;
+  let hall=data.halls.find(h=>h.id===hallId);
+  let id=+$('wBatch').value,b=data.batches.find(x=>x.id===id);
+  if(!field||!hallId)return alert('اختر الحقل والقاعة');
+  if(!b)return alert('اختر الوجبة داخل القاعة');
+  if(!isAdmin()&&!canSeeField(b.field))return alert('لا تملك صلاحية لهذه القاعة');
+  let actual=+($('wAvg').value||0);if(actual<=0)return alert('أدخل الوزن الفعلي بالغرام');
+  let c=calc(b,val('wDate')||today());
+  let guide=Math.round(expectedWeightForBatch(b,c.flockAge)*1000);
+  let hallAlive=hallId?batchHallAlive(b,hallId):c.alive;
+  let total=Math.round(actual*(hallAlive||c.fieldBirds||0));
+  let achievementPct=guide?+(actual/guide*100).toFixed(1):0;
+  let rec={id:Date.now(),batchId:b.id,field:field,hallId:hallId,hall:hall?hall.name:(b.hall||''),date:val('wDate')||today(),
+    alive:hallAlive,ageDays:c.flockAge,actual_weight_grams:actual,guideWeightGrams:guide,achievementPct:achievementPct,
+    avgWeight:+(actual/1000).toFixed(3),expectedWeight:+(guide/1000).toFixed(3),totalWeight:total,diff:+(achievementPct-100).toFixed(1),note:val('wNote')};
+  data.weights=data.weights||[];data.weights.push(rec);
+  if(hall){hall.avgWeight=rec.avgWeight;hall.totalWeight=total;}
+  save();renderAll();clearWeightForm();msg('تم حفظ وزن القاعة');
+}
+
+// ── فورم إدخال جميع القاعات دفعة واحدة (الجديد) ──
+function onBulkFieldChange(){
+  let fn=$('wBulkField')?$('wBulkField').value:'';
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&(!fn||b.field===fn));
+  if($('wBulkBatch'))$('wBulkBatch').innerHTML='<option value="">-- اختر الوجبة --</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  buildWeightHallsGrid();
+}
+function buildWeightHallsGrid(){
+  let el=$('wHallsGrid');if(!el)return;
+  let bId=$('wBulkBatch')&&$('wBulkBatch').value?+$('wBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){el.innerHTML='';return;}
+  let date=val('wBulkDate')||today();
+  let c=calc(b,date);
+  let age=c.flockAge;
+  let guide=Math.round(expectedWeightForBatch(b,age)*1000);
+  let strain=b.type==='بياض'?(b.birdStrain||'بياض تجاري'):(b.birdStrain||'Ross 308');
+  let fn=$('wBulkField')?$('wBulkField').value:'';
+  let f=data.fields.find(x=>x.name===(fn||b.field));
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id&&batchAllocatedToHall(b,h.id)>0):[];
+  if(!halls.length){el.innerHTML=`<div style="color:var(--ink3);font-size:13px;padding:10px 0">لا توجد قاعات مرتبطة بهذه الوجبة. أضف القاعات أولاً من صفحة الإعدادات.</div>`;return;}
+  let infoBar=`<div style="display:flex;gap:16px;flex-wrap:wrap;background:var(--card2,#f3f4f6);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+    <span>📅 عمر الطير: <strong>يوم ${age}</strong></span>
+    <span>🐔 السلالة: <strong>${strain}</strong></span>
+    <span>📐 كايد اليوم: <strong>${guide} غم</strong></span>
+    <span>🏠 عدد القاعات: <strong>${halls.length}</strong></span>
+  </div>`;
+  let rows=halls.map(h=>{
+    let alive=batchHallAlive(b,h.id);
+    let lastW=(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===h.id).sort((a,z)=>String(z.date).localeCompare(String(a.date)))[0];
+    let lastActual=lastW?lastW.actual_weight_grams:null;
+    let vsGuide=lastActual&&guide?((lastActual/guide-1)*100).toFixed(1):null;
+    let vsCol=vsGuide!=null?(+vsGuide>=0?'#16a34a':'#dc2626'):'#6b7280';
+    return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:var(--bg)">
+      <div style="min-width:100px;font-weight:700;font-size:14px">${h.name}</div>
+      <div style="font-size:12px;color:var(--ink3);min-width:70px">🐔 حي: <strong>${alive.toLocaleString()}</strong></div>
+      <div style="font-size:12px;color:var(--ink3);min-width:95px">📐 كايد: <strong>${guide} غم</strong></div>
+      ${lastActual!=null?`<div style="font-size:12px;color:${vsCol};min-width:110px">آخر: <strong>${lastActual}غم</strong> (${vsGuide!=null?(+vsGuide>0?'+':'')+vsGuide+'%':'—'})</div>`:`<div style="font-size:12px;color:var(--ink3);min-width:110px">لا يوجد وزن سابق</div>`}
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:190px">
+        <label style="font-size:13px;white-space:nowrap;color:var(--ink2)">الوزن الفعلي (غم):</label>
+        <input type="number" min="0" step="1" id="wHall_${h.id}"
+          style="width:110px;padding:7px 10px;border:2px solid var(--border);border-radius:8px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;background:var(--bg)"
+          placeholder="0" oninput="updateHallWeightDiff(${h.id},${guide})">
+        <span id="wHallDiff_${h.id}" style="font-size:13px;min-width:55px;font-weight:700"></span>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=infoBar+rows;
+}
+function updateHallWeightDiff(hallId,guide){
+  let inp=$(`wHall_${hallId}`);let sp=$(`wHallDiff_${hallId}`);
+  if(!inp||!sp)return;
+  let actual=+inp.value;
+  if(!actual||!guide){sp.textContent='';return;}
+  let pct=((actual/guide-1)*100).toFixed(1);
+  sp.textContent=(+pct>=0?'+':'')+pct+'%';
+  sp.style.color=+pct>=0?'#16a34a':'#dc2626';
+}
+function saveAllWeights(){
+  let bId=$('wBulkBatch')&&$('wBulkBatch').value?+$('wBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b)return alert('اختر الوجبة أولاً');
+  let date=val('wBulkDate')||today();
+  let c=calc(b,date);
+  let age=c.flockAge;
+  let guide=Math.round(expectedWeightForBatch(b,age)*1000);
+  let note=val('wBulkNote')||'';
+  let fn=$('wBulkField')?$('wBulkField').value:'';
+  let f=data.fields.find(x=>x.name===(fn||b.field));
+  let halls=f?data.halls.filter(h=>h.fieldId===f.id&&batchAllocatedToHall(b,h.id)>0):[];
+  data.weights=data.weights||[];
+  let saved=0,ts=Date.now();
+  halls.forEach(h=>{
+    let inp=$(`wHall_${h.id}`);
+    let actual=inp?+inp.value:0;
+    if(!actual)return;
+    let alive=batchHallAlive(b,h.id);
+    let total=Math.round(actual*alive);
+    let achievementPct=guide?+(actual/guide*100).toFixed(1):0;
+    let rec={id:ts+saved,batchId:b.id,field:fn||b.field||'',hallId:h.id,hall:h.name,
+      date,alive,ageDays:age,actual_weight_grams:actual,guideWeightGrams:guide,
+      achievementPct,avgWeight:+(actual/1000).toFixed(3),expectedWeight:+(guide/1000).toFixed(3),
+      totalWeight:total,diff:+(achievementPct-100).toFixed(1),note};
+    data.weights.push(rec);
+    h.avgWeight=rec.avgWeight;h.totalWeight=total;
+    saved++;
+  });
+  if(!saved)return alert('أدخل وزن قاعة واحدة على الأقل');
+  save();renderAll();clearBulkWeightForm();msg(`تم حفظ أوزان ${saved} قاعة ✅`);
+}
+function clearBulkWeightForm(){
+  if($('wBulkField'))$('wBulkField').selectedIndex=0;
+  if($('wBulkDate'))$('wBulkDate').value=today();
+  if($('wBulkNote'))$('wBulkNote').value='';
+  if($('wHallsGrid'))$('wHallsGrid').innerHTML='';
+  onBulkFieldChange();
 }
 // ── دليل الكايد المستقل (بدون ربط بوجبة) ──
 function lastMarketDateForBatch(batchId){
@@ -3282,6 +3656,232 @@ function deleteMed(id){
     save();renderAll();msg('تم حذف سجل الدواء/اللقاح');
   }
 }
+// ══════════════════════════════════════════════
+// دوال الإدخال الجماعي — هلاك / علف / أدوية
+// ══════════════════════════════════════════════
+
+// ── مساعد مشترك: قاعات الوجبة في الحقل ──
+function _bulkHalls(batchId, fieldName){
+  let b=(data.batches||[]).find(x=>x.id===batchId);
+  if(!b)return[];
+  let fn=fieldName||(b.field||'');
+  let f=data.fields.find(x=>x.name===fn);
+  return f?data.halls.filter(h=>h.fieldId===f.id&&batchAllocatedToHall(b,h.id)>0):[];
+}
+
+// ── مساعد: بناء شريط معلومات الوجبة ──
+function _bulkInfoBar(b, date, extra=''){
+  let c=calc(b,date);
+  let strain=b.type==='بياض'?(b.birdStrain||'بياض تجاري'):(b.birdStrain||'Ross 308');
+  return`<div style="display:flex;gap:16px;flex-wrap:wrap;background:var(--card2,#f3f4f6);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+    <span>📅 عمر الطير: <strong>يوم ${c.flockAge}</strong></span>
+    <span>🐔 السلالة: <strong>${strain}</strong></span>${extra}
+  </div>`;
+}
+
+// ══ هلاك جماعي ══
+
+function onMortBulkFieldChange(){
+  let fn=val('mortBulkField')||'';
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&(!fn||b.field===fn));
+  if($('mortBulkBatch'))$('mortBulkBatch').innerHTML='<option value="">-- اختر الوجبة --</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  buildMortHallsGrid();
+}
+function buildMortHallsGrid(){
+  let el=$('mortHallsGrid');if(!el)return;
+  let bId=$('mortBulkBatch')&&$('mortBulkBatch').value?+$('mortBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){el.innerHTML='';return;}
+  let date=val('mortBulkDate')||today();
+  let halls=_bulkHalls(bId, val('mortBulkField'));
+  if(!halls.length){el.innerHTML=`<div style="color:var(--ink3);font-size:13px;padding:10px 0">لا توجد قاعات مرتبطة بهذه الوجبة.</div>`;return;}
+  let infoBar=_bulkInfoBar(b,date,`<span>🏠 عدد القاعات: <strong>${halls.length}</strong></span>`);
+  let rows=halls.map(h=>{
+    let alive=batchHallAlive(b,h.id);
+    let todayMort=(data.morts||[]).filter(m=>m.batchId===b.id&&+m.hallId===h.id&&m.date===date).reduce((s,m)=>s+(+m.count||0),0);
+    return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:var(--bg)">
+      <div style="min-width:100px;font-weight:700;font-size:14px">${h.name}</div>
+      <div style="font-size:12px;color:var(--ink3);min-width:80px">🐔 حي: <strong>${alive.toLocaleString()}</strong></div>
+      ${todayMort?`<div style="font-size:12px;color:#dc2626;min-width:100px">اليوم: <strong>${todayMort} طير</strong></div>`:'<div style="min-width:100px"></div>'}
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
+        <label style="font-size:13px;white-space:nowrap;color:var(--ink2)">عدد الهلاك:</label>
+        <input type="number" min="0" step="1" id="mortHall_${h.id}"
+          style="width:100px;padding:7px 10px;border:2px solid #fca5a5;border-radius:8px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;background:var(--bg)"
+          placeholder="0">
+        <label style="font-size:12px;color:var(--ink3);white-space:nowrap">السبب:</label>
+        <input type="text" id="mortHallReason_${h.id}"
+          style="flex:1;min-width:100px;padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--bg)"
+          placeholder="اختياري">
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=infoBar+rows;
+}
+function saveAllMorts(){
+  let bId=$('mortBulkBatch')&&$('mortBulkBatch').value?+$('mortBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b)return alert('اختر الوجبة أولاً');
+  let date=val('mortBulkDate')||today();
+  let commonReason=val('mortBulkReason')||'';
+  let halls=_bulkHalls(bId, val('mortBulkField'));
+  let saved=0,ts=Date.now();
+  halls.forEach(h=>{
+    let inp=$(`mortHall_${h.id}`);
+    let cnt=inp?+inp.value:0;
+    if(!cnt)return;
+    let reason=val(`mortHallReason_${h.id}`)||commonReason;
+    let hallObj=data.halls.find(x=>x.id===h.id);
+    data.morts.push({id:ts+saved,batchId:b.id,hallId:h.id,hall:hallObj?hallObj.name:h.name,date,count:cnt,reason});
+    saved++;
+  });
+  if(!saved)return alert('أدخل عدد هلاك قاعة واحدة على الأقل');
+  updateBatchArchiveStatus(b);
+  save();renderAll();clearMortBulkForm();msg(`تم حفظ هلاك ${saved} قاعة ✅`);
+}
+function clearMortBulkForm(){
+  if($('mortBulkField'))$('mortBulkField').selectedIndex=0;
+  if($('mortBulkDate'))$('mortBulkDate').value=today();
+  if($('mortBulkReason'))$('mortBulkReason').value='';
+  if($('mortHallsGrid'))$('mortHallsGrid').innerHTML='';
+  onMortBulkFieldChange();
+}
+
+// ══ علف جماعي ══
+
+function onFeedBulkFieldChange(){
+  let fn=val('feedBulkField')||'';
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&(!fn||b.field===fn));
+  if($('feedBulkBatch'))$('feedBulkBatch').innerHTML='<option value="">-- اختر الوجبة --</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  buildFeedHallsGrid();
+}
+function buildFeedHallsGrid(){
+  let el=$('feedHallsGrid');if(!el)return;
+  let bId=$('feedBulkBatch')&&$('feedBulkBatch').value?+$('feedBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){el.innerHTML='';return;}
+  let date=val('feedBulkDate')||today();
+  let halls=_bulkHalls(bId, val('feedBulkField'));
+  if(!halls.length){el.innerHTML=`<div style="color:var(--ink3);font-size:13px;padding:10px 0">لا توجد قاعات مرتبطة بهذه الوجبة.</div>`;return;}
+  let infoBar=_bulkInfoBar(b,date,`<span>🏠 عدد القاعات: <strong>${halls.length}</strong></span>`);
+  let rows=halls.map(h=>{
+    let alive=batchHallAlive(b,h.id);
+    let todayFeed=(data.feeds||[]).filter(f=>+f.hallId===h.id&&f.date===date).reduce((s,f)=>s+(+f.qty||0),0);
+    return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:var(--bg)">
+      <div style="min-width:100px;font-weight:700;font-size:14px">${h.name}</div>
+      <div style="font-size:12px;color:var(--ink3);min-width:80px">🐔 حي: <strong>${alive.toLocaleString()}</strong></div>
+      ${todayFeed?`<div style="font-size:12px;color:#16a34a;min-width:110px">اليوم: <strong>${todayFeed} كغم</strong></div>`:'<div style="min-width:110px"></div>'}
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px">
+        <label style="font-size:13px;white-space:nowrap;color:var(--ink2)">الكمية (كغم):</label>
+        <input type="number" min="0" step="0.01" id="feedHall_${h.id}"
+          style="width:110px;padding:7px 10px;border:2px solid #86efac;border-radius:8px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;background:var(--bg)"
+          placeholder="0">
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=infoBar+rows;
+}
+function saveAllFeeds(){
+  let bId=$('feedBulkBatch')&&$('feedBulkBatch').value?+$('feedBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b)return alert('اختر الوجبة أولاً');
+  let date=val('feedBulkDate')||today();
+  let feedType=val('feedBulkType')||'';
+  let note=val('feedBulkNote')||'';
+  let fn=val('feedBulkField')||'';
+  let halls=_bulkHalls(bId, fn);
+  data.feeds=data.feeds||[];
+  let saved=0,ts=Date.now();
+  halls.forEach(h=>{
+    let inp=$(`feedHall_${h.id}`);
+    let qty=inp?+inp.value:0;
+    if(!qty)return;
+    let hallObj=data.halls.find(x=>x.id===h.id);
+    data.feeds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,feedType,qty,note});
+    saved++;
+  });
+  if(!saved)return alert('أدخل كمية قاعة واحدة على الأقل');
+  save();renderAll();clearFeedBulkForm();msg(`تم حفظ علف ${saved} قاعة ✅`);
+}
+function clearFeedBulkForm(){
+  if($('feedBulkField'))$('feedBulkField').selectedIndex=0;
+  if($('feedBulkDate'))$('feedBulkDate').value=today();
+  ['feedBulkType','feedBulkNote'].forEach(id=>{if($(id))$(id).value='';});
+  if($('feedHallsGrid'))$('feedHallsGrid').innerHTML='';
+  onFeedBulkFieldChange();
+}
+
+// ══ أدوية/لقاحات جماعية ══
+
+function onMedBulkFieldChange(){
+  let fn=val('medBulkField')||'';
+  let batches=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed&&(!fn||b.field===fn));
+  if($('medBulkBatch'))$('medBulkBatch').innerHTML='<option value="">-- اختر الوجبة --</option>'+batches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  buildMedHallsGrid();
+}
+function buildMedHallsGrid(){
+  let el=$('medHallsGrid');if(!el)return;
+  let bId=$('medBulkBatch')&&$('medBulkBatch').value?+$('medBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){el.innerHTML='';return;}
+  let date=val('medBulkDate')||today();
+  let halls=_bulkHalls(bId, val('medBulkField'));
+  if(!halls.length){el.innerHTML=`<div style="color:var(--ink3);font-size:13px;padding:10px 0">لا توجد قاعات مرتبطة بهذه الوجبة.</div>`;return;}
+  let infoBar=_bulkInfoBar(b,date,`<span>🏠 عدد القاعات: <strong>${halls.length}</strong></span>`);
+  let rows=halls.map(h=>{
+    let alive=batchHallAlive(b,h.id);
+    let lastMed=(data.meds||[]).filter(m=>m.batchId===b.id&&+m.hallId===h.id).sort((a,z)=>String(z.date).localeCompare(String(a.date)))[0];
+    return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:var(--bg)">
+      <div style="min-width:100px;font-weight:700;font-size:14px">${h.name}</div>
+      <div style="font-size:12px;color:var(--ink3);min-width:80px">🐔 حي: <strong>${alive.toLocaleString()}</strong></div>
+      ${lastMed?`<div style="font-size:12px;color:#7c3aed;min-width:140px">آخر: <strong>${lastMed.name}</strong> (${lastMed.date})</div>`:'<div style="font-size:12px;color:var(--ink3);min-width:140px">لا يوجد سابق</div>'}
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
+        <label style="font-size:13px;white-space:nowrap;color:var(--ink2)">الكمية:</label>
+        <input type="number" min="0" step="0.01" id="medHall_${h.id}"
+          style="width:100px;padding:7px 10px;border:2px solid #c4b5fd;border-radius:8px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;background:var(--bg)"
+          placeholder="0">
+        <label style="font-size:12px;color:var(--ink3)">✔ تطبيق:</label>
+        <input type="checkbox" id="medHallChk_${h.id}" checked
+          style="width:18px;height:18px;accent-color:#7c3aed;cursor:pointer">
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=infoBar+rows;
+}
+function saveAllMeds(){
+  let bId=$('medBulkBatch')&&$('medBulkBatch').value?+$('medBulkBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b)return alert('اختر الوجبة أولاً');
+  let name=val('medBulkName')||'';
+  if(!name)return alert('أدخل اسم المادة');
+  let date=val('medBulkDate')||today();
+  let type=val('medBulkType')||'لقاح';
+  let dose=val('medBulkDose')||'';
+  let note=val('medBulkNote')||'';
+  let fn=val('medBulkField')||'';
+  let halls=_bulkHalls(bId, fn);
+  data.meds=data.meds||[];
+  let saved=0,ts=Date.now();
+  halls.forEach(h=>{
+    let chk=$(`medHallChk_${h.id}`);
+    if(chk&&!chk.checked)return;
+    let qtyInp=$(`medHall_${h.id}`);
+    let qty=qtyInp?+qtyInp.value:0;
+    let hallObj=data.halls.find(x=>x.id===h.id);
+    data.meds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,type,name,dose,qty,note});
+    saved++;
+  });
+  if(!saved)return alert('لم يتم تحديد أي قاعة — تأكد من تحديد ✔ تطبيق');
+  save();renderAll();clearMedBulkForm();msg(`تم حفظ المادة لـ ${saved} قاعة ✅`);
+}
+function clearMedBulkForm(){
+  if($('medBulkField'))$('medBulkField').selectedIndex=0;
+  if($('medBulkDate'))$('medBulkDate').value=today();
+  if($('medBulkType'))$('medBulkType').selectedIndex=0;
+  ['medBulkName','medBulkDose','medBulkNote'].forEach(id=>{if($(id))$(id).value='';});
+  if($('medHallsGrid'))$('medHallsGrid').innerHTML='';
+  onMedBulkFieldChange();
+}
+
 function toggleInlineDetails(id){
   let el=$(id);if(!el)return;
   el.classList.toggle('hidden');
@@ -3578,6 +4178,8 @@ function reportStatusOptions(type){
   ];
   if(type==='meds')return [['لقاح','لقاح'],['دواء','دواء'],['فيتامين','فيتامين'],['تعقيم','تعقيم']];
   if(type==='feed')return [...new Set((data.feeds||[]).map(x=>x.feedType).filter(Boolean))].map(x=>[x,x]);
+  if(type==='mort')return [...new Set((data.morts||[]).map(x=>x.reason).filter(Boolean))].map(x=>[x,x]);
+  if(type==='weights')return [];
   return [];
 }
 function renderReportFilters(){
@@ -3665,10 +4267,99 @@ function renderReports(){
     }).join('');
     el.innerHTML=`<thead><tr><th>${t('thBatch')}</th><th>${t('thType')}</th><th>${t('thEntryDate')}</th><th>${t('thField')}</th><th>${t('thHalls')}</th><th>${t('thEggs')}</th><th>${t('thHatchRate')}</th><th>${t('thNet')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thAlive')}</th><th>${t('thSuccess')}</th><th>${t('thLastWeight')}</th><th>${t('thStatus')}</th></tr></thead><tbody>${rows}</tbody>`;
 
+  }else if(type==='mort'){
+    if(title)title.textContent='💔 تقرير الهلاك';
+    // مورت ليس فيه field — نجيبه من الوجبة
+    let batchMap={};(data.batches||[]).forEach(b=>{batchMap[b.id]=b;});
+    let hallMap={};(data.halls||[]).forEach(h=>{hallMap[h.id]=h;});
+    let morts=(data.morts||[]).filter(x=>{
+      let b=batchMap[x.batchId];
+      let bField=b?b.field:'';
+      if(!inField(bField))return false;
+      if(!inRange(x.date))return false;
+      if(hallId&&+x.hallId!==hallId)return false;
+      if(batchId&&x.batchId!==batchId)return false;
+      return true;
+    }).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    if(status)morts=morts.filter(x=>x.reason===status);
+    morts=morts.filter(x=>{
+      let b=batchMap[x.batchId];
+      return textMatch([b?b.name:'',b?b.field:'',x.hall,x.reason]);
+    });
+    let totalMort=morts.reduce((s,x)=>s+(+x.count||0),0);
+    let byField={};morts.forEach(x=>{let f=batchMap[x.batchId]?batchMap[x.batchId].field:'—';byField[f]=(byField[f]||0)+(+x.count||0);});
+    let byHall={};morts.forEach(x=>{let k=x.hall||'—';byHall[k]=(byHall[k]||0)+(+x.count||0);});
+    if(summary)summary.innerHTML=[
+      {l:'إجمالي الهلاك',v:totalMort.toLocaleString(),c:'#dc2626'},
+      {l:'عدد السجلات',v:morts.length,c:'#64748b'},
+      ...Object.entries(byField).map(([f,c])=>({l:'هلاك '+f,v:c.toLocaleString(),c:'#dc2626'})),
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val" style="color:${x.c||'var(--p)'}">${x.v}</div></div>`).join('');
+    let rows=morts.map(x=>{
+      let b=batchMap[x.batchId];
+      let h=hallMap[x.hallId]||{};
+      let f=data.fields.find(fi=>b&&fi.id===(data.halls.find(hh=>hh.id===+x.hallId)||{}).fieldId);
+      return `<tr>
+        <td>${fmt(x.date)}</td>
+        <td>${b?b.name:'—'}</td>
+        <td>${b?b.field:'—'}</td>
+        <td>${x.hall||h.name||'—'}</td>
+        <td style="color:#dc2626;font-weight:700">${(+x.count||0).toLocaleString()}</td>
+        <td>${x.reason||'—'}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML=`<thead><tr><th>التاريخ</th><th>الوجبة</th><th>الحقل</th><th>القاعة</th><th>عدد الهلاك</th><th>السبب</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px">لا توجد سجلات</td></tr>'}</tbody>`;
+
+  }else if(type==='weights'){
+    if(title)title.textContent='⚖️ تقرير الأوزان';
+    let batchMap={};(data.batches||[]).forEach(b=>{batchMap[b.id]=b;});
+    let wRecs=(data.weights||[]).filter(x=>{
+      if(!inField(x.field))return false;
+      if(!inRange(x.date))return false;
+      if(hallId&&+x.hallId!==hallId)return false;
+      if(batchId&&x.batchId!==batchId)return false;
+      return true;
+    }).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    wRecs=wRecs.filter(x=>{
+      let b=batchMap[x.batchId];
+      return textMatch([b?b.name:'',x.field,x.hall,x.note]);
+    });
+    let actuals=wRecs.map(x=>+(x.actual_weight_grams||x.avgWeight||0)).filter(v=>v>0);
+    let avgActual=actuals.length?Math.round(actuals.reduce((s,v)=>s+v,0)/actuals.length):0;
+    let guides=wRecs.map(x=>+(x.guideWeightGrams||0)).filter(v=>v>0);
+    let avgGuide=guides.length?Math.round(guides.reduce((s,v)=>s+v,0)/guides.length):0;
+    if(summary)summary.innerHTML=[
+      {l:'عدد السجلات',v:wRecs.length,c:'#64748b'},
+      {l:'متوسط الوزن الفعلي',v:avgActual?avgActual+'غم':'—',c:'#2563eb'},
+      {l:'متوسط الكايد',v:avgGuide?avgGuide+'غم':'—',c:'#64748b'},
+      {l:'نسبة التحقق',v:avgActual&&avgGuide?((avgActual/avgGuide)*100).toFixed(1)+'%':'—',c:avgActual>=avgGuide?'#16a34a':'#dc2626'},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val" style="color:${x.c}">${x.v}</div></div>`).join('');
+    let rows=wRecs.map(x=>{
+      let b=batchMap[x.batchId];
+      let actual=+(x.actual_weight_grams||x.avgWeight||0);
+      let guide=+(x.guideWeightGrams||0);
+      let diff=actual&&guide?actual-guide:null;
+      let diffCol=diff!=null?(diff>=0?'#16a34a':'#dc2626'):'#64748b';
+      let pct=guide?((actual/guide)*100).toFixed(1):null;
+      return `<tr>
+        <td>${fmt(x.date)}</td>
+        <td>${b?b.name:'—'}</td>
+        <td>${x.field||'—'}</td>
+        <td>${x.hall||'—'}</td>
+        <td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
+        <td style="font-weight:700;color:#2563eb">${actual?actual+'غم':'—'}</td>
+        <td style="color:#64748b">${guide?guide+'غم':'—'}</td>
+        <td style="color:${diffCol};font-weight:700">${diff!=null?(diff>0?'+':'')+diff+'غم':'—'}</td>
+        <td style="color:${diffCol}">${pct!=null?pct+'%':'—'}</td>
+        <td>${(+x.alive||0).toLocaleString()}</td>
+        <td>${x.note||'—'}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML=`<thead><tr><th>التاريخ</th><th>الوجبة</th><th>الحقل</th><th>القاعة</th><th>العمر</th><th>الوزن الفعلي</th><th>الكايد</th><th>الفرق</th><th>نسبة التحقق</th><th>الحي</th><th>ملاحظة</th></tr></thead><tbody>${rows||'<tr><td colspan="11" style="text-align:center;color:var(--ink3);padding:16px">لا توجد سجلات</td></tr>'}</tbody>`;
+
   }else if(type==='feed'){
     if(title)title.textContent='🌾 تقرير استهلاك العلف';
     let feeds=(data.feeds||[]).filter(x=>inField(x.field)&&inRange(x.date)).sort((a,b)=>b.date.localeCompare(a.date));
-    if(hallId)feeds=feeds.filter(x=>inHall(x.hallId));
+    if(hallId)feeds=feeds.filter(x=>+x.hallId===hallId);
     if(batchId){
       let rb=data.batches.find(b=>b.id===batchId),hids=batchHallIds(rb);
       feeds=feeds.filter(x=>rb&&x.field===rb.field&&(!hids.length||hids.includes(+x.hallId)));
@@ -3676,25 +4367,22 @@ function renderReports(){
     if(status)feeds=feeds.filter(x=>x.feedType===status);
     feeds=feeds.filter(x=>textMatch([x.field,x.hall,x.feedType,x.note]));
     let totalQty=feeds.reduce((s,x)=>s+(+x.qty||0),0);
-    // ملخص حسب الحقل
     let byField={};feeds.forEach(x=>{byField[x.field]=(byField[x.field]||0)+(+x.qty||0);});
-    // ملخص حسب القاعة
-    let byHall={};feeds.forEach(x=>{let k=x.field+'/'+x.hall;byHall[k]=(byHall[k]||0)+(+x.qty||0);});
     if(summary)summary.innerHTML=[
       {l:'إجمالي العلف (كغم)',v:totalQty.toLocaleString()},
       {l:'عدد السجلات',v:feeds.length},
       ...Object.entries(byField).map(([f,q])=>({l:'علف '+f,v:q.toLocaleString()+' كغم'})),
     ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
     let rows=feeds.map(x=>`<tr>
-      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall}</td>
+      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall||'—'}</td>
       <td>${x.feedType||'—'}</td><td><b>${(+x.qty||0).toLocaleString()} كغم</b></td><td>${x.note||'—'}</td>
     </tr>`).join('');
-    el.innerHTML=`<thead><tr><th>${t('thDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thFeedType')}</th><th>${t('thQtyKg')}</th><th>${t('thNote')}</th></tr></thead><tbody>${rows}</tbody>`;
+    el.innerHTML=`<thead><tr><th>${t('thDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thFeedType')}</th><th>${t('thQtyKg')}</th><th>${t('thNote')}</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:16px">لا توجد سجلات</td></tr>'}</tbody>`;
 
   }else if(type==='meds'){
     if(title)title.textContent='💉 تقرير الأدوية واللقاحات';
     let meds=(data.meds||[]).filter(x=>inField(x.field)&&inRange(x.date)).sort((a,b)=>b.date.localeCompare(a.date));
-    if(hallId)meds=meds.filter(x=>inHall(x.hallId));
+    if(hallId)meds=meds.filter(x=>+x.hallId===hallId);
     if(batchId){
       let rb=data.batches.find(b=>b.id===batchId),hids=batchHallIds(rb);
       meds=meds.filter(x=>rb&&x.field===rb.field&&(!hids.length||hids.includes(+x.hallId)));
@@ -3707,12 +4395,93 @@ function renderReports(){
       ...Object.entries(byType).map(([t,c])=>({l:t,v:c+' جرعة'})),
     ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
     let rows=meds.map(x=>`<tr>
-      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall}</td>
+      <td>${fmt(x.date)}</td><td>${x.field}</td><td>${x.hall||'—'}</td>
       <td><span class="badge ${x.type==='لقاح'?'b-violet':x.type==='دواء'?'b-red':x.type==='فيتامين'?'b-green':'b-gray'}">${x.type}</span></td>
       <td><b>${x.name}</b></td><td>${x.dose||'—'}</td>
       <td>${(+x.qty||0).toLocaleString()}</td><td>${x.note||'—'}</td>
     </tr>`).join('');
-    el.innerHTML=`<thead><tr><th>${t('thDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thType')}</th><th>${t('thMaterial')}</th><th>${t('thDose')}</th><th>${t('thQty')}</th><th>${t('thNote')}</th></tr></thead><tbody>${rows}</tbody>`;
+    el.innerHTML=`<thead><tr><th>${t('thDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thType')}</th><th>${t('thMaterial')}</th><th>${t('thDose')}</th><th>${t('thQty')}</th><th>${t('thNote')}</th></tr></thead><tbody>${rows||'<tr><td colspan="8" style="text-align:center;color:var(--ink3);padding:16px">لا توجد سجلات</td></tr>'}</tbody>`;
+
+  }else if(type==='supervisor'||type==='vet'){
+    let isSup=type==='supervisor';
+    if(title)title.textContent=isSup?'👷 تقرير المشرفين':'🩺 تقرير الأطباء البيطريين';
+    let keyField=isSup?'supervisor':'vet';
+    let allBatches=(isAdmin()?data.batches:visibleBatches()).filter(b=>{
+      if(!inField(b.field))return false;
+      if(batchId&&b.id!==batchId)return false;
+      return true;
+    });
+    // تجميع حسب المشرف/الدكتور
+    let groups={};
+    allBatches.forEach(b=>{
+      let key=b[keyField]||'غير محدد';
+      if(!groups[key])groups[key]=[];
+      groups[key].push(b);
+    });
+    // فلتر نصي على الاسم
+    if(search){
+      Object.keys(groups).forEach(k=>{if(!k.toLowerCase().includes(search))delete groups[k];});
+    }
+    // ملخص
+    let names=Object.keys(groups);
+    let totalBatches=allBatches.length;
+    let avgSuccessAll=totalBatches?Math.round(allBatches.reduce((s,b)=>s+(+successRate(b)),0)/totalBatches):0;
+    if(summary)summary.innerHTML=[
+      {l:isSup?'عدد المشرفين':'عدد الأطباء',v:names.length},
+      {l:'إجمالي الوجبات',v:totalBatches},
+      {l:'متوسط النجاح الكلي',v:avgSuccessAll+'%'},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
+    // صفوف الجدول — صف لكل شخص
+    let rows=names.sort().map(name=>{
+      let bs=groups[name];
+      let active=bs.filter(b=>!calc(b).completed);
+      let done=bs.filter(b=>calc(b).completed);
+      let totalAlive=bs.reduce((s,b)=>s+calc(b).alive,0);
+      let totalMort=bs.reduce((s,b)=>s+calc(b).mort,0);
+      let totalSold=bs.reduce((s,b)=>s+calc(b).sold,0);
+      let totalField=bs.reduce((s,b)=>s+(calc(b).fieldBirds||0),0);
+      let avgSR=bs.length?Math.round(bs.reduce((s,b)=>s+(+successRate(b)),0)/bs.length):0;
+      let avgHatch=bs.length?Math.round(bs.reduce((s,b)=>s+(+hatchRate(b)),0)/bs.length):0;
+      let srCol=avgSR>=90?'#16a34a':avgSR>=80?'#d97706':'#dc2626';
+      let fields=[...new Set(bs.map(b=>b.field).filter(Boolean))].join(' / ')||'—';
+      // تفاصيل الوجبات (accordion style - row per batch inside)
+      let batchDetails=bs.map(b=>{
+        let c=calc(b);
+        let sr=+successRate(b);
+        return `<tr style="background:#f8fafc;font-size:11px">
+          <td style="padding:4px 8px;padding-right:28px;color:var(--ink3)" colspan="2">↳ ${b.name} (${b.field||'—'})</td>
+          <td style="padding:4px 8px;color:var(--ink3)">${fmt(b.hatchDate)}</td>
+          <td style="padding:4px 8px"></td>
+          <td style="padding:4px 8px;color:var(--ink3)">${(c.fieldBirds||0).toLocaleString()}</td>
+          <td style="padding:4px 8px;color:#dc2626">${c.mort.toLocaleString()}</td>
+          <td style="padding:4px 8px;color:#16a34a">${c.alive.toLocaleString()}</td>
+          <td style="padding:4px 8px;color:#7c3aed">${c.sold.toLocaleString()}</td>
+          <td style="padding:4px 8px"></td>
+          <td style="padding:4px 8px;color:${sr>=90?'#16a34a':sr>=80?'#d97706':'#dc2626'};font-weight:700">${sr}%</td>
+          <td style="padding:4px 8px">${statusBadge(b)}</td>
+        </tr>`;
+      }).join('');
+      return `<tr style="border-top:2px solid var(--border);cursor:pointer" onclick="this.nextElementSibling&&(this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none')">
+        <td><b style="font-size:14px">${name}</b></td>
+        <td>${bs.length} وجبة</td>
+        <td>${fields}</td>
+        <td>${active.length} نشطة / ${done.length} منتهية</td>
+        <td>${totalField.toLocaleString()}</td>
+        <td style="color:#dc2626">${totalMort.toLocaleString()}</td>
+        <td style="color:#16a34a;font-weight:700">${totalAlive.toLocaleString()}</td>
+        <td style="color:#7c3aed">${totalSold.toLocaleString()}</td>
+        <td>${avgHatch}%</td>
+        <td style="color:${srCol};font-weight:800">${avgSR}%</td>
+        <td><span style="font-size:10px;color:var(--ink3)">▼ تفاصيل</span></td>
+      </tr>
+      <tbody style="display:none">${batchDetails}</tbody>`;
+    }).join('');
+    let personLabel=isSup?'المشرف':'الدكتور البيطري';
+    el.innerHTML=`<thead><tr>
+      <th>${personLabel}</th><th>عدد الوجبات</th><th>الحقول</th><th>الحالة</th>
+      <th>المنقول</th><th>الهلاك</th><th>الحي</th><th>المسوق</th>
+      <th>متوسط الفقس%</th><th>متوسط النجاح%</th><th></th>
+    </tr></thead><tbody>${rows||`<tr><td colspan="11" style="text-align:center;color:var(--ink3);padding:16px">لا توجد بيانات</td></tr>`}</tbody>`;
 
   }else if(type==='fields'){
     if(title)title.textContent='🏡 تقرير الحقول';
@@ -3901,6 +4670,489 @@ function archiveBatchDetails(b){
   <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="4">${t('secMort')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thCount')}</th><th>${t('thReason')}</th></tr></thead><tbody>${tr(mortRows,t('noMort'),4)}</tbody></table></div>
   <div class="tableWrap"><table><thead><tr><th colspan="5">${t('secMarket')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thCount')}</th><th>${t('thType')}</th><th>${t('thNote')}</th></tr></thead><tbody>${tr(marketRows,t('noSales'),5)}</tbody></table></div>`;
 }
+// ===== AI ANALYSIS =====
+function buildDailyGrowthCurve(b,transferW,eggW,wRecs){
+  let actualMap={};
+  wRecs.forEach(w=>{actualMap[+w.ageDays]=+w.actual_weight_grams;});
+  let day0W=transferW||(eggW?Math.round(eggW*0.68):0);
+  if(day0W&&actualMap[0]==null)actualMap[0]=day0W;
+  let sortedDays=Object.keys(actualMap).map(Number).sort((a,z)=>a-z);
+  let maxDay=Math.max(56,...(sortedDays.length?sortedDays:[0]));
+  let curve=[];
+  let prevGuide=0;
+  for(let d=0;d<=maxDay;d++){
+    let guide=Math.round(expectedWeightForBatch(b,d)*1000);
+    let actual=actualMap[d]!=null?actualMap[d]:null;
+    let projected=null;
+    if(sortedDays.length>0){
+      let before=null,after=null;
+      for(let i=0;i<sortedDays.length;i++){if(sortedDays[i]<=d)before=sortedDays[i];}
+      for(let i=0;i<sortedDays.length;i++){if(sortedDays[i]>d){after=sortedDays[i];break;}}
+      if(before!=null&&after!=null){
+        let span=after-before;let prog=(d-before)/span;
+        projected=Math.round(actualMap[before]+(actualMap[after]-actualMap[before])*prog);
+      }else if(before!=null){
+        let lastRatio=actualMap[before]/((Math.round(expectedWeightForBatch(b,before)*1000))||1);
+        projected=Math.round(guide*lastRatio);
+      }else if(after!=null){
+        let firstRatio=actualMap[after]/((Math.round(expectedWeightForBatch(b,after)*1000))||1);
+        projected=Math.round(guide*firstRatio);
+      }
+    }
+    let dailyGainGuide=guide-prevGuide;
+    let prevActual=d>0&&actualMap[d-1]!=null?actualMap[d-1]:null;
+    let dailyGainActual=actual!=null&&prevActual!=null?actual-prevActual:null;
+    prevGuide=guide;
+    curve.push({d,guide,actual,projected,dailyGainGuide,dailyGainActual});
+  }
+  return curve;
+}
+
+function renderAiAnalysis(){
+  let sel=$('aiaBatch');if(!sel)return;
+  let batches=(data.batches||[]).filter(b=>b.type!=='بياض');
+  let prevVal=sel.value;
+  sel.innerHTML='<option value="">-- اختر وجبة --</option>'+batches.map(b=>{let c=calc(b);return`<option value="${b.id}">${b.name} — ${b.hall||''} (يوم ${c.flockAge}${c.completed?' — منتهية':''})</option>`}).join('');
+  // استعادة الاختيار السابق
+  if(prevVal)sel.value=prevVal;
+  // استعادة مفتاح API
+  let k=localStorage.getItem('groqApiKey');if(k&&$('aiaApiKey')&&!$('aiaApiKey').value)$('aiaApiKey').value=k;
+  // تشغيل التحليل إذا كانت وجبة محددة
+  runAiAnalysis();
+}
+function onAiaBatchChange(){
+  let bId=$('aiaBatch')&&$('aiaBatch').value?+$('aiaBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(b){
+    if($('aiaEggWeight'))$('aiaEggWeight').value=b.eggWeight||'';
+    if($('aiaTransferWeight'))$('aiaTransferWeight').value=b.transferBirdWeight||'';
+  }
+  runAiAnalysis();
+}
+
+function _aiaComputeCore(b){
+  // ══ حسابات مشتركة بين runAiAnalysis و runGroqAnalysis ══
+  let eggW=+($('aiaEggWeight').value||0);
+  let transferW=+($('aiaTransferWeight').value||0)||+b.transferWeight||0;
+  let targetW=+($('aiaTargetWeight').value||2500);
+  let c=calc(b);
+  let age=c.flockAge;
+  let initBirds=c.fieldBirds||+b.initialBirds||+b.fieldBirds||1;
+  let wRecs=(data.weights||[]).filter(w=>w.batchId===b.id).sort((a,z)=>+a.ageDays-+z.ageDays);
+  let lastW=wRecs.length?wRecs[wRecs.length-1]:null;
+  let actualNow=lastW?+lastW.actual_weight_grams:0;
+  let ratios=wRecs.filter(w=>+w.guideWeightGrams>0).map(w=>+w.actual_weight_grams/+w.guideWeightGrams);
+  let avgRatio=ratios.length?ratios.reduce((s,r)=>s+r,0)/ratios.length:1;
+  let trend=0;
+  if(ratios.length>=2){let h=Math.ceil(ratios.length/2);let e=ratios.slice(0,h).reduce((s,r)=>s+r,0)/h;let l=ratios.slice(h).reduce((s,r)=>s+r,0)/(ratios.length-h||1);trend=l-e;}
+  let adgActual=0,adgGuide=0;
+  if(wRecs.length>=2){let first=wRecs[0],last=wRecs[wRecs.length-1];let dd=+last.ageDays-+first.ageDays||1;adgActual=Math.round((+last.actual_weight_grams-+first.actual_weight_grams)/dd);adgGuide=Math.round((+last.guideWeightGrams-+first.guideWeightGrams)/dd);}
+  let mortRecs=(data.morts||[]).filter(m=>m.batchId===b.id).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let totalDead=c.mort||mortRecs.reduce((s,m)=>s+(+m.count||0),0);
+  let mortPct=initBirds?(totalDead/initBirds*100).toFixed(2):0;
+  let mortPhases={early:0,mid:0,late:0};let mortByWeek={};let mortReasons={};
+  mortRecs.forEach(m=>{
+    let mAge=m.ageDays!=null?+m.ageDays:null;
+    if(mAge==null&&m.date&&b.startDate)mAge=Math.round((new Date(m.date)-new Date(b.startDate))/(864e5));
+    let cnt=+m.count||0;
+    if(mAge!=null){if(mAge<=7)mortPhases.early+=cnt;else if(mAge<=21)mortPhases.mid+=cnt;else mortPhases.late+=cnt;let wk=Math.floor(mAge/7);mortByWeek[wk]=(mortByWeek[wk]||0)+cnt;}
+    if(m.reason)mortReasons[m.reason]=(mortReasons[m.reason]||0)+(+m.count||0);
+  });
+  let worstMortWeek=Object.entries(mortByWeek).sort((a,z)=>z[1]-a[1])[0];
+  let topReason=Object.entries(mortReasons).sort((a,z)=>z[1]-a[1])[0];
+  let livability=((initBirds-totalDead)/initBirds*100).toFixed(1);
+  let dailyMortRate=(totalDead/(age||1)/initBirds*100).toFixed(3);
+  let feedRecs=(data.feeds||[]).filter(f=>f.batchId===b.id);
+  let totalFeedKg=feedRecs.reduce((s,f)=>s+(+f.qty||+f.amount||0),0);
+  let feedPerBirdDay=age&&c.alive?(totalFeedKg*1000/c.alive/age).toFixed(1):null;
+  let totalBirdKg=actualNow&&c.alive?(actualNow/1000*c.alive):0;
+  let fcrEst=totalFeedKg&&totalBirdKg?(totalFeedKg/totalBirdKg).toFixed(2):null;
+  let fcrBench=age<=21?1.35:age<=35?1.55:age<=42?1.70:1.85;
+  let epef=null;if(fcrEst&&actualNow&&age)epef=Math.round((+livability*(actualNow/1000)*100)/(age*+fcrEst));
+  let expectedChickW=eggW?Math.round(eggW*0.68):0;
+  let chickDiff=expectedChickW&&transferW?transferW-expectedChickW:0;
+  // نافذة التسويق
+  let marketWindows=[];
+  for(let d=Math.max(age,28);d<=70;d++){let g=Math.round(expectedWeightForBatch(b,d)*1000);let proj=Math.round(g*avgRatio);if(proj>=targetW&&!marketWindows.find(x=>x.label==='هدفك'))marketWindows.push({d,proj,label:'هدفك'});if(proj>=2000&&proj<2200&&!marketWindows.find(x=>x.label==='2كغ'))marketWindows.push({d,proj,label:'2كغ'});if(proj>=2500&&proj<2700&&!marketWindows.find(x=>x.label==='2.5كغ'))marketWindows.push({d,proj,label:'2.5كغ'});if(proj>=3000&&proj<3200&&!marketWindows.find(x=>x.label==='3كغ'))marketWindows.push({d,proj,label:'3كغ'});}
+  marketWindows=marketWindows.slice(0,4);
+  // مجموعات القاعات
+  let hallGroups={};
+  wRecs.forEach(w=>{let key=w.hallId||w.hall||'عام';let label=w.hall||(w.hallId?'قاعة '+w.hallId:'عام');if(!hallGroups[key])hallGroups[key]={label,recs:[]};hallGroups[key].recs.push(w);});
+  return{eggW,transferW,targetW,c,age,initBirds,wRecs,lastW,actualNow,ratios,avgRatio,trend,adgActual,adgGuide,mortRecs,totalDead,mortPct,mortPhases,mortByWeek,mortReasons,worstMortWeek,topReason,livability,dailyMortRate,feedRecs,totalFeedKg,feedPerBirdDay,totalBirdKg,fcrEst,fcrBench,epef,expectedChickW,chickDiff,marketWindows,hallGroups};
+}
+
+function runAiAnalysis(){
+  let el=$('aiaResults');if(!el)return;
+  let bId=$('aiaBatch')&&$('aiaBatch').value?+$('aiaBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){el.innerHTML='<div class="card" style="text-align:center;color:var(--ink3);padding:60px 20px"><span class="material-symbols-outlined" style="font-size:48px;color:var(--ink3);display:block;margin-bottom:12px">psychology</span><div style="font-size:15px">اختر وجبة لبدء التحليل الذكي</div></div>';return;}
+  try{
+  let _d=_aiaComputeCore(b);
+  let eggW=_d.eggW,transferW=_d.transferW,targetW=_d.targetW,c=_d.c,age=_d.age,initBirds=_d.initBirds;
+  let wRecs=_d.wRecs,lastW=_d.lastW,actualNow=_d.actualNow,avgRatio=_d.avgRatio,trend=_d.trend;
+  let adgActual=_d.adgActual,adgGuide=_d.adgGuide,totalDead=_d.totalDead,mortPct=_d.mortPct;
+  let mortPhases=_d.mortPhases,mortByWeek=_d.mortByWeek,topReason=_d.topReason,livability=_d.livability;
+  let feedPerBirdDay=_d.feedPerBirdDay,totalFeedKg=_d.totalFeedKg,fcrEst=_d.fcrEst,fcrBench=_d.fcrBench;
+  let epef=_d.epef,expectedChickW=_d.expectedChickW,chickDiff=_d.chickDiff,marketWindows=_d.marketWindows,hallGroups=_d.hallGroups;
+  // مؤشر الأداء
+  let scoreGrowth=Math.min(40,Math.max(0,Math.round(avgRatio*40)));
+  let scoreMort=Math.min(30,Math.max(0,Math.round((1-totalDead/initBirds)*30)));
+  let scoreFCR=fcrEst?Math.min(30,Math.max(0,Math.round((1-(+fcrEst-fcrBench)/fcrBench)*30))):15;
+  let totalScore=scoreGrowth+scoreMort+scoreFCR;
+  let scoreColor=totalScore>=85?'#16a34a':totalScore>=70?'#2563eb':totalScore>=55?'#d97706':'#dc2626';
+  let scoreLabel=totalScore>=85?'ممتاز':totalScore>=70?'جيد':totalScore>=55?'مقبول':'ضعيف';
+  let epefColor=epef?epef>=400?'#16a34a':epef>=300?'#2563eb':epef>=200?'#d97706':'#dc2626':'#6b7280';
+  let epefLabel=epef?epef>=400?'ممتاز':epef>=300?'جيد':epef>=200?'مقبول':'ضعيف':null;
+  // توصيات
+  let recs=[];
+  if(!wRecs.length)recs.push({icon:'info',c:'#6b7280',p:'high',t:'لا توجد سجلات وزن — أدخل وزناً واحداً على الأقل.'});
+  if(avgRatio<0.90)recs.push({icon:'crisis_alert',c:'#dc2626',p:'high',t:'الأوزان أقل من الكايد بأكثر من 10% — حالة حرجة. راجع التغذية فوراً وتحقق من الحرارة والتهوية.'});
+  else if(avgRatio<0.95)recs.push({icon:'warning',c:'#d97706',p:'high',t:'الأوزان أقل من الكايد بـ 5-10% — راجع نوع العلف وكثافة الطيور.'});
+  else if(avgRatio>1.08)recs.push({icon:'thumb_up',c:'#16a34a',p:'low',t:'أداء ممتاز — الأوزان تتجاوز الكايد. حافظ على نفس برنامج التغذية والإدارة.'});
+  if(trend<-0.05)recs.push({icon:'trending_down',c:'#dc2626',p:'high',t:'معدل النمو يتراجع — قد يكون سبب مرضي أو تراجع في العلف.'});
+  else if(trend>0.05)recs.push({icon:'trending_up',c:'#16a34a',p:'low',t:'معدل النمو في تصاعد مستمر — الوجبة تتحسن.'});
+  if(+mortPct>5)recs.push({icon:'crisis_alert',c:'#dc2626',p:'high',t:`نسبة الهلاك ${mortPct}% عالية جداً — تدخل عاجل.`});
+  else if(+mortPct>3)recs.push({icon:'warning',c:'#d97706',p:'high',t:`نسبة الهلاك ${mortPct}% أعلى من المعدل المقبول (3%).`});
+  if(mortPhases.early>initBirds*0.02)recs.push({icon:'warning',c:'#d97706',p:'high',t:`هلاك مبكر (0-7 أيام) ${mortPhases.early} طير — يشير إلى جودة كتاكيت أو ظروف استقبال.`});
+  if(topReason)recs.push({icon:'info',c:'#7c3aed',p:'mid',t:`أكثر أسباب الهلاك: "${topReason[0]}" (${topReason[1]} طير).`});
+  if(fcrEst&&+fcrEst>fcrBench+0.2)recs.push({icon:'warning',c:'#d97706',p:'mid',t:`FCR تقديري ${fcrEst} أعلى من المعيار (${fcrBench}).`});
+  if(chickDiff<-5)recs.push({icon:'info',c:'#7c3aed',p:'mid',t:`وزن الكتكوت عند النقل (${transferW}غم) أقل من المتوقع من البيضة (${expectedChickW}غم).`});
+  if(chickDiff>5)recs.push({icon:'thumb_up',c:'#16a34a',p:'low',t:`بداية قوية — وزن الكتكوت (${transferW}غم) أعلى من المتوقع من البيضة (${expectedChickW}غم).`});
+  if(epef&&epef<200)recs.push({icon:'crisis_alert',c:'#dc2626',p:'high',t:`EPEF ${epef} منخفض جداً — المعيار الجيد فوق 300.`});
+  recs.sort((a,z)=>({high:0,mid:1,low:2}[a.p]-{high:0,mid:1,low:2}[z.p]));
+  // هلاك أسبوعي
+  let mortWeekRows=Object.entries(mortByWeek).sort((a,z)=>+a[0]-+z[0]).map(([wk,cnt])=>{
+    let pct=(cnt/initBirds*100).toFixed(2);let bad=+pct>1;
+    return`<tr><td>الأسبوع ${+wk+1} (يوم ${+wk*7}–${+wk*7+6})</td><td style="color:${bad?'#dc2626':'inherit'};font-weight:${bad?700:400}">${cnt.toLocaleString()}</td><td style="color:${bad?'#dc2626':'inherit'}">${pct}%</td></tr>`;
+  }).join('');
+  // بناء القاعات
+  let hallKeys=Object.keys(hallGroups);
+  let hallCardsHtml='';
+  if(hallKeys.length){
+    let hallStats=hallKeys.map(k=>{
+      let hrs=hallGroups[k].recs.sort((a,z)=>+a.ageDays-+z.ageDays);
+      let rs=hrs.filter(w=>+w.guideWeightGrams>0).map(w=>+w.actual_weight_grams/+w.guideWeightGrams);
+      let avgR=rs.length?rs.reduce((s,r)=>s+r,0)/rs.length:1;
+      let tr=0;if(rs.length>=2){let h=Math.ceil(rs.length/2);let e=rs.slice(0,h).reduce((s,r)=>s+r,0)/h;let l=rs.slice(h).reduce((s,r)=>s+r,0)/(rs.length-h||1);tr=l-e;}
+      let curve=buildDailyGrowthCurve(b,transferW,eggW,hrs);
+      return{key:k,label:hallGroups[k].label,hrs,avgR,trend:tr,curve};
+    }).sort((a,z)=>a.avgR-z.avgR);
+    hallCardsHtml=hallStats.map(hs=>{
+      let pct=(hs.avgR*100).toFixed(1);
+      let pCol=hs.avgR>=1.05?'#16a34a':hs.avgR>=0.95?'#2563eb':hs.avgR>=0.88?'#d97706':'#dc2626';
+      let pLbl=hs.avgR>=1.05?'ممتاز':hs.avgR>=0.95?'جيد':hs.avgR>=0.88?'مقبول':'ضعيف';
+      let tTxt=hs.trend>0.03?'↑ تحسن':hs.trend<-0.03?'↓ انحدار':'← ثابت';
+      let tCol=hs.trend>0.03?'#16a34a':hs.trend<-0.03?'#dc2626':'#6b7280';
+      // نسبة التوقع من وزن النقل يوم 0 (أو متوسط القاعة إن لم يتوفر)
+      let day0Guide=Math.round(expectedWeightForBatch(b,0)*1000)||1;
+      let day0W=transferW||(eggW?Math.round(eggW*0.68):0);
+      let initRatio=day0W>0?(day0W/day0Guide):hs.avgR;
+      let tableRows=hs.hrs.map(w=>{
+        let guideAtDay=Math.round(expectedWeightForBatch(b,+w.ageDays)*1000);
+        let projW=guideAtDay?Math.round(guideAtDay*initRatio):null;
+        let actual=+w.actual_weight_grams;
+        let diff=projW&&projW>0?((actual/projW-1)*100).toFixed(1):null;
+        let dCol=diff!=null?(+diff>=0?'#16a34a':'#dc2626'):'';
+        let guideW=w.guideWeightGrams?(+w.guideWeightGrams):guideAtDay;
+        let vsGuide=guideW>0?((actual/guideW-1)*100).toFixed(1):null;
+        let vgCol=vsGuide!=null?(+vsGuide>=0?'#16a34a':'#dc2626'):'';
+        return`<tr>
+          <td style="font-weight:600">يوم ${w.ageDays}</td>
+          <td>${guideW?guideW.toLocaleString()+'غم':'—'}</td>
+          <td style="font-weight:700">${actual.toLocaleString()}غم <span style="font-size:11px;color:${vgCol}">(${vsGuide!=null?(+vsGuide>0?'+':'')+vsGuide+'%':'—'})</span></td>
+          <td style="color:#7c3aed;font-weight:700">${projW?projW.toLocaleString()+'غم':'—'}</td>
+          <td style="color:${dCol};font-weight:700">${diff!=null?(+diff>0?'+':'')+diff+'%':'—'}</td>
+        </tr>`}).join('');
+      let initBasis=day0W>0?`وزن النقل ${day0W}غم ÷ كايد يوم0 ${day0Guide}غم = ${(initRatio*100).toFixed(1)}%`:`متوسط أداء القاعة ${(initRatio*100).toFixed(1)}%`;
+      return`<div style="border:1px solid var(--border);border-right:4px solid ${pCol};border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <div style="font-weight:700;font-size:15px">${hs.label}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="background:${pCol}18;color:${pCol};border-radius:6px;padding:3px 10px;font-size:13px;font-weight:700">${pct}% — ${pLbl}</span>
+            <span style="background:${tCol}15;color:${tCol};border-radius:6px;padding:3px 10px;font-size:13px;font-weight:700">${tTxt}</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#7c3aed;margin-bottom:8px">📐 أساس التوقع: ${initBasis} · المتوقع = الكايد × النسبة</div>
+        <div class="tableWrap"><table class="tbl" style="font-size:13px">
+          <thead><tr><th>اليوم</th><th>الكايد</th><th>الفعلي (vs كايد)</th><th>المتوقع 📐</th><th>فعلي vs متوقع</th></tr></thead>
+          <tbody>${tableRows||'<tr><td colspan="5" style="text-align:center;color:var(--ink3)">لا يوجد بيانات</td></tr>'}</tbody>
+        </table></div>
+      </div>`;
+    }).join('');
+  }
+  el.innerHTML=`
+  <div class="statsGrid" style="margin-bottom:14px">
+    <div class="statCard" style="border-right:4px solid ${scoreColor}"><div class="statVal" style="color:${scoreColor}">${totalScore}/100</div><div class="statLbl">مؤشر الأداء — ${scoreLabel}</div></div>
+    ${epef!=null?`<div class="statCard" style="border-right:4px solid ${epefColor}"><div class="statVal" style="color:${epefColor}">${epef}</div><div class="statLbl">EPEF — ${epefLabel}</div></div>`:''}
+    <div class="statCard" style="border-right:4px solid #2563eb"><div class="statVal">${(avgRatio*100).toFixed(1)}%</div><div class="statLbl">تحقيق الكايد (${trend>0.03?'↑ تحسن':trend<-0.03?'↓ تراجع':'← ثابت'})</div></div>
+    <div class="statCard" style="border-right:4px solid ${+mortPct>3?'#dc2626':+mortPct>1.5?'#d97706':'#16a34a'}"><div class="statVal" style="color:${+mortPct>3?'#dc2626':+mortPct>1.5?'#d97706':'#16a34a'}">${mortPct}%</div><div class="statLbl">الهلاك — ${totalDead.toLocaleString()} طير</div></div>
+    <div class="statCard" style="border-right:4px solid #16a34a"><div class="statVal">${livability}%</div><div class="statLbl">الحيوية</div></div>
+    <div class="statCard" style="border-right:4px solid #0891b2"><div class="statVal">${fcrEst||'—'}</div><div class="statLbl">FCR (معيار: ${fcrBench})</div></div>
+    ${adgActual?`<div class="statCard" style="border-right:4px solid #7c3aed"><div class="statVal" style="color:${adgActual>=adgGuide*0.95?'#16a34a':'#d97706'}">${adgActual}غم/يوم</div><div class="statLbl">نمو يومي (كايد: ${adgGuide}غم)</div></div>`:''}
+    ${feedPerBirdDay?`<div class="statCard" style="border-right:4px solid #d97706"><div class="statVal">${feedPerBirdDay}غم</div><div class="statLbl">علف/طير/يوم</div></div>`:''}
+    ${eggW?`<div class="statCard" style="border-right:4px solid #7c3aed"><div class="statVal">${expectedChickW}غم</div><div class="statLbl">وزن كتكوت متوقع (بيضة ${eggW}غم) ${chickDiff>5?'✅':chickDiff<-5?'⚠️':''}</div></div>`:''}
+    <div class="statCard" style="border-right:4px solid #d97706"><div class="statVal">يوم ${age}</div><div class="statLbl">العمر — ${c.alive.toLocaleString()} حي</div></div>
+  </div>
+  ${marketWindows.length?`<div class="card" style="margin-bottom:14px">
+    <div class="cardTitle"><span class="material-symbols-outlined ct-icon">store</span> نوافذ التسويق المتوقعة</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:6px 0">
+      ${marketWindows.map(mw=>`<div style="background:var(--card2,#f3f4f6);border-radius:10px;padding:12px 20px;text-align:center;min-width:110px;border-top:3px solid #7c3aed"><div style="font-size:20px;font-weight:700;color:#7c3aed">يوم ${mw.d}</div><div style="font-size:14px;font-weight:700">${mw.proj.toLocaleString()}غم</div><div style="font-size:11px;color:var(--ink3)">${mw.label}</div></div>`).join('')}
+    </div>
+  </div>`:''}
+  ${hallCardsHtml?`<div class="card" style="margin-bottom:14px">
+    <div class="cardTitle"><span class="material-symbols-outlined ct-icon">home_work</span> تحليل الأداء لكل قاعة</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">مرتبة من الأضعف للأقوى · المتوقع 📐 = نسبة الأداء الفعلية × كايد Ross 308</div>
+    ${hallCardsHtml}
+  </div>`:''}
+  <div class="card" style="margin-bottom:14px">
+    <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> تحليل الهلاك</div>
+    ${_d.mortRecs.length?`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:100px;background:var(--card2,#f3f4f6);border-radius:8px;padding:10px;text-align:center"><div style="font-size:17px;font-weight:700;color:${mortPhases.early>initBirds*0.02?'#dc2626':'#d97706'}">${mortPhases.early}</div><div style="font-size:11px;color:var(--ink3)">مبكر (0-7)</div></div>
+      <div style="flex:1;min-width:100px;background:var(--card2,#f3f4f6);border-radius:8px;padding:10px;text-align:center"><div style="font-size:17px;font-weight:700;color:#d97706">${mortPhases.mid}</div><div style="font-size:11px;color:var(--ink3)">متوسط (8-21)</div></div>
+      <div style="flex:1;min-width:100px;background:var(--card2,#f3f4f6);border-radius:8px;padding:10px;text-align:center"><div style="font-size:17px;font-weight:700;color:${mortPhases.late>mortPhases.early?'#dc2626':'#d97706'}">${mortPhases.late}</div><div style="font-size:11px;color:var(--ink3)">متأخر (>21)</div></div>
+      <div style="flex:1;min-width:100px;background:var(--card2,#f3f4f6);border-radius:8px;padding:10px;text-align:center"><div style="font-size:17px;font-weight:700;color:#6b7280">${_d.dailyMortRate}%</div><div style="font-size:11px;color:var(--ink3)">يومي متوسط</div></div>
+    </div>${_d.worstMortWeek?`<div style="font-size:13px;margin-bottom:6px">⚠️ أعلى أسبوع: <strong>الأسبوع ${+_d.worstMortWeek[0]+1}</strong> (${_d.worstMortWeek[1].toLocaleString()} طير)</div>`:''}${topReason?`<div style="font-size:13px;margin-bottom:8px">السبب الأكثر: <strong>${topReason[0]}</strong> (${topReason[1]} طير)</div>`:''}${mortWeekRows?`<div class="tableWrap"><table class="tbl"><thead><tr><th>الفترة</th><th>الهلاك</th><th>النسبة</th></tr></thead><tbody>${mortWeekRows}</tbody></table></div>`:''}`:`<p style="color:var(--ink3);font-size:13px">لا توجد سجلات هلاك.</p>`}
+  </div>
+  ${recs.length?`<div class="card">
+    <div class="cardTitle"><span class="material-symbols-outlined ct-icon">lightbulb</span> التوصيات والمؤشرات (تحليل رياضي)</div>
+    ${recs.map((r,i)=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${i<recs.length-1?'border-bottom:1px solid var(--border)':''}"><span class="material-symbols-outlined" style="color:${r.c};font-size:22px;flex-shrink:0;margin-top:1px">${r.icon}</span><div><span style="display:inline-block;background:${r.p==='high'?'#fee2e2':r.p==='mid'?'#fef3c7':'#dcfce7'};color:${r.p==='high'?'#dc2626':r.p==='mid'?'#d97706':'#16a34a'};border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;margin-bottom:4px">${r.p==='high'?'عاجل':r.p==='mid'?'مهم':'معلومة'}</span><div style="font-size:13px;line-height:1.7">${r.t}</div></div></div>`).join('')}
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center">
+      <button onclick="runGroqAnalysis()" style="background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:0;border-radius:9px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🤖 احصل على تحليل أعمق بالذكاء الاصطناعي</button>
+    </div>
+  </div>`:''}`;
+  }catch(err){el.innerHTML=`<div class="card" style="border-right:4px solid #dc2626;color:#dc2626;padding:14px;font-family:monospace;font-size:13px">خطأ في التحليل: ${err.message}<br><small>${err.stack||''}</small></div>`;}
+}
+
+async function runGroqAnalysis(){
+  let bId=$('aiaBatch')&&$('aiaBatch').value?+$('aiaBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b){alert('اختر وجبة أولاً');return;}
+  let apiKey=($('aiaApiKey').value||'').trim()||localStorage.getItem('groqApiKey')||'';
+  if(!apiKey){alert('أدخل Groq API Key — من console.groq.com مجاناً');return;}
+  localStorage.setItem('groqApiKey',apiKey);
+  if($('aiaApiKey'))$('aiaApiKey').value=apiKey;
+  let _d=_aiaComputeCore(b);
+  let eggW=_d.eggW,transferW=_d.transferW,targetW=_d.targetW,c=_d.c,age=_d.age,initBirds=_d.initBirds;
+  let wRecs=_d.wRecs,avgRatio=_d.avgRatio,trend=_d.trend,totalDead=_d.totalDead,mortPct=_d.mortPct;
+  let mortPhases=_d.mortPhases,mortReasons=_d.mortReasons,livability=_d.livability;
+  let totalFeedKg=_d.totalFeedKg,fcrEst=_d.fcrEst,fcrBench=_d.fcrBench,epef=_d.epef;
+  let expectedChickW=_d.expectedChickW,chickDiff=_d.chickDiff,hallGroups=_d.hallGroups;
+  let curve=buildDailyGrowthCurve(b,transferW,eggW,wRecs);
+  let growthLines=curve.filter(p=>p.actual!=null||p.d%7===0).map(p=>{
+    let s=`يوم${p.d}: كايد=${p.guide}غم`;
+    if(p.actual!=null)s+=` | فعلي=${p.actual}غم (${p.guide?((p.actual/p.guide-1)*100).toFixed(1):0}%)`;
+    else if(p.projected)s+=` | متوقع=${p.projected}غم`;
+    return s;
+  }).join('\n');
+  let marketDay=targetW>=3000?49:targetW>=2500?42:35;
+  let hallsSummary=Object.values(hallGroups).map(hg=>{
+    let hrs=hg.recs.sort((a,z)=>+a.ageDays-+z.ageDays);
+    let rs=hrs.filter(w=>+w.guideWeightGrams>0).map(w=>+w.actual_weight_grams/+w.guideWeightGrams);
+    let avgR=rs.length?rs.reduce((s,r)=>s+r,0)/rs.length:null;
+    let tr=0;if(rs.length>=2){let h=Math.ceil(rs.length/2);let e=rs.slice(0,h).reduce((s,r)=>s+r,0)/h;let l=rs.slice(h).reduce((s,r)=>s+r,0)/(rs.length-h||1);tr=l-e;}
+    let lastRec=hrs[hrs.length-1];
+    let hCurve=buildDailyGrowthCurve(b,transferW,eggW,hrs);
+    let projMkt=hCurve.find(p=>p.d===marketDay);
+    return`القاعة "${hg.label}": تحقيق=${avgR?(avgR*100).toFixed(1)+'%':'—'} ترند=${tr>0.03?'تحسن':tr<-0.03?'تراجع':'ثابت'} آخر=${lastRec?lastRec.actual_weight_grams+'غم يوم'+lastRec.ageDays:'—'} متوقع_يوم${marketDay}=${projMkt?.projected||'—'}غم`;
+  }).join('\n');
+  let guideCP=[7,14,21,28,35,42,49].map(dd=>{
+    let g=Math.round(expectedWeightForBatch(b,dd)*1000);
+    let cl=wRecs.filter(w=>Math.abs(+w.ageDays-dd)<=2).sort((a,z)=>Math.abs(+a.ageDays-dd)-Math.abs(+z.ageDays-dd))[0];
+    return`يوم${dd}: كايد=${g}غم فعلي=${cl?cl.actual_weight_grams+'غم ('+(((cl.actual_weight_grams/g-1)*100).toFixed(1))+'%)':'لم يسجل'}`;
+  }).join(' | ');
+  let statusEl=$('aiaClaudeStatus'),resultEl=$('aiaClaudeResult');
+  statusEl.innerHTML='<span style="color:#7c3aed;animation:pulse 1.5s infinite">⏳ يحلل الذكاء الاصطناعي بياناتك...</span>';
+  resultEl.innerHTML='';
+  // نسبة جودة الكتكوت من البيضة
+  let strain=b.birdStrain||'Ross 308';
+  let chickQualityRatio=expectedChickW&&transferW?(transferW/expectedChickW):null;
+  let chickQualityPct=chickQualityRatio?(chickQualityRatio*100).toFixed(1):null;
+  // آخر وزن فعلي مسجل
+  let lastActual=wRecs.length?wRecs[wRecs.length-1]:null;
+  let lastActualW=lastActual?+lastActual.actual_weight_grams:null;
+  let lastActualDay=lastActual?+lastActual.ageDays:null;
+  // نقاط الكايد المرجعية للفصيل
+  let strainGuidePoints=[1,7,14,21,28,35,42,49,56].map(dd=>{
+    let g=Math.round(expectedWeightForBatch(b,dd)*1000);
+    return`يوم${dd}=${g}غم`;
+  }).join(', ');
+  // التوقع الرياضي لكل نقطة فحص (نسبة الأداء الحالية × الكايد)
+  let mathForecast=[7,14,21,28,35,42,49].map(dd=>{
+    let g=Math.round(expectedWeightForBatch(b,dd)*1000);
+    let cl=wRecs.filter(w=>Math.abs(+w.ageDays-dd)<=2).sort((a,z)=>Math.abs(+a.ageDays-dd)-Math.abs(+z.ageDays-dd))[0];
+    let actual=cl?+cl.actual_weight_grams:null;
+    let math=Math.round(g*avgRatio);
+    return`يوم${dd}: كايد=${g}غم | فعلي=${actual!=null?actual+'غم ('+(((actual/g-1)*100).toFixed(1))+'%)':'لم_يسجل'} | رياضي=${math}غم`;
+  }).join('\n');
+
+  let prompt=`أنت خبير في علم وراثة وإنتاج الدواجن متخصص في أمراض وأداء الدجاج اللاحم.
+
+══ معلومات الفصيل ══
+الفصيل: ${strain}
+${strain.includes('308')||strain.toLowerCase().includes('ross')?`Ross 308: فصيل سريع النمو، مؤشر أداء اقتصادي مرتفع، يحتاج تغذية دقيقة، حساس للحرارة والتهوية.
+نقاط الكايد القياسية لهذا الفصيل: ${strainGuidePoints}`:
+strain.toLowerCase().includes('cobb')?`Cobb 500: فصيل ذو كفاءة غذائية عالية، أقل حساسية للحرارة من Ross 308، يصل 2.5كغ بعمر 38-40 يوم.
+نقاط الكايد القياسية: ${strainGuidePoints}`:
+`فصيل: ${strain}. نقاط الكايد المستخدمة: ${strainGuidePoints}`}
+
+══ تحليل جودة البداية (الأساس البيولوجي) ══
+• وزن البيضة المرقدة: ${eggW||'غير محدد'}غم
+• وزن الكتكوت المتوقع بيولوجياً: البيضة × 0.68 = ${expectedChickW||'؟'}غم
+• وزن الطير الفعلي عند النقل (اليوم 0): ${transferW||'غير محدد'}غم
+• نسبة جودة الكتكوت: ${chickQualityPct||'؟'}% من المتوقع
+• التفسير: ${!chickQualityRatio?'بيانات غير كاملة':chickQualityRatio>=1.08?'جودة استثنائية — كتاكيت فوق المعدل بفارق واضح، ظروف تفريخ ممتازة':chickQualityRatio>=1.02?'جودة جيدة — الكتاكيت بدأت بتفوق خفيف على المتوقع':chickQualityRatio>=0.96?'جودة طبيعية — الكتاكيت ضمن النطاق المقبول':chickQualityRatio>=0.90?'جودة منخفضة — الكتاكيت أخف من المتوقع، راجع ظروف التفريخ':'جودة ضعيفة — فجوة كبيرة بين وزن البيضة والكتكوت، مشكلة تفريخية محتملة'}
+• IMPORTANT: وزن النقل ${transferW||'؟'}غم هو نقطة الانطلاق الحقيقية للتوقع — كل توقع للأوزان يجب أن يُبنى على هذا الرقم وليس على كايد الفصيل المجرد.
+
+══ أداء الوجبة الحالي ══
+الوجبة: "${b.name}" | العمر: ${age} يوم | الطيور: ${initBirds} مُسكّنة | حية: ${c.alive} | نافقة: ${totalDead} (${mortPct}%)
+الحيوية: ${livability}% | متوسط تحقيق الكايد: ${avgRatio?(avgRatio*100).toFixed(1)+'%':'غير محدد'} | الترند: ${trend>0.03?'↑ تحسن':trend<-0.03?'↓ تراجع':'← ثابت'}
+آخر وزن مسجل: ${lastActualW?lastActualW+'غم في يوم '+lastActualDay:'لا يوجد'}
+FCR تقديري: ${fcrEst||'؟'} (معيار العمر ${age}يوم: ${fcrBench}) | EPEF: ${epef||'؟'} | علف/طير/يوم: ${_d.feedPerBirdDay||'؟'}غم
+الهلاك: مبكر(0-7)=${mortPhases.early} متوسط(8-21)=${mortPhases.mid} متأخر(>21)=${mortPhases.late}
+${Object.keys(mortReasons||{}).length?'أسباب الهلاك: '+Object.entries(mortReasons).map(([r,n])=>`${r}:${n}`).join(', '):''}
+
+══ منحنى النمو (الكايد مقابل الفعلي) ══
+${growthLines||'لا توجد سجلات أوزان'}
+
+══ التوقعات الرياضية (نسبة الأداء الحالية × الكايد) لمقارنة توقعاتك بها ══
+${mathForecast}
+
+══ بيانات القاعات ══
+${hallsSummary||'لا يوجد تفريق بالقاعات'}
+
+══ الهدف: ${targetW}غم في يوم ${marketDay} ══
+
+IMPORTANT INSTRUCTIONS — READ CAREFULLY:
+1. ai_predicted_g must be calculated step by step:
+   STEP A: Start from actual transfer weight (day 0) = ${transferW||expectedChickW||42}g
+   STEP B: Apply the strain's daily growth rate for ${strain}
+   STEP C: Adjust using chick_quality_ratio = ${chickQualityPct||100}% (if >100%, birds grow faster; if <100%, slower)
+   STEP D: If actual weights exist, use them as anchors and extrapolate from the LAST actual weight recorded
+   STEP E: Apply current performance trend (${trend>0.03?'improving +3%':trend<-0.03?'declining -3%':'stable'})
+2. Each entry MUST have a "basis" field — a short Arabic formula showing EXACTLY how you got the number.
+   Example basis: "وزن النقل ${transferW}غم × نمو يومي Ross 308 × نسبة جودة ${chickQualityPct}%"
+   Example basis: "بناءً على الوزن الفعلي يوم ${lastActualDay||'؟'} (${lastActualW||'؟'}غم) + معدل النمو اليومي للفصيل"
+3. NEVER return ai_predicted_g=0 — calculate a real number using the steps above.
+4. The "note" field should explain the biological/performance reasoning (why more/less than guide).
+5. All recommendations must be strain-specific and data-driven.
+
+Return ONLY this JSON (all Arabic text):
+{
+  "diagnosis":{"level":"ممتاز|جيد|مقبول|ضعيف","score":85,"title":"عنوان وصفي","summary":"ملخص دقيق يذكر الفصيل وجودة البداية والأداء الحالي"},
+  "chick_start":{"quality":"ممتاز|جيد|ضعيف","chick_quality_pct":"${chickQualityPct||'؟'}%","impact":"تأثير جودة الكتكوت على المسار المتوقع للوجبة","comment":"تقييم مفصل يربط وزن البيضة بوزن النقل وخصائص الفصيل"},
+  "weight_forecast":[
+    {"day":7,"guide_g":${Math.round(expectedWeightForBatch(b,7)*1000)},"ai_predicted_g":185,"basis":"المعادلة المستخدمة بالتفصيل","confidence":"عالية|متوسطة|منخفضة","note":"السبب البيولوجي"},
+    {"day":14,"guide_g":${Math.round(expectedWeightForBatch(b,14)*1000)},"ai_predicted_g":420,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""},
+    {"day":21,"guide_g":${Math.round(expectedWeightForBatch(b,21)*1000)},"ai_predicted_g":790,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""},
+    {"day":28,"guide_g":${Math.round(expectedWeightForBatch(b,28)*1000)},"ai_predicted_g":1260,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""},
+    {"day":35,"guide_g":${Math.round(expectedWeightForBatch(b,35)*1000)},"ai_predicted_g":1880,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""},
+    {"day":42,"guide_g":${Math.round(expectedWeightForBatch(b,42)*1000)},"ai_predicted_g":2600,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""},
+    {"day":49,"guide_g":${Math.round(expectedWeightForBatch(b,49)*1000)},"ai_predicted_g":3100,"basis":"","confidence":"عالية|متوسطة|منخفضة","note":""}
+  ],
+  "market":{"optimal_day":${marketDay},"predicted_weight_g":0,"vs_target_g":0,"recommendation":"توصية تسويق مخصصة للفصيل والأداء الحالي","confidence":"عالية|متوسطة|منخفضة"},
+  "urgency_alerts":[{"level":"critical|warning|info","title":"عنوان","action":"إجراء محدد وعملي"}],
+  "strengths":["نقطة قوة محددة 1","نقطة قوة 2"],
+  "risks":[{"title":"خطر محدد","severity":"عالي|متوسط|منخفض","prevention":"إجراء وقائي عملي"}],
+  "feed_strategy":{"status":"مناسب|يحتاج زيادة|يحتاج تقليل","target_g_per_bird_day":0,"detail":"توصية تغذية مخصصة للفصيل وعمر الطيور الحالي"},
+  "halls":[{"name":"اسم القاعة","achievement_pct":0,"trend":"تحسن|ثابت|تراجع","status":"ممتاز|جيد|مقبول|ضعيف","key_issue":"مشكلة محددة أو null","immediate_action":"إجراء فوري مخصص للقاعة"}]
+}`;
+  try{
+    let res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:2500,temperature:0.15,response_format:{type:'json_object'},messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok){let e=await res.json();throw new Error(e.error?.message||res.statusText);}
+    let json=await res.json();
+    let ai=JSON.parse(json.choices?.[0]?.message?.content||'{}');
+    statusEl.innerHTML='<span style="color:#16a34a">✅ اكتمل التحليل</span>';
+    let dCol=ai.diagnosis?.level==='ممتاز'?'#16a34a':ai.diagnosis?.level==='جيد'?'#2563eb':ai.diagnosis?.level==='مقبول'?'#d97706':'#dc2626';
+    let sCol=s=>s==='عالي'||s==='critical'?'#dc2626':s==='متوسط'||s==='warning'?'#d97706':'#16a34a';
+    let sBg=s=>s==='عالي'||s==='critical'?'#fee2e2':s==='متوسط'||s==='warning'?'#fef3c7':'#dcfce7';
+    let confIcon=cf=>cf==='عالية'?'🟢':cf==='متوسطة'?'🟡':'🔴';
+    // جدول توقعات الأوزان
+    let forecastRows=(ai.weight_forecast||[]).map(fp=>{
+      let mathProj=Math.round((fp.guide_g||0)*avgRatio);
+      let aiW=fp.ai_predicted_g||0;
+      let vsGuide=fp.guide_g&&aiW?((aiW/fp.guide_g-1)*100).toFixed(1):null;
+      let isPast=fp.day<=age;
+      let cl=wRecs.filter(w=>Math.abs(+w.ageDays-fp.day)<=2).sort((a,z)=>Math.abs(+a.ageDays-fp.day)-Math.abs(+z.ageDays-fp.day))[0];
+      let actualW=cl?+cl.actual_weight_grams:null;
+      let aiCol=vsGuide!=null?(+vsGuide>=0?'#16a34a':'#dc2626'):'';
+      return`<tr style="${isPast&&!actualW?'opacity:.5':''}">
+        <td style="font-weight:700;color:${isPast?'var(--ink1)':'#7c3aed'}">${isPast?'':'📍'} يوم ${fp.day}</td>
+        <td>${(fp.guide_g||0).toLocaleString()}غم</td>
+        <td style="color:${actualW?(actualW>=fp.guide_g?'#16a34a':'#dc2626'):'#9ca3af'};font-weight:${actualW?700:400}">${actualW?actualW.toLocaleString()+'غم':'—'}</td>
+        <td style="color:#9ca3af">${mathProj.toLocaleString()}غم</td>
+        <td style="color:${aiCol};font-weight:700">${aiW?aiW.toLocaleString()+'غم':'—'}</td>
+        <td>${confIcon(fp.confidence)} <span style="color:${aiCol}">${vsGuide!=null?(+vsGuide>0?'+':'')+vsGuide+'%':'—'}</span></td>
+        <td style="font-size:11px;color:var(--ink3);min-width:140px">
+          ${fp.basis?`<div style="color:#7c3aed;font-weight:600;margin-bottom:2px">📐 ${fp.basis}</div>`:''}
+          ${fp.note?`<div style="color:var(--ink3)">${fp.note}</div>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+    // تنبيهات
+    let alertsHtml=(ai.urgency_alerts||[]).map(a=>`<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 12px;background:${sBg(a.level)};border-radius:8px;border-right:4px solid ${sCol(a.level)};margin-bottom:8px"><span class="material-symbols-outlined" style="color:${sCol(a.level)};font-size:20px;flex-shrink:0;margin-top:1px">${a.level==='critical'?'crisis_alert':a.level==='warning'?'warning':'info'}</span><div><div style="font-weight:700;font-size:13px;color:${sCol(a.level)};margin-bottom:3px">${a.title}</div><div style="font-size:12px;color:var(--ink2)">${a.action}</div></div></div>`).join('');
+    // قاعات
+    let hallsHtml=(ai.halls||[]).map(h=>{
+      let hCol=h.status==='ممتاز'?'#16a34a':h.status==='جيد'?'#2563eb':h.status==='مقبول'?'#d97706':'#dc2626';
+      let tCol=h.trend==='تحسن'?'#16a34a':h.trend==='تراجع'?'#dc2626':'#6b7280';
+      return`<div style="border:1px solid ${hCol}30;border-right:4px solid ${hCol};border-radius:8px;padding:12px;background:${hCol}06"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px"><div style="font-weight:700">${h.name}</div><div style="display:flex;gap:6px"><span style="background:${hCol}18;color:${hCol};border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700">${h.achievement_pct}% — ${h.status}</span><span style="background:${tCol}15;color:${tCol};border-radius:5px;padding:2px 7px;font-size:12px;font-weight:600">${h.trend==='تحسن'?'↑':h.trend==='تراجع'?'↓':'→'} ${h.trend}</span></div></div>${h.key_issue?`<div style="font-size:12px;color:#dc2626;margin-bottom:6px">⚠️ ${h.key_issue}</div>`:''}${h.immediate_action?`<div style="font-size:12px;background:var(--card2,#f3f4f6);border-radius:6px;padding:6px 10px;color:var(--ink2)">💡 ${h.immediate_action}</div>`:''}</div>`;
+    }).join('');
+    resultEl.innerHTML=`
+    <div class="card" style="margin-bottom:14px;border-top:3px solid #7c3aed">
+      <div class="cardTitle" style="margin-bottom:14px"><span class="material-symbols-outlined ct-icon" style="color:#7c3aed">psychology</span> <span style="background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800">تحليل الذكاء الاصطناعي</span> <span style="font-size:11px;color:var(--ink3);font-weight:400;margin-right:8px">Groq / Llama 3.3 70B</span></div>
+      <!-- التشخيص -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+        <div style="min-width:160px;background:${dCol}12;border:2px solid ${dCol};border-radius:12px;padding:16px;text-align:center;flex-shrink:0">
+          <div style="font-size:32px;font-weight:900;color:${dCol}">${ai.diagnosis?.level||'—'}</div>
+          <div style="font-size:24px;font-weight:800;color:${dCol};margin:4px 0">${ai.diagnosis?.score!=null?ai.diagnosis.score+'/100':''}</div>
+          <div style="font-size:12px;color:var(--ink2);margin-top:6px;line-height:1.5">${ai.diagnosis?.title||''}</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;line-height:1.8;color:var(--ink2);background:var(--card2,#f3f4f6);border-radius:10px;padding:14px;margin-bottom:8px">${ai.diagnosis?.summary||''}</div>
+          ${ai.chick_start?`<div style="background:var(--card2,#f3f4f6);border-radius:10px;padding:10px 14px"><div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:4px">🥚 تقييم جودة البداية</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="background:${ai.chick_start.quality==='ممتاز'?'#dcfce7':ai.chick_start.quality==='جيد'?'#dbeafe':'#fef3c7'};color:${ai.chick_start.quality==='ممتاز'?'#16a34a':ai.chick_start.quality==='جيد'?'#2563eb':'#d97706'};border-radius:5px;padding:2px 9px;font-size:12px;font-weight:700">${ai.chick_start.quality}</span><span style="font-size:12px;color:var(--ink2)">${ai.chick_start.comment||''}</span></div></div>`:''}
+        </div>
+      </div>
+      <!-- جدول توقعات الأوزان -->
+      ${forecastRows?`<div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:6px">📊 جدول توقعات الأوزان — AI vs الكايد</div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">📍 أيام مستقبلية &nbsp;|&nbsp; 🟢 ثقة عالية 🟡 متوسطة 🔴 منخفضة &nbsp;|&nbsp; الرياضي = نسبة الأداء × الكايد &nbsp;|&nbsp; 📐 = المعادلة التي استخدمها الذكاء</div>
+        <div class="tableWrap"><table class="tbl" style="font-size:12px">
+          <thead><tr><th>اليوم</th><th>كايد ${strain}</th><th>الفعلي</th><th>الرياضي 📐</th><th>توقع AI 🤖</th><th>ثقة / فرق</th><th>📐 المعادلة + السبب</th></tr></thead>
+          <tbody>${forecastRows}</tbody>
+        </table></div>
+      </div>`:''}
+      <!-- توقع التسويق -->
+      ${ai.market?`<div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px">🏪 توصية التسويق</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <div style="flex:1;min-width:110px;background:var(--card2,#f3f4f6);border-radius:8px;padding:12px;text-align:center;border-top:3px solid #7c3aed"><div style="font-size:11px;color:var(--ink3);margin-bottom:4px">أفضل يوم تسويق</div><div style="font-size:24px;font-weight:800;color:#7c3aed">يوم ${ai.market.optimal_day||marketDay}</div><div style="font-size:11px;color:var(--ink3);margin-top:3px">ثقة: ${ai.market.confidence}</div></div>
+          <div style="flex:1;min-width:110px;background:var(--card2,#f3f4f6);border-radius:8px;padding:12px;text-align:center;border-top:3px solid #2563eb"><div style="font-size:11px;color:var(--ink3);margin-bottom:4px">الوزن المتوقع</div><div style="font-size:24px;font-weight:800;color:#2563eb">${(ai.market.predicted_weight_g||0).toLocaleString()}<span style="font-size:14px">غم</span></div></div>
+          <div style="flex:1;min-width:110px;background:var(--card2,#f3f4f6);border-radius:8px;padding:12px;text-align:center;border-top:3px solid ${(ai.market.vs_target_g||0)>=0?'#16a34a':'#dc2626'}"><div style="font-size:11px;color:var(--ink3);margin-bottom:4px">فرق عن الهدف (${targetW}غم)</div><div style="font-size:24px;font-weight:800;color:${(ai.market.vs_target_g||0)>=0?'#16a34a':'#dc2626'}">${(ai.market.vs_target_g||0)>0?'+':''}${ai.market.vs_target_g||0}غم</div></div>
+        </div>
+        <div style="font-size:13px;background:var(--card2,#f3f4f6);border-radius:8px;padding:10px 14px;color:var(--ink2)">💬 ${ai.market.recommendation||''}</div>
+      </div>`:''}
+      <!-- تنبيهات -->
+      ${alertsHtml?`<div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)"><div style="font-weight:700;font-size:14px;margin-bottom:10px">⚡ تنبيهات فورية</div>${alertsHtml}</div>`:''}
+      <!-- نقاط القوة والمخاطر -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)">
+        ${ai.strengths?.length?`<div><div style="font-weight:700;font-size:13px;color:#16a34a;margin-bottom:8px">✅ نقاط القوة</div>${ai.strengths.map(s=>`<div style="font-size:12px;color:var(--ink2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:6px"><span style="color:#16a34a;flex-shrink:0">●</span>${s}</div>`).join('')}</div>`:''}
+        ${ai.risks?.length?`<div><div style="font-weight:700;font-size:13px;color:#dc2626;margin-bottom:8px">⚠️ مخاطر محتملة</div>${ai.risks.map(r=>`<div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;gap:6px"><span style="color:var(--ink2)">${r.title}</span><span style="background:${sBg(r.severity)};color:${sCol(r.severity)};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;white-space:nowrap">${r.severity}</span></div>${r.prevention?`<div style="font-size:11px;color:var(--ink3);margin-top:3px">🛡️ ${r.prevention}</div>`:''}</div>`).join('')}</div>`:''}
+      </div>
+      <!-- العلف -->
+      ${ai.feed_strategy?`<div style="margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border)"><div style="font-weight:700;font-size:14px;margin-bottom:8px">🌾 استراتيجية التغذية</div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="background:var(--card2,#f3f4f6);border-radius:8px;padding:10px 16px;display:flex;align-items:center;gap:10px"><span style="background:${ai.feed_strategy.status==='مناسب'?'#dcfce7':ai.feed_strategy.status==='يحتاج زيادة'?'#fef3c7':'#fee2e2'};color:${ai.feed_strategy.status==='مناسب'?'#16a34a':ai.feed_strategy.status==='يحتاج زيادة'?'#d97706':'#dc2626'};border-radius:6px;padding:4px 12px;font-size:13px;font-weight:700">${ai.feed_strategy.status}</span>${ai.feed_strategy.target_g_per_bird_day?`<span style="font-size:13px;color:var(--ink2)">الهدف: <strong>${ai.feed_strategy.target_g_per_bird_day}غم/طير/يوم</strong></span>`:''}</div><div style="flex:1;min-width:200px;font-size:13px;color:var(--ink2);background:var(--card2,#f3f4f6);border-radius:8px;padding:10px 14px">${ai.feed_strategy.detail||''}</div></div></div>`:''}
+      <!-- قاعات AI -->
+      ${hallsHtml?`<div><div style="font-weight:700;font-size:14px;margin-bottom:10px">🏠 تحليل القاعات — رأي الذكاء الاصطناعي</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">${hallsHtml}</div></div>`:''}
+    </div>`;
+  }catch(e){
+    statusEl.textContent='';
+    resultEl.innerHTML=`<div class="card" style="border-right:4px solid #dc2626;color:#dc2626;padding:14px">خطأ: ${e.message}</div>`;
+  }
+}
+// ===== END AI ANALYSIS =====
+
+
 function renderArchive(){
   let el=$('archiveTable');if(!el)return;
   let q=($('archiveSearch')&&$('archiveSearch').value||'').trim().toLowerCase();
