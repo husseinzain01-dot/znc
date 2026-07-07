@@ -1062,6 +1062,29 @@ tbody tr:active td{background:#ccfbf1}
         </div>
         <p style="font-size:12px;color:var(--ink3);margin-top:14px">البيانات محفوظة في المتصفح. خذ نسخة احتياطية قبل مسح بيانات المتصفح.</p>
       </div>
+
+      <!-- تصحيح تاريخ الدخول وإعادة حساب الأعمار -->
+      <div class="card" style="border-top:3px solid #f59e0b">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">event_repeat</span> تصحيح تاريخ دخول الوجبة وإعادة حساب الأعمار</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">إذا أدخلت تاريخ دخول خاطئ، صحّح التاريخ هنا ثم اضغط "إعادة حساب" لتحديث عمر الطير في جميع سجلات الوجبة (أعلاف، أدوية، هلاك، أوزان، وكايد الأوزان).</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label>
+            <select id="fixBatch" onchange="onFixBatchChange()">
+              <option value="">-- اختر الوجبة --</option>
+            </select>
+          </div>
+          <div class="formGroup"><label>تاريخ الدخول الحالي</label>
+            <input id="fixCurrentDate" readonly style="background:var(--card2);color:var(--ink3)">
+          </div>
+          <div class="formGroup"><label>تاريخ الدخول الصحيح</label>
+            <input id="fixNewDate" type="date">
+          </div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="applyFixEntryDate()">🔄 تصحيح التاريخ وإعادة حساب الأعمار</button>
+        </div>
+        <div id="fixResult" style="margin-top:12px;font-size:13px;color:#16a34a;font-weight:600"></div>
+      </div>
     </section>
 
   </main>
@@ -1645,6 +1668,7 @@ function show(id,btn,skipHistory){
   if(id==='batch'){clearForm();}
   if(id==='fields'&&typeof clearFieldForm==='function'){clearFieldForm();}
   if(id==='users'&&typeof clearUserForm==='function'){clearUserForm();}
+  if(id==='settings'){renderFixBatchSelect();}
 }
 
 // ── LAYER AGE HELPERS ──
@@ -3788,7 +3812,7 @@ function buildFeedHallsGrid(){
   if(!halls.length){el.innerHTML=`<div style="color:var(--ink3);font-size:13px;padding:10px 0">لا توجد قاعات مرتبطة بهذه الوجبة.</div>`;return;}
   let infoBar=_bulkInfoBar(b,date,`<span>🏠 عدد القاعات: <strong>${halls.length}</strong></span>`);
   let rows=halls.map(h=>{
-    let alive=batchHallAlive(b,h.id);
+    let alive=batchHallAliveBeforeDate(b,h.id,date);
     let todayFeed=(data.feeds||[]).filter(f=>+f.hallId===h.id&&f.date===date).reduce((s,f)=>s+(+f.qty||0),0);
     return`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:7px;background:var(--bg)">
       <div style="min-width:100px;font-weight:700;font-size:14px">${esc(h.name)}</div>
@@ -3796,9 +3820,11 @@ function buildFeedHallsGrid(){
       ${todayFeed?`<div style="font-size:12px;color:#16a34a;min-width:110px">اليوم: <strong>${todayFeed} كغم</strong></div>`:'<div style="min-width:110px"></div>'}
       <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px">
         <label style="font-size:13px;white-space:nowrap;color:var(--ink2)">الكمية (كغم):</label>
-        <input type="number" min="0" step="0.01" id="feedHall_${h.id}"
+        <input type="number" min="0" step="0.01" id="feedHall_${h.id}" data-alive="${alive}"
           style="width:110px;padding:7px 10px;border:2px solid #86efac;border-radius:8px;font-size:15px;font-weight:700;text-align:center;font-family:inherit;background:var(--bg)"
-          placeholder="0">
+          placeholder="0"
+          oninput="let v=+this.value,a=+this.dataset.alive,g=v&&a?(v*1000/a).toFixed(2):0;document.getElementById('feedGram_${h.id}').textContent=g>0?g+' غم/طير':''">
+        <span id="feedGram_${h.id}" style="font-size:13px;font-weight:700;color:#7c3aed;min-width:80px"></span>
       </div>
     </div>`;
   }).join('');
@@ -3821,7 +3847,9 @@ function saveAllFeeds(){
     if(!qty)return;
     let hallObj=data.halls.find(x=>x.id===h.id);
     let feedBulkAge=calcBirdAge(b.fieldEntryDate||b.transferDate||'',date);
-    data.feeds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,feedType,qty,note,ageDays:feedBulkAge!=null?feedBulkAge:undefined});
+    let alive=batchHallAliveBeforeDate(b,h.id,date);
+    let gramsPerBird=qty&&alive?parseFloat((qty*1000/alive).toFixed(2)):0;
+    data.feeds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,feedType,qty,note,ageDays:feedBulkAge!=null?feedBulkAge:undefined,gramsPerBird:gramsPerBird||undefined});
     saved++;
   });
   if(!saved)return alert('أدخل كمية قاعة واحدة على الأقل');
@@ -3933,14 +3961,16 @@ function renderFeed(){
       let latest=hallFeeds[0]||{};
       let dailyRows=hallFeeds.map(x=>`<tr>
         <td>${fmt(x.date)}</td>
+        <td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
         <td>${esc(x.feedType||'—')}</td>
         <td>${(+x.qty||0).toLocaleString()} كغم</td>
+        <td>${x.gramsPerBird?`<span style="color:#7c3aed;font-weight:700">${x.gramsPerBird} غم/طير</span>`:'—'}</td>
         <td>${esc(x.note||'—')}</td>
         <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteFeed(${x.id})">حذف</button>`:'—'}</td>
       </tr>`).join('');
       return `<tr class="selectable" onclick="toggleInlineDetails('feedHallDetail${i}_${j}')"><td>${esc(hall)}</td><td>${fmt(latest.date)}</td><td>${esc(latest.feedType||'—')}</td><td>${hTotal.toLocaleString()} كغم</td><td>${hallFeeds.length.toLocaleString()}</td><td>${esc(latest.note||'—')}</td><td>اضغط لعرض السجلات اليومية</td></tr>
       <tr id="feedHallDetail${i}_${j}" class="hidden"><td colspan="7">
-        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thFeedType')}</th><th>${t('thQty')}</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>العمر</th><th>${t('thFeedType')}</th><th>${t('thQty')}</th><th>غم/طير</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('feedDetail${i}')" style="background:var(--bg)">
@@ -5278,6 +5308,79 @@ function renderUsers(){
 function saveCreds(){if(!isAdmin())return;if(!val('newUser')||!val('newPass'))return alert('أدخل اسم المستخدم وكلمة المرور');data.user=val('newUser');data.pass=val('newPass');save();msg('تم حفظ بيانات الدخول')}
 function wipeAll(){if(!isAdmin())return;if(confirm('مسح كل البيانات نهائياً؟ لا يمكن التراجع.')){data.batches=[];data.morts=[];data.markets=[];data.fields=[];data.halls=[];data.weights=[];data.subUsers=[];selectedBatchId=null;save();renderAll()}}
 
+function onFixBatchChange(){
+  let bId=$('fixBatch')&&$('fixBatch').value?+$('fixBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  let cur=b?(b.fieldEntryDate||b.transferDate||''):'';
+  if($('fixCurrentDate'))$('fixCurrentDate').value=cur;
+  if($('fixNewDate'))$('fixNewDate').value=cur;
+  if($('fixResult'))$('fixResult').textContent='';
+}
+function renderFixBatchSelect(){
+  let sel=$('fixBatch');if(!sel)return;
+  let opts=(data.batches||[]).map(b=>`<option value="${b.id}">${esc(b.name)} — ${b.fieldEntryDate||b.transferDate||'بدون تاريخ'}</option>`).join('');
+  sel.innerHTML='<option value="">-- اختر الوجبة --</option>'+opts;
+  if($('fixCurrentDate'))$('fixCurrentDate').value='';
+  if($('fixNewDate'))$('fixNewDate').value='';
+  if($('fixResult'))$('fixResult').textContent='';
+}
+function applyFixEntryDate(){
+  if(!isAdmin())return;
+  let bId=$('fixBatch')&&$('fixBatch').value?+$('fixBatch').value:0;
+  let b=bId?(data.batches||[]).find(x=>x.id===bId):null;
+  if(!b)return alert('اختر الوجبة أولاً');
+  let newDate=val('fixNewDate');
+  if(!newDate)return alert('أدخل تاريخ الدخول الصحيح');
+  let oldDate=b.fieldEntryDate||b.transferDate||'';
+  if(newDate===oldDate)return alert('التاريخ الجديد مطابق للحالي، لا يوجد تغيير');
+  if(!confirm(`سيتم تغيير تاريخ الدخول من ${oldDate||'غير محدد'} إلى ${newDate}\nوإعادة حساب عمر الطير في جميع السجلات.\nهل أنت متأكد؟`))return;
+
+  // تحديث التاريخ في الوجبة
+  if(b.fieldEntryDate)b.fieldEntryDate=newDate;
+  if(b.transferDate)b.transferDate=newDate;
+
+  let counts={feeds:0,meds:0,morts:0,weights:0};
+
+  // إعادة حساب ageDays في الأعلاف
+  (data.feeds||[]).filter(x=>x.batchId===b.id).forEach(x=>{
+    let age=calcBirdAge(newDate,x.date);
+    x.ageDays=age!=null?age:undefined;
+    counts.feeds++;
+  });
+
+  // إعادة حساب ageDays في الأدوية
+  (data.meds||[]).filter(x=>x.batchId===b.id).forEach(x=>{
+    let age=calcBirdAge(newDate,x.date);
+    x.ageDays=age!=null?age:undefined;
+    counts.meds++;
+  });
+
+  // إعادة حساب ageDays في الهلاك
+  (data.morts||[]).filter(x=>x.batchId===b.id).forEach(x=>{
+    let age=calcBirdAge(newDate,x.date);
+    x.ageDays=age!=null?age:undefined;
+    counts.morts++;
+  });
+
+  // إعادة حساب الأوزان + الكايد
+  (data.weights||[]).filter(x=>x.batchId===b.id).forEach(x=>{
+    let age=calcBirdAge(newDate,x.date);
+    if(age==null)return;
+    x.ageDays=age;
+    let guideG=Math.round(expectedWeightForBatch(b,age)*1000);
+    x.guideWeightGrams=guideG;
+    x.expectedWeight=+(guideG/1000).toFixed(3);
+    let actualG=+x.actual_weight_grams||0;
+    x.achievementPct=guideG&&actualG?+(actualG/guideG*100).toFixed(1):0;
+    x.diff=+(x.achievementPct-100).toFixed(1);
+    counts.weights++;
+  });
+
+  save();renderAll();
+  if($('fixResult'))$('fixResult').textContent=`✅ تم التحديث: ${counts.feeds} علف، ${counts.meds} دواء/لقاح، ${counts.morts} هلاك، ${counts.weights} وزن`;
+  if($('fixCurrentDate'))$('fixCurrentDate').value=newDate;
+}
+
 // ── BOOT ──
 let _sess=sessionStorage.getItem('cf_logged');
 let _user=sessionStorage.getItem('cf_user');
@@ -5393,6 +5496,16 @@ function batchHallSold(b,hallId){
 function batchHallAlive(b,hallId){
   let alloc=batchAllocatedToHall(b,hallId);
   return Math.max(0,alloc-batchHallMort(b,hallId)-batchHallSold(b,hallId));
+}
+function batchHallAliveBeforeDate(b,hallId,date){
+  let alloc=batchAllocatedToHall(b,hallId);
+  let mortBefore=(data.morts||[]).filter(m=>m.batchId===b.id&&+m.hallId===hallId&&m.date<date).reduce((s,m)=>s+(+m.count||0),0);
+  let unassignedMortBefore=(data.morts||[]).filter(m=>m.batchId===b.id&&!m.hallId&&m.date<date).reduce((s,m)=>s+(+m.count||0),0);
+  let base=calc(b).fieldBirds||0;
+  if(unassignedMortBefore&&base)mortBefore+=Math.round(unassignedMortBefore*(alloc/base));
+  let soldBefore=(data.markets||[]).filter(m=>m.batchId===b.id&&m.date<date).reduce((s,m)=>s+(+m.count||0),0);
+  let soldHallBefore=base?Math.round(soldBefore*(alloc/base)):0;
+  return Math.max(0,alloc-mortBefore-soldHallBefore);
 }
 function hallUsedBirds(hallId,ignoreBatchId=null){
   return data.batches.filter(b=>b.id!==ignoreBatchId&&!calc(b).completed&&b.transferDate)
