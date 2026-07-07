@@ -747,7 +747,7 @@ tbody tr:active td{background:#ccfbf1}
           <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="feedField" onchange="onFeedFieldChange()"></select></div>
           <div class="formGroup"><label data-i18n="lblHall">القاعة</label><select id="feedHall" onchange="updateFeedAge()"></select></div>
           <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="feedAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
-          <div class="formGroup"><label>نوع العلف</label><input id="feedType" placeholder="بادئ / نامي / ناهي"></div>
+          <div class="formGroup"><label>نوع العلف</label><select id="feedType"><option value="">-- اختر --</option><option>بادئ</option><option>نامي</option><option>ناهي</option><option>بادئ + نامي</option><option>نامي + ناهي</option></select></div>
           <div class="formGroup"><label>الكمية كغم</label><input id="feedQty" type="number" min="0" step="0.01"></div>
           <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="feedNote"></div>
         </div>
@@ -765,7 +765,7 @@ tbody tr:active td{background:#ccfbf1}
           <div class="formGroup"><label>الوجبة</label><select id="feedBulkBatch" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></select></div>
           <div class="formGroup"><label>التاريخ</label><input id="feedBulkDate" type="date" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></div>
           <div class="formGroup"><label>عمر الطير (يوم)</label><input id="feedBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
-          <div class="formGroup"><label>نوع العلف</label><input id="feedBulkType" placeholder="بادئ / نامي / ناهي"></div>
+          <div class="formGroup"><label>نوع العلف</label><select id="feedBulkType"><option value="">-- اختر --</option><option>بادئ</option><option>نامي</option><option>ناهي</option><option>بادئ + نامي</option><option>نامي + ناهي</option></select></div>
           <div class="formGroup"><label>ملاحظة عامة</label><input id="feedBulkNote" placeholder="اختياري"></div>
         </div>
         <div id="feedHallsGrid" style="margin-top:14px"></div>
@@ -1977,6 +1977,20 @@ const BROILER_WEIGHT_GUIDES={
   'Indian River':[[0,0.04],[7,0.17],[14,0.44],[21,0.85],[28,1.40],[35,2.06],[42,2.76],[49,3.40]],
   'Sasso (بلدي مطور)':[[0,0.04],[7,0.10],[14,0.25],[21,0.45],[28,0.70],[35,1.00],[42,1.35],[49,1.75],[56,2.10],[63,2.45]]
 };
+// كايد استهلاك العلف Ross 308 — غرام/طير/يوم (As-Hatched, من جدول Performance Objectives 2022)
+const FEED_GUIDE_ROSS308=[0,12,16,20,24,27,31,35,39,44,48,52,57,62,67,72,77,83,88,94,100,106,111,117,122,128,134,139,145,150,156,161,166,171,176,180,185,189,193,197,201,204,207,211,213,216,219,221,223,225,227,229,230,231,233,233,234];
+function feedGuideGrams(ageDays){
+  if(ageDays==null||ageDays<0)return null;
+  if(ageDays<FEED_GUIDE_ROSS308.length)return FEED_GUIDE_ROSS308[ageDays];
+  return FEED_GUIDE_ROSS308[FEED_GUIDE_ROSS308.length-1];
+}
+function feedAvgRatio(b){
+  if(!b)return 1;
+  let day0Guide=Math.round(expectedWeightForBatch(b,0)*1000);
+  if(b.transferBirdWeight&&+b.transferBirdWeight>0&&day0Guide>0)return +b.transferBirdWeight/day0Guide;
+  if(b.eggWeight&&+b.eggWeight>0&&day0Guide>0)return (+b.eggWeight*0.67)/day0Guide;
+  return 1;
+}
 const LAYER_WEIGHT_GUIDES={
   'Lohmann Brown':[[0,0.04],[28,0.28],[56,0.68],[84,1.08],[112,1.40],[126,1.55],[140,1.68]],
   'Lohmann LSL':[[0,0.04],[28,0.26],[56,0.62],[84,0.98],[112,1.28],[126,1.42],[140,1.55]],
@@ -3959,18 +3973,33 @@ function renderFeed(){
       let hallFeeds=fieldFeeds.filter(x=>(x.hall||'—')===hall);
       let hTotal=hallFeeds.reduce((s,x)=>s+(+x.qty||0),0);
       let latest=hallFeeds[0]||{};
-      let dailyRows=hallFeeds.map(x=>`<tr>
-        <td>${fmt(x.date)}</td>
-        <td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
-        <td>${esc(x.feedType||'—')}</td>
-        <td>${(+x.qty||0).toLocaleString()} كغم</td>
-        <td>${x.gramsPerBird?`<span style="color:#7c3aed;font-weight:700">${x.gramsPerBird} غم/طير</span>`:'—'}</td>
-        <td>${esc(x.note||'—')}</td>
-        <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteFeed(${x.id})">حذف</button>`:'—'}</td>
-      </tr>`).join('');
+      let hBatch=data.batches.find(bb=>hallFeeds[0]&&bb.id===hallFeeds[0].batchId);
+      let hRatio=feedAvgRatio(hBatch);
+      let isRoss=hBatch&&(hBatch.birdStrain||'Ross 308')==='Ross 308';
+      let dailyRows=hallFeeds.map(x=>{
+        let guide=isRoss&&x.ageDays!=null?feedGuideGrams(x.ageDays):null;
+        let mathPred=guide!=null?+(guide*hRatio).toFixed(2):null;
+        let actual=x.gramsPerBird||null;
+        let diffGuide=guide!=null&&actual!=null?+(actual-guide).toFixed(2):null;
+        let diffMath=mathPred!=null&&actual!=null?+(actual-mathPred).toFixed(2):null;
+        let colG=diffGuide==null?'var(--ink3)':diffGuide>=0?'#16a34a':'#dc2626';
+        let colM=diffMath==null?'var(--ink3)':diffMath>=0?'#16a34a':'#dc2626';
+        return`<tr>
+          <td>${fmt(x.date)}</td>
+          <td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
+          <td>${esc(x.feedType||'—')}</td>
+          <td>${(+x.qty||0).toLocaleString()} كغم</td>
+          <td>${actual?`<span style="color:#7c3aed;font-weight:700">${actual} غم</span>`:'—'}</td>
+          <td>${guide!=null?`<span style="color:#0369a1;font-weight:700">${guide} غم</span>`:'—'}</td>
+          <td>${mathPred!=null?`<div style="font-size:12px;color:#7c3aed;font-weight:700">${mathPred} غم</div><div style="font-size:11px;color:${colM};font-weight:600">${diffMath!=null?(diffMath>=0?'+':'')+diffMath+' غم':'—'}</div>`:'—'}</td>
+          <td>${diffGuide!=null?`<span style="color:${colG};font-weight:700">${diffGuide>=0?'+':''}${diffGuide} غم</span>`:'—'}</td>
+          <td>${esc(x.note||'—')}</td>
+          <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteFeed(${x.id})">حذف</button>`:'—'}</td>
+        </tr>`;
+      }).join('');
       return `<tr class="selectable" onclick="toggleInlineDetails('feedHallDetail${i}_${j}')"><td>${esc(hall)}</td><td>${fmt(latest.date)}</td><td>${esc(latest.feedType||'—')}</td><td>${hTotal.toLocaleString()} كغم</td><td>${hallFeeds.length.toLocaleString()}</td><td>${esc(latest.note||'—')}</td><td>اضغط لعرض السجلات اليومية</td></tr>
-      <tr id="feedHallDetail${i}_${j}" class="hidden"><td colspan="7">
-        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>العمر</th><th>${t('thFeedType')}</th><th>${t('thQty')}</th><th>غم/طير</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      <tr id="feedHallDetail${i}_${j}" class="hidden"><td colspan="10">
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>العمر</th><th>نوع العلف</th><th>الكمية</th><th>فعلي غم/طير</th><th>كايد Ross غم/طير</th><th>📐 توقع رياضي / فرق</th><th>فرق عن الكايد</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('feedDetail${i}')" style="background:var(--bg)">
