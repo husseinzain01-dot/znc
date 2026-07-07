@@ -622,8 +622,9 @@ tbody tr:active td{background:#ccfbf1}
         <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">اختر الوجبة والتاريخ — أدخل عدد الهلاك لكل قاعة ثم احفظ الكل مرة واحدة.</p>
         <div class="formGrid">
           <div class="formGroup"><label>الحقل</label><select id="mortBulkField" onchange="onMortBulkFieldChange()"></select></div>
-          <div class="formGroup"><label>الوجبة</label><select id="mortBulkBatch" onchange="buildMortHallsGrid()"></select></div>
-          <div class="formGroup"><label>التاريخ</label><input id="mortBulkDate" type="date" onchange="buildMortHallsGrid()"></div>
+          <div class="formGroup"><label>الوجبة</label><select id="mortBulkBatch" onchange="buildMortHallsGrid();updateBulkAge('mortBulkBatch','mortBulkDate','mortBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="mortBulkDate" type="date" onchange="buildMortHallsGrid();updateBulkAge('mortBulkBatch','mortBulkDate','mortBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="mortBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
           <div class="formGroup"><label>السبب العام</label><input id="mortBulkReason" placeholder="اختياري — يُطبّق على كل القاعات"></div>
         </div>
         <div id="mortHallsGrid" style="margin-top:14px"></div>
@@ -708,32 +709,14 @@ tbody tr:active td{background:#ccfbf1}
 
     <!-- USERS (admin only) -->
     <section id="users" class="page hidden">
-      <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">person_add</span> <span data-i18n="ctAddUser">إضافة / تعديل مستخدم</span></div>
-        <div class="formGrid">
-          <div class="formGroup"><label>اسم المستخدم *</label><input id="uName" autocomplete="off"></div>
-          <div class="formGroup"><label>كلمة المرور *</label><input id="uPass" type="password" autocomplete="new-password"></div>
-          <div class="formGroup"><label>الدور</label>
-            <select id="uRole">
-              <option value="user">مستخدم عادي</option>
-              <option value="admin">مدير</option>
-            </select>
-          </div>
-        </div>
-        <div class="formGroup" style="margin-top:14px">
-          <label>الحقول المُخصصة لهذا المستخدم</label>
-          <div class="fieldCheckList" id="uFieldsList"></div>
-          <p style="font-size:11px;color:var(--ink3);margin-top:6px">المدير يرى كل الحقول تلقائياً — هذا الإعداد للمستخدم العادي فقط.</p>
-        </div>
-        <input type="hidden" id="uEditId">
-        <div class="formActions">
-          <button class="btn btn-primary" onclick="saveUser()">💾 حفظ المستخدم</button>
-          <button class="btn btn-secondary" onclick="clearUserForm()">مسح</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">group</span> <span data-i18n="ctUsersList">قائمة المستخدمين</span></div>
-        <div class="tableWrap"><table id="usersTable"></table></div>
+      <div class="card" style="text-align:center;padding:40px 20px">
+        <span class="material-symbols-outlined" style="font-size:48px;color:var(--ink3);display:block;margin-bottom:12px">manage_accounts</span>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">إدارة المستخدمين</div>
+        <div style="font-size:13px;color:var(--ink3);margin-bottom:20px">المستخدمون يُضافون ويُدارون عبر Supabase Dashboard مباشرةً لضمان الأمان.</div>
+        <a href="https://supabase.com/dashboard/project/tvuymajwnrzlibxzfdhy/auth/users" target="_blank"
+           style="display:inline-block;background:#7c3aed;color:#fff;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;text-decoration:none">
+          فتح Supabase Auth
+        </a>
       </div>
     </section>
 
@@ -779,8 +762,9 @@ tbody tr:active td{background:#ccfbf1}
         <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل نوع العلف المشترك ثم كمية كل قاعة، ثم احفظ الكل مرة واحدة.</p>
         <div class="formGrid">
           <div class="formGroup"><label>الحقل</label><select id="feedBulkField" onchange="onFeedBulkFieldChange()"></select></div>
-          <div class="formGroup"><label>الوجبة</label><select id="feedBulkBatch" onchange="buildFeedHallsGrid()"></select></div>
-          <div class="formGroup"><label>التاريخ</label><input id="feedBulkDate" type="date" onchange="buildFeedHallsGrid()"></div>
+          <div class="formGroup"><label>الوجبة</label><select id="feedBulkBatch" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="feedBulkDate" type="date" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="feedBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
           <div class="formGroup"><label>نوع العلف</label><input id="feedBulkType" placeholder="بادئ / نامي / ناهي"></div>
           <div class="formGroup"><label>ملاحظة عامة</label><input id="feedBulkNote" placeholder="اختياري"></div>
         </div>
@@ -825,8 +809,9 @@ tbody tr:active td{background:#ccfbf1}
         <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل بيانات المادة مرة واحدة — ستُطبَّق على جميع القاعات المختارة. يمكن تخصيص الكمية لكل قاعة.</p>
         <div class="formGrid">
           <div class="formGroup"><label>الحقل</label><select id="medBulkField" onchange="onMedBulkFieldChange()"></select></div>
-          <div class="formGroup"><label>الوجبة</label><select id="medBulkBatch" onchange="buildMedHallsGrid()"></select></div>
-          <div class="formGroup"><label>التاريخ</label><input id="medBulkDate" type="date" onchange="buildMedHallsGrid()"></div>
+          <div class="formGroup"><label>الوجبة</label><select id="medBulkBatch" onchange="buildMedHallsGrid();updateBulkAge('medBulkBatch','medBulkDate','medBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="medBulkDate" type="date" onchange="buildMedHallsGrid();updateBulkAge('medBulkBatch','medBulkDate','medBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="medBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
           <div class="formGroup"><label>النوع</label><select id="medBulkType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
           <div class="formGroup"><label>اسم المادة *</label><input id="medBulkName" placeholder="مثال: نيوكاسل / AD3E"></div>
           <div class="formGroup"><label>الجرعة</label><input id="medBulkDose" placeholder="مثال: 1 مل / طير"></div>
@@ -1271,16 +1256,6 @@ async function loginNow(){
     return;
   }
 
-  // Fallback: check subUsers in data
-  await pullCloud();
-  const sub=(data.subUsers||[]).find(x=>x.name===u&&x.pass===p);
-  if(sub){
-    currentUser={name:sub.name,role:sub.role||'viewer',fields:sub.fields||null};
-    startSession();
-    startRealtimeSync();
-    renderAll();
-    return;
-  }
   showLoginError('بيانات الدخول غير صحيحة');
 }
 function showLoginError(msg){$('loginMsg').textContent=msg;}
@@ -3662,7 +3637,8 @@ function saveFeed(){
   let qty=num('feedQty');
   if(qty<=0)return alert('أدخل كمية العلف');
   data.feeds=data.feeds||[];
-  data.feeds.push({id:Date.now(),date:val('feedDate')||today(),field,hallId,hall:hall?hall.name:'',feedType:val('feedType'),qty,note:val('feedNote')});
+  let feedAgeV=$('feedAge')&&$('feedAge').value!==''?+$('feedAge').value:null;
+  data.feeds.push({id:Date.now(),date:val('feedDate')||today(),field,hallId,hall:hall?hall.name:'',feedType:val('feedType'),qty,note:val('feedNote'),ageDays:feedAgeV});
   save();renderAll();clearFeedForm();msg('تم حفظ استهلاك العلف');
 }
 function saveMed(){
@@ -3671,7 +3647,8 @@ function saveMed(){
   if(!field||!hallId)return alert('اختر الحقل والقاعة');
   if(!val('medName'))return alert('أدخل اسم المادة');
   data.meds=data.meds||[];
-  data.meds.push({id:Date.now(),date:val('medDate')||today(),field,hallId,hall:hall?hall.name:'',type:val('medType'),name:val('medName'),dose:val('medDose'),qty:num('medQty'),note:val('medNote')});
+  let medAgeV=$('medAge')&&$('medAge').value!==''?+$('medAge').value:null;
+  data.meds.push({id:Date.now(),date:val('medDate')||today(),field,hallId,hall:hall?hall.name:'',type:val('medType'),name:val('medName'),dose:val('medDose'),qty:num('medQty'),note:val('medNote'),ageDays:medAgeV});
   save();renderAll();clearMedForm();msg('تم حفظ الدواء/اللقاح');
 }
 function deleteFeed(id){
@@ -3719,6 +3696,20 @@ function onMortBulkFieldChange(){
   if($('mortBulkBatch'))$('mortBulkBatch').innerHTML='<option value="">-- اختر الوجبة --</option>'+batches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
   buildMortHallsGrid();
 }
+function updateBulkAge(batchSelId, dateInputId, ageInputId){
+  let bEl=$(batchSelId), dEl=$(dateInputId), aEl=$(ageInputId);
+  if(!bEl||!dEl||!aEl)return;
+  let bId=bEl.value?+bEl.value:0;
+  let date=dEl.value;
+  let b=(data.batches||[]).find(x=>x.id===bId);
+  if(b&&date){
+    let entryDate=b.fieldEntryDate||b.transferDate||'';
+    let age=calcBirdAge(entryDate,date);
+    aEl.value=age>=0?age:'';
+  } else {
+    aEl.value='';
+  }
+}
 function buildMortHallsGrid(){
   let el=$('mortHallsGrid');if(!el)return;
   let bId=$('mortBulkBatch')&&$('mortBulkBatch').value?+$('mortBulkBatch').value:0;
@@ -3763,7 +3754,8 @@ function saveAllMorts(){
     if(!cnt)return;
     let reason=val(`mortHallReason_${h.id}`)||commonReason;
     let hallObj=data.halls.find(x=>x.id===h.id);
-    data.morts.push({id:ts+saved,batchId:b.id,hallId:h.id,hall:hallObj?hallObj.name:h.name,date,count:cnt,reason});
+    let mortBulkAge=calcBirdAge(b.fieldEntryDate||b.transferDate||'',date);
+    data.morts.push({id:ts+saved,batchId:b.id,hallId:h.id,hall:hallObj?hallObj.name:h.name,date,count:cnt,reason,ageDays:mortBulkAge!=null?mortBulkAge:undefined});
     saved++;
   });
   if(!saved)return alert('أدخل عدد هلاك قاعة واحدة على الأقل');
@@ -3828,7 +3820,8 @@ function saveAllFeeds(){
     let qty=inp?+inp.value:0;
     if(!qty)return;
     let hallObj=data.halls.find(x=>x.id===h.id);
-    data.feeds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,feedType,qty,note});
+    let feedBulkAge=calcBirdAge(b.fieldEntryDate||b.transferDate||'',date);
+    data.feeds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,feedType,qty,note,ageDays:feedBulkAge!=null?feedBulkAge:undefined});
     saved++;
   });
   if(!saved)return alert('أدخل كمية قاعة واحدة على الأقل');
@@ -3899,7 +3892,8 @@ function saveAllMeds(){
     let qtyInp=$(`medHall_${h.id}`);
     let qty=qtyInp?+qtyInp.value:0;
     let hallObj=data.halls.find(x=>x.id===h.id);
-    data.meds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,type,name,dose,qty,note});
+    let medBulkAge=calcBirdAge(b.fieldEntryDate||b.transferDate||'',date);
+    data.meds.push({id:ts+saved,batchId:b.id,date,field:fn||b.field||'',hallId:h.id,hall:hallObj?hallObj.name:h.name,type,name,dose,qty,note,ageDays:medBulkAge!=null?medBulkAge:undefined});
     saved++;
   });
   if(!saved)return alert('لم يتم تحديد أي قاعة — تأكد من تحديد ✔ تطبيق');
