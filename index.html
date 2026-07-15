@@ -239,6 +239,33 @@ tbody tr:active td{background:#ccfbf1}
 .selectable:hover td{background:#f0fdfa!important}
 .selectedRow td{background:#ccfbf1!important;border-bottom-color:#99f6e4!important}
 
+/* RECORD TABLE DESIGN */
+.rec-field-row td{background:#eef2f7;color:#1e293b;font-weight:700;font-size:13px;padding:12px 14px;border-top:2px solid #cbd5e1;border-bottom:2px solid #cbd5e1}
+.rec-field-row:hover td{background:#e2e8f0!important}
+.rec-field-row .field-chevron{display:inline-block;transition:transform .2s;margin-left:6px;color:#64748b}
+.rec-hall-row td{background:#fff;font-size:13px;padding:9px 12px;border-bottom:1px solid #e2e8f0}
+.rec-hall-row:hover td{background:#f8fafc!important}
+.rec-hall-row .hall-chevron{display:inline-block;transition:transform .2s;margin-left:4px;color:#94a3b8;font-size:12px}
+.rec-daily-row:nth-child(even) td{background:#f8fafc}
+.filterBar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;padding:12px;background:var(--card2,#f8fafc);border-radius:10px;border:1px solid var(--border)}
+.filterBar .formGroup{margin:0;min-width:130px;flex:1}
+.filterBar label{font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px}
+.filterBar input,.filterBar select{font-size:12px;padding:6px 8px}
+.filterBar .clearBtn{align-self:flex-end;white-space:nowrap;flex-shrink:0}
+
+/* EDIT MODAL */
+.editModalOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;backdrop-filter:blur(3px);align-items:center;justify-content:center}
+.editModalOverlay.show{display:flex}
+.editModalBox{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:500px;margin:16px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.editModalHead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0}
+.editModalHead h3{margin:0;font-size:16px;font-weight:700;color:#1e293b}
+.editModalBody{padding:20px;overflow-y:auto;flex:1}
+.editModalFoot{padding:14px 20px;border-top:1px solid #e2e8f0;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.editModalBody .formGrid{gap:12px}
+.editModalBody .formGroup label{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px}
+.editModalBody input,.editModalBody select,.editModalBody textarea{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:13px;color:#1e293b;background:#f8fafc;box-sizing:border-box;transition:border .15s}
+.editModalBody input:focus,.editModalBody select:focus,.editModalBody textarea:focus{outline:none;border-color:#0d9488;background:#fff}
+
 /* BADGES */
 .badge{padding:3px 10px;border-radius:var(--r3);font-size:11px;font-weight:600;display:inline-block;white-space:nowrap}
 .b-blue{background:var(--blue2);color:#1d4ed8}
@@ -452,8 +479,6 @@ tbody tr:active td{background:#ccfbf1}
     <!-- DASHBOARD -->
     <section id="dash" class="page">
       <div id="statsCards" class="statsGrid"></div>
-      <div id="statsDetail"></div>
-      <div id="batchHallsPanel"></div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">inventory</span> <span data-i18n="ctActiveBatches">الوجبات النشطة</span></div>
         <div class="formGrid" style="margin-bottom:12px">
@@ -461,6 +486,8 @@ tbody tr:active td{background:#ccfbf1}
         </div>
         <div class="tableWrap"><table id="batchTable"></table></div>
       </div>
+      <div id="statsDetail"></div>
+      <div id="batchHallsPanel"></div>
     </section>
 
     <!-- CHARTS -->
@@ -635,8 +662,12 @@ tbody tr:active td{background:#ccfbf1}
       </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">clinical_notes</span> <span data-i18n="ctMortLog">سجل الهلاكات</span></div>
-        <div class="formGrid" style="margin-bottom:12px">
-          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="mortBatchFilter" onchange="renderMort()"></select></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="mortBatchFilter" onchange="renderMort();fillRecHallFilter('mort')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="mortHallFilter" onchange="renderMort()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="mortFromDate" onchange="renderMort()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="mortToDate" onchange="renderMort()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('mort')">✕ مسح</button>
         </div>
         <div class="tableWrap"><table id="mortTable"></table></div>
       </div>
@@ -776,8 +807,12 @@ tbody tr:active td{background:#ccfbf1}
       </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">format_list_bulleted</span> <span data-i18n="ctFeedLog">سجل العلف</span></div>
-        <div class="formGrid" style="margin-bottom:12px">
-          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="feedBatchFilter" onchange="renderFeed()"></select></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="feedBatchFilter" onchange="renderFeed();fillRecHallFilter('feed')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="feedHallFilter" onchange="renderFeed()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="feedFromDate" onchange="renderFeed()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="feedToDate" onchange="renderFeed()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('feed')">✕ مسح</button>
         </div>
         <div class="tableWrap"><table id="feedTable"></table></div>
       </div>
@@ -825,8 +860,12 @@ tbody tr:active td{background:#ccfbf1}
       </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">medication</span> <span data-i18n="ctMedsLog">سجل الأدوية واللقاحات</span></div>
-        <div class="formGrid" style="margin-bottom:12px">
-          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="medBatchFilter" onchange="renderMeds()"></select></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="medBatchFilter" onchange="renderMeds();fillRecHallFilter('med')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="medHallFilter" onchange="renderMeds()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="medFromDate" onchange="renderMeds()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="medToDate" onchange="renderMeds()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('med')">✕ مسح</button>
         </div>
         <div class="tableWrap"><table id="medTable"></table></div>
       </div>
@@ -875,12 +914,17 @@ tbody tr:active td{background:#ccfbf1}
       </div>
       <div class="card">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">monitor_weight</span> <span data-i18n="ctWeightLog">سجل أوزان القاعات</span></div>
-        <div class="formGrid" style="margin-bottom:12px">
-          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="weightBatchFilter" onchange="renderWeights()"></select></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="weightBatchFilter" onchange="renderWeights();fillRecHallFilter('weight')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="weightHallFilter" onchange="renderWeights()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="weightFromDate" onchange="renderWeights()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="weightToDate" onchange="renderWeights()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('weight')">✕ مسح</button>
         </div>
         <div class="tableWrap"><table id="weightsTable"></table></div>
       </div>
     </section>
+
 
     <!-- GUIDE REFERENCE -->
     <section id="guideRef" class="page hidden">
@@ -968,7 +1012,6 @@ tbody tr:active td{background:#ccfbf1}
           <button class="btn btn-danger" onclick="exportRptPDF()">📄 تصدير PDF</button>
           <button class="btn btn-success" id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
           <label class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
-          <button class="btn btn-warning" id="recalcGuideBtn" onclick="if(confirm('سيتم إعادة حساب كايد جميع سجلات الأوزان بناءً على السلالة الرسمية. هل أنت متأكد؟'))recalcAllGuideWeights()">🔄 تحديث الكايد</button>
         </div>
       </div>
 
@@ -1084,6 +1127,15 @@ tbody tr:active td{background:#ccfbf1}
           <button class="btn btn-primary" onclick="applyFixEntryDate()">🔄 تصحيح التاريخ وإعادة حساب الأعمار</button>
         </div>
         <div id="fixResult" style="margin-top:12px;font-size:13px;color:#16a34a;font-weight:600"></div>
+      </div>
+
+      <!-- إعادة حساب الكايد -->
+      <div class="card" style="border-top:3px solid #16a34a">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">autorenew</span> إعادة حساب الكايد</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">يعيد احتساب الوزن القياسي (الكايد) لجميع سجلات الأوزان بناءً على السلالة الرسمية لكل وجبة.</p>
+        <div class="formActions">
+          <button class="btn btn-warning" onclick="if(confirm('سيتم إعادة حساب كايد جميع سجلات الأوزان بناءً على السلالة الرسمية. هل أنت متأكد؟'))recalcAllGuideWeights()">🔄 إعادة حساب الكايد لجميع السجلات</button>
+        </div>
       </div>
 
       <!-- تعديل بيانات الوجبة -->
@@ -2435,6 +2487,40 @@ function renderCompare(){
   </tr></thead><tbody>${rows}</tbody>`;
 }
 
+function batchWeightSuccessRates(b){
+  if(!b)return{guide:null,math:null};
+  // avgRatio بنفس أولوية renderWeights
+  let day0Guide=Math.round(expectedWeightForBatch(b,0)*1000);
+  let ratio=1;
+  if(b.transferBirdWeight&&b.transferBirdWeight>0&&day0Guide>0)ratio=b.transferBirdWeight/day0Guide;
+  else if(b.eggWeight&&b.eggWeight>0&&day0Guide>0)ratio=(b.eggWeight*0.67)/day0Guide;
+  else{
+    let bw=(data.weights||[]).filter(w=>w.batchId===b.id&&weightActualGrams(w)>0&&weightGuideGrams(w)>0);
+    if(bw.length)ratio=bw.reduce((s,w)=>s+weightActualGrams(w)/weightGuideGrams(w),0)/bw.length;
+  }
+  // آخر وزن لكل قاعة
+  let hallIds=[...new Set((data.weights||[]).filter(w=>w.batchId===b.id).map(w=>w.hallId).filter(x=>x!=null))];
+  if(!hallIds.length){
+    // بدون تخصيص قاعات — آخر سجل عام
+    let sorted=(data.weights||[]).filter(w=>w.batchId===b.id&&weightActualGrams(w)>0&&weightGuideGrams(w)>0).sort((a,z)=>String(z.date).localeCompare(String(a.date)));
+    if(!sorted.length)return{guide:null,math:null};
+    let lw=sorted[0];
+    let aG=weightActualGrams(lw),gG=weightGuideGrams(lw),mp=Math.round(gG*ratio);
+    return{guide:+(aG/gG*100).toFixed(1),math:mp?+(aG/mp*100).toFixed(1):null};
+  }
+  let guideVals=[],mathVals=[];
+  hallIds.forEach(hId=>{
+    let hw=(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===+hId&&weightActualGrams(w)>0&&weightGuideGrams(w)>0).sort((a,z)=>String(z.date).localeCompare(String(a.date)));
+    if(!hw.length)return;
+    let lw=hw[0],aG=weightActualGrams(lw),gG=weightGuideGrams(lw),mp=Math.round(gG*ratio);
+    guideVals.push(aG/gG*100);
+    if(mp)mathVals.push(aG/mp*100);
+  });
+  return{
+    guide:guideVals.length?+(guideVals.reduce((s,v)=>s+v,0)/guideVals.length).toFixed(1):null,
+    math:mathVals.length?+(mathVals.reduce((s,v)=>s+v,0)/mathVals.length).toFixed(1):null
+  };
+}
 function renderStats(){
   let b=data.batches.find(x=>x.id===selectedBatchId);
   if(b&&!canSeeField(b.field))b=null;
@@ -2444,6 +2530,9 @@ function renderStats(){
   if(b){
     let c=calc(b);
     let lw=latestWeightForBatch(b.id);
+    let wsr=batchWeightSuccessRates(b);
+    let guideColor=wsr.guide==null?'inherit':wsr.guide>=100?'#16a34a':'#dc2626';
+    let mathColor=wsr.math==null?'inherit':wsr.math>=100?'#7c3aed':'#f59e0b';
     let stats=[
       {l:'عمر التفقيس',v:c.hatchAge+'/21',s:c.hatchLate?'⚠️ متأخرة':c.hatchComplete?'🔔 جاهزة':''},
       {l:'عمر الطير',v:c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—',s:c.isLayer?'بياض':'بالحقل'},
@@ -2451,8 +2540,10 @@ function renderStats(){
       {l:'هلاك الحقل',v:c.mort.toLocaleString(),s:'متراكم'},
       {l:'المسوق',v:c.sold.toLocaleString(),s:'إجمالي'},
       {l:'الحي المتبقي',v:c.alive.toLocaleString(),s:'صافي'},
-      {l:'نسبة النجاح',v:successRate(b)+'%',s:''},
+      {l:'نسبة النجاح (هلاك)',v:successRate(b)+'%',s:''},
       {l:'آخر وزن (الفعلي)',v:lw?(weightActualGrams(lw)+' غم'):'—',s:lw?('الكايد '+weightGuideGrams(lw)+' غم'):''},
+      {l:'نجاح الوزن / كايد',v:wsr.guide!=null?`<span style="color:${guideColor};font-weight:800">${wsr.guide}%</span>`:'—',s:'متوسط القاعات'},
+      {l:'نجاح الوزن / رياضي',v:wsr.math!=null?`<span style="color:${mathColor};font-weight:800">${wsr.math}%</span>`:'—',s:'بوزن الاستلام'},
     ];
     cardsEl.innerHTML=
       `<div class="heroBanner"><div><h2>${esc(b.name)}</h2><p>${esc(b.type||'وجبة')} — ${fmt(b.hatchDate)} — ${esc(b.field||'لم تُنقل')}</p></div></div>`+
@@ -2477,7 +2568,7 @@ function renderStats(){
   let greeting=isAdmin()?'زهور الوطن — لوحة المعلومات':`مرحباً، ${currentUser.name}`;
   cardsEl.innerHTML=`<div class="heroBanner"><div><h2>${greeting}</h2><p>${isAdmin()?t('dashAdminDesc'):t('dashUserDesc')}</p></div></div>`+stats.map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div><div class="sc-sub">${x.s}</div></div>`).join('')+smartShortcutCards('');
   if(detailEl){
-    detailEl.innerHTML=buildFieldsDashboard();
+    detailEl.innerHTML='';
     if(selectedFieldName&&data.fields.some(f=>f.name===selectedFieldName)&&canSeeField(selectedFieldName)){
       showFieldDetails(selectedFieldName);
     }
@@ -2497,7 +2588,8 @@ function renderBatches(){
   let rows=batches.map(b=>{
     let c=calc(b),sel=b.id===selectedBatchId?' selectedRow':'';
     let ageDisp=c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'):'—';
-    let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button>`:'—';
+    let archiveBtn=isAdmin()&&c.transferred?`<button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="event.stopPropagation();forceArchiveBatch(${b.id})" title="تحويل الوجبة إلى منتهية وأرشفتها">📦 أرشفة</button>`:'';
+    let editDel=isAdmin()?`<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editBatch(${b.id})">تعديل</button> <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteBatch(${b.id})">حذف</button> ${archiveBtn}`:'—';
     return `<tr class="selectable${sel}" onclick="selectBatch(${b.id})"><td><b>${esc(b.name)}</b></td><td>${fmt(b.eggReceiveDate)||'—'}</td><td>${fmt(b.hatchDate)}</td><td>${esc(b.targetField||'—')}</td><td>${esc(b.type||'—')}</td><td>${statusBadge(b)}</td><td>${c.hatchAge}/21</td><td>${c.transferred?fmt(c.entryDate):'—'}</td><td>${esc(b.field||'—')}</td><td>${esc(b.hall||'—')}</td><td>${ageDisp}</td><td>${hatchRate(b)}%</td><td>${c.fieldBirds?(+c.fieldBirds).toLocaleString():'—'}</td><td>${c.mort.toLocaleString()}</td><td>${c.sold.toLocaleString()}</td><td><b>${c.alive.toLocaleString()}</b></td><td>${((latestWeightForBatch(b.id)||{}).avgWeight)||'—'}</td><td>${successRate(b)}%</td><td>${editDel}</td></tr>`;
   }).join('');
   $('batchTable').innerHTML=`<thead><tr><th>${t('thBatch')}</th><th>${t('thEggReceive')}</th><th>${t('thEntryDate')}</th><th>${t('thTargetField')}</th><th>${t('thType')}</th><th>${t('thStatus')}</th><th>${t('thHatching')}</th><th>${t('thEntryDate')}</th><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thAge')}</th><th>${t('thHatchRate')}</th><th>${t('thNet')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thAlive')}</th><th>${t('thLastWeight')}</th><th>${t('thSuccess')}</th><th>${t('thAction')}</th></tr></thead><tbody>${rows||'<tr><td colspan="19" style="text-align:center;color:var(--ink3);padding:18px">لا توجد وجبات نشطة</td></tr>'}</tbody>`;
@@ -3507,6 +3599,12 @@ function renderWeights(){
   let weights=(data.weights||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   let filterBatchId=$('weightBatchFilter')&&$('weightBatchFilter').value?+$('weightBatchFilter').value:0;
   if(filterBatchId)weights=weights.filter(w=>+w.batchId===filterBatchId);
+  let wHall=$('weightHallFilter')&&$('weightHallFilter').value?+$('weightHallFilter').value:0;
+  if(wHall)weights=weights.filter(w=>+w.hallId===wHall);
+  let wFrom=$('weightFromDate')&&$('weightFromDate').value;
+  let wTo=$('weightToDate')&&$('weightToDate').value;
+  if(wFrom)weights=weights.filter(w=>w.date>=wFrom);
+  if(wTo)weights=weights.filter(w=>w.date<=wTo);
   // نسبة أداء كل وجبة — مصدرها بالأولوية:
   // 1) وزن الطير عند النقل ÷ كايد يوم 0
   // 2) وزن البيضة × 67% ÷ كايد يوم 0
@@ -3553,7 +3651,7 @@ function renderWeights(){
         let mathDiff=aG&&mathPred?aG-mathPred:null;
         let mathCol=mathDiff==null?'var(--ink3)':mathDiff>=0?'#16a34a':'#dc2626';
         let mathCell=mathPred?`<div style="font-size:12px;color:#7c3aed;font-weight:700">${mathPred}غم</div><div style="font-size:11px;color:${mathCol};font-weight:600">${mathDiff!=null?(mathDiff>=0?'+':'')+mathDiff+'غم':'—'}</div>`:'—';
-        return `<tr>
+        return `<tr class="rec-daily-row">
           <td>${fmt(w.date)}</td>
           <td>${wb?wb.name:'—'}</td>
           <td>${w.ageDays!=null?w.ageDays:'—'}</td>
@@ -3564,11 +3662,20 @@ function renderWeights(){
           <td>${aG?p+'% '+bd:'—'}</td>
           <td>${mathCell}</td>
           <td>${esc(w.note||'—')}</td>
-          <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteWeight(${w.id})">حذف</button>`:'—'}</td>
+          <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditRecord('weight',${w.id})">تعديل</button> ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteWeight(${w.id})">حذف</button>`:''}</td>
         </tr>`;
       }).join('');
-      return `<tr class="selectable" onclick="toggleInlineDetails('weightHallDetail${i}_${j}')">
-        <td><b>${hall}</b></td>
+      // نسبة نجاح الوزن: آخر سجل مقارنةً بكايد عمره
+      let lastW=hallWeights.find(w=>weightActualGrams(w)>0&&weightGuideGrams(w)>0)||null;
+      let avgAchieveGuide=lastW?+(weightActualGrams(lastW)/weightGuideGrams(lastW)*100).toFixed(1):null;
+      let lastR=lastW?(batchAvgRatio[lastW.batchId]||1):1;
+      let lastMathPred=lastW&&weightGuideGrams(lastW)?Math.round(weightGuideGrams(lastW)*lastR):0;
+      let avgAchieveMath=lastW&&lastMathPred?+(weightActualGrams(lastW)/lastMathPred*100).toFixed(1):null;
+      let guideColor=avgAchieveGuide==null?'var(--ink3)':avgAchieveGuide>=100?'#16a34a':'#dc2626';
+      let mathColor=avgAchieveMath==null?'var(--ink3)':avgAchieveMath>=100?'#7c3aed':'#f59e0b';
+      let chId=`wChev${i}_${j}`;
+      return `<tr class="selectable rec-hall-row" onclick="toggleInlineDetails('weightHallDetail${i}_${j}','${chId}')">
+        <td><span id="${chId}" class="hall-chevron" style="transition:transform .2s">◀</span> <b>${hall}</b></td>
         <td>${fmt(last.date)}</td>
         <td>${b?b.name:'—'}</td>
         <td>${last.ageDays!=null?last.ageDays:'—'}</td>
@@ -3577,24 +3684,25 @@ function renderWeights(){
         <td>${guideG||'—'} غم</td>
         <td>${(actualG&&guideG)?(actualG-guideG)+' غم':'—'}</td>
         <td>${actualG?pct+'% '+badge:'—'}</td>
+        <td><span style="font-weight:700;color:${guideColor}">${avgAchieveGuide!=null?avgAchieveGuide+'%':'—'}</span></td>
+        <td><span style="font-weight:700;color:${mathColor}">${avgAchieveMath!=null?avgAchieveMath+'%':'—'}</span></td>
         <td>${hallWeights.length.toLocaleString()}</td>
-        <td>${last.note||'—'}</td>
-        <td>اضغط لعرض السجلات اليومية</td>
       </tr>
-      <tr id="weightHallDetail${i}_${j}" class="hidden"><td colspan="12">
-        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thAlive')}</th><th>${t('thActual')}</th><th>${t('thGuide')}</th><th>${t('thDiff')}</th><th>${t('thAchieve')}</th><th>📐 توقع رياضي / فرق</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      <tr id="weightHallDetail${i}_${j}" class="hidden"><td colspan="13">
+        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thAlive')}</th><th>${t('thActual')}</th><th>${t('thGuide')}</th><th>${t('thDiff')}</th><th>${t('thAchieve')}</th><th>📐 توقع رياضي / فرق</th><th>${t('thNote')}</th><th>إجراء</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
-    return `<tr class="selectable" onclick="toggleInlineDetails('weightDetail${i}')" style="background:var(--bg)">
-      <td><b>🏡 ${field}</b></td>
+    let fChId=`wFChev${i}`;
+    return `<tr class="selectable rec-field-row" onclick="toggleInlineDetails('weightDetail${i}','${fChId}')">
+      <td><span id="${fChId}" class="field-chevron">◀</span> 🏡 ${field}</td>
       <td>${fmt(latest.date)}</td>
       <td>${halls.length.toLocaleString()} قاعة</td>
       <td>${avgWeight?avgWeight+' غم':'—'}</td>
-      <td>${fieldWeights.length.toLocaleString()}</td>
-      <td colspan="4">اضغط لعرض القاعات</td>
+      <td>${fieldWeights.length.toLocaleString()} سجل</td>
+      <td colspan="4"></td>
     </tr>
     <tr id="weightDetail${i}" class="hidden"><td colspan="9">
-      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thAlive')}</th><th>${t('thActual')}</th><th>${t('thGuide')}</th><th>${t('thDiff')}</th><th>${t('thAchieve')}</th><th>${t('thRecords')}</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thAlive')}</th><th>${t('thActual')}</th><th>${t('thGuide')}</th><th>${t('thDiff')}</th><th>${t('thAchieve')}</th><th>% كايد</th><th>% رياضي</th><th>${t('thRecords')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   el.innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thLastDate')}</th><th>${t('thHalls')}</th><th>${t('thAvgWeight')}</th><th>${t('thRecords')}</th><th colspan="4">${t('thDetails')}</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">'+t('noRecords')+' أوزان</td></tr>'}</tbody>`;
@@ -3976,9 +4084,36 @@ function clearMedBulkForm(){
   onMedBulkFieldChange();
 }
 
-function toggleInlineDetails(id){
+function toggleInlineDetails(id,chevronId){
   let el=$(id);if(!el)return;
   el.classList.toggle('hidden');
+  if(chevronId){let ch=$(chevronId);if(ch)ch.style.transform=el.classList.contains('hidden')?'':'rotate(90deg)';}
+}
+
+function fillRecHallFilter(prefix){
+  let batchSel=$(prefix+'BatchFilter');
+  let hallSel=$(prefix+'HallFilter');
+  if(!hallSel)return;
+  let batchId=batchSel?+batchSel.value:0;
+  let b=batchId?(data.batches||[]).find(x=>x.id===batchId):null;
+  let halls=[];
+  if(b){
+    let allocs=Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations:(b.hallId?[{hallId:b.hallId,hall:b.hall}]:[]);
+    halls=allocs.map(a=>({id:a.hallId,name:a.hall||'قاعة'}));
+  } else {
+    let dataset={weight:data.weights,feed:data.feeds,med:data.meds,mort:data.morts}[prefix]||[];
+    let seen={};
+    dataset.forEach(r=>{if(r.hallId&&!seen[r.hallId]){seen[r.hallId]=1;halls.push({id:r.hallId,name:r.hall||'قاعة '+r.hallId});}});
+  }
+  let cur=hallSel.value;
+  hallSel.innerHTML='<option value="">كل القاعات</option>'+halls.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');
+  if(cur&&[...hallSel.options].some(o=>o.value===cur))hallSel.value=cur;
+}
+
+function clearRecFilters(prefix){
+  let ids={weight:['weightBatchFilter','weightHallFilter','weightFromDate','weightToDate'],feed:['feedBatchFilter','feedHallFilter','feedFromDate','feedToDate'],med:['medBatchFilter','medHallFilter','medFromDate','medToDate'],mort:['mortBatchFilter','mortHallFilter','mortFromDate','mortToDate']};
+  (ids[prefix]||[]).forEach(id=>{let el=$(id);if(el){if(el.tagName==='SELECT')el.value='';else el.value='';}});
+  ({weight:renderWeights,feed:renderFeed,med:renderMeds,mort:renderMort}[prefix]||renderAll)();
 }
 function renderFeed(){
   let el=$('feedTable');if(!el)return;
@@ -3989,6 +4124,12 @@ function renderFeed(){
     let halls=batchHallIds(fb);
     feeds=feeds.filter(x=>fb&&x.field===fb.field&&(!halls.length||halls.includes(+x.hallId)));
   }
+  let fHall=$('feedHallFilter')&&$('feedHallFilter').value?+$('feedHallFilter').value:0;
+  if(fHall)feeds=feeds.filter(x=>+x.hallId===fHall);
+  let fFrom=$('feedFromDate')&&$('feedFromDate').value;
+  let fTo=$('feedToDate')&&$('feedToDate').value;
+  if(fFrom)feeds=feeds.filter(x=>x.date>=fFrom);
+  if(fTo)feeds=feeds.filter(x=>x.date<=fTo);
   let fields=[...new Set(feeds.map(x=>x.field).filter(Boolean))];
   let rows=fields.map((field,i)=>{
     let fieldFeeds=feeds.filter(x=>x.field===field);
@@ -4010,7 +4151,7 @@ function renderFeed(){
         let diffMath=mathPred!=null&&actual!=null?+(actual-mathPred).toFixed(2):null;
         let colG=diffGuide==null?'var(--ink3)':diffGuide>=0?'#16a34a':'#dc2626';
         let colM=diffMath==null?'var(--ink3)':diffMath>=0?'#16a34a':'#dc2626';
-        return`<tr>
+        return`<tr class="rec-daily-row">
           <td>${fmt(x.date)}</td>
           <td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
           <td>${esc(x.feedType||'—')}</td>
@@ -4020,24 +4161,28 @@ function renderFeed(){
           <td>${mathPred!=null?`<div style="font-size:12px;color:#7c3aed;font-weight:700">${mathPred} غم</div><div style="font-size:11px;color:${colM};font-weight:600">${diffMath!=null?(diffMath>=0?'+':'')+diffMath+' غم':'—'}</div>`:'—'}</td>
           <td>${diffGuide!=null?`<span style="color:${colG};font-weight:700">${diffGuide>=0?'+':''}${diffGuide} غم</span>`:'—'}</td>
           <td>${esc(x.note||'—')}</td>
-          <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteFeed(${x.id})">حذف</button>`:'—'}</td>
+          <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditRecord('feed',${x.id})">تعديل</button> ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteFeed(${x.id})">حذف</button>`:''}</td>
         </tr>`;
       }).join('');
-      return `<tr class="selectable" onclick="toggleInlineDetails('feedHallDetail${i}_${j}')"><td>${esc(hall)}</td><td>${fmt(latest.date)}</td><td>${esc(latest.feedType||'—')}</td><td>${hTotal.toLocaleString()} كغم</td><td>${hallFeeds.length.toLocaleString()}</td><td>${esc(latest.note||'—')}</td><td>اضغط لعرض السجلات اليومية</td></tr>
-      <tr id="feedHallDetail${i}_${j}" class="hidden"><td colspan="10">
-        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>العمر</th><th>نوع العلف</th><th>الكمية</th><th>فعلي غم/طير</th><th>كايد Ross غم/طير</th><th>📐 توقع رياضي / فرق</th><th>فرق عن الكايد</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      let fhChId=`fhChev${i}_${j}`;
+      return `<tr class="selectable rec-hall-row" onclick="toggleInlineDetails('feedHallDetail${i}_${j}','${fhChId}')">
+        <td><span id="${fhChId}" class="hall-chevron" style="transition:transform .2s">◀</span> <b>${esc(hall)}</b></td><td>${fmt(latest.date)}</td><td>${esc(latest.feedType||'—')}</td><td>${hTotal.toLocaleString()} كغم</td><td>${hallFeeds.length.toLocaleString()}</td><td>${esc(latest.note||'—')}</td>
+      </tr>
+      <tr id="feedHallDetail${i}_${j}" class="hidden"><td colspan="6">
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>العمر</th><th>نوع العلف</th><th>الكمية</th><th>فعلي غم/طير</th><th>كايد Ross غم/طير</th><th>📐 توقع رياضي / فرق</th><th>فرق عن الكايد</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
-    return `<tr class="selectable" onclick="toggleInlineDetails('feedDetail${i}')" style="background:var(--bg)">
-      <td><b>🏡 ${field}</b></td>
+    let ffChId=`ffChev${i}`;
+    return `<tr class="selectable rec-field-row" onclick="toggleInlineDetails('feedDetail${i}','${ffChId}')">
+      <td><span id="${ffChId}" class="field-chevron">◀</span> 🏡 ${field}</td>
       <td>اليوم: ${todayQty.toLocaleString()} كغم</td>
       <td>${halls.length.toLocaleString()} قاعة</td>
       <td><b>${total.toLocaleString()} كغم</b></td>
-      <td>${fieldFeeds.length.toLocaleString()}</td>
-      <td>اضغط لعرض التفاصيل</td>
+      <td>${fieldFeeds.length.toLocaleString()} سجل</td>
+      <td></td>
     </tr>
     <tr id="feedDetail${i}" class="hidden"><td colspan="6">
-      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thLastType')}</th><th>${t('thFeedTotal')}</th><th>${t('thRecords')}</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thLastType')}</th><th>${t('thFeedTotal')}</th><th>${t('thRecords')}</th><th>${t('thNote')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   el.innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thFeedToday')}</th><th>${t('thHalls')}</th><th>${t('thFeedTotal')}</th><th>${t('thRecords')}</th><th>${t('thDetails')}</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">'+t('noRecords')+' '+t('lblFeed')+'</td></tr>'}</tbody>`;
@@ -4051,6 +4196,12 @@ function renderMeds(){
     let halls=batchHallIds(fb);
     meds=meds.filter(x=>fb&&x.field===fb.field&&(!halls.length||halls.includes(+x.hallId)));
   }
+  let mdHall=$('medHallFilter')&&$('medHallFilter').value?+$('medHallFilter').value:0;
+  if(mdHall)meds=meds.filter(x=>+x.hallId===mdHall);
+  let mdFrom=$('medFromDate')&&$('medFromDate').value;
+  let mdTo=$('medToDate')&&$('medToDate').value;
+  if(mdFrom)meds=meds.filter(x=>x.date>=mdFrom);
+  if(mdTo)meds=meds.filter(x=>x.date<=mdTo);
   let fields=[...new Set(meds.map(x=>x.field).filter(Boolean))];
   let rows=fields.map((field,i)=>{
     let fieldMeds=meds.filter(x=>x.field===field);
@@ -4059,36 +4210,36 @@ function renderMeds(){
     let hallRows=halls.map((hall,j)=>{
       let hallMeds=fieldMeds.filter(x=>(x.hall||'—')===hall);
       let latest=hallMeds[0]||{};
-      let dailyRows=hallMeds.map(x=>`<tr>
+      let dailyRows=hallMeds.map(x=>`<tr class="rec-daily-row">
         <td>${fmt(x.date)}</td>
         <td>${esc(x.type||'—')}</td>
         <td><b>${esc(x.name||'—')}</b></td>
         <td>${esc(x.note||'—')}</td>
-        <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMed(${x.id})">حذف</button>`:'—'}</td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditRecord('med',${x.id})">تعديل</button> ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMed(${x.id})">حذف</button>`:''}</td>
       </tr>`).join('');
-      return `<tr class="selectable" onclick="toggleInlineDetails('medHallDetail${i}_${j}')">
-        <td>${esc(hall)}</td>
+      let mdChId=`mdChev${i}_${j}`;
+      return `<tr class="selectable rec-hall-row" onclick="toggleInlineDetails('medHallDetail${i}_${j}','${mdChId}')">
+        <td><span id="${mdChId}" class="hall-chevron" style="transition:transform .2s">◀</span> <b>${esc(hall)}</b></td>
         <td>${fmt(latest.date)}</td>
         <td>${esc(latest.type||'—')}</td>
         <td><b>${esc(latest.name||'—')}</b></td>
         <td>${hallMeds.length.toLocaleString()}</td>
         <td>${esc(latest.note||'—')}</td>
-        <td>اضغط لعرض السجلات اليومية</td>
       </tr>
-      <tr id="medHallDetail${i}_${j}" class="hidden"><td colspan="7">
-        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thType')}</th><th>${t('thMaterial')}</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+      <tr id="medHallDetail${i}_${j}" class="hidden"><td colspan="6">
+        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thType')}</th><th>${t('thMaterial')}</th><th>${t('thNote')}</th><th>إجراء</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
-    return `<tr class="selectable" onclick="toggleInlineDetails('medDetail${i}')" style="background:var(--bg)">
-      <td><b>🏡 ${field}</b></td>
+    let mdfChId=`mdfChev${i}`;
+    return `<tr class="selectable rec-field-row" onclick="toggleInlineDetails('medDetail${i}','${mdfChId}')">
+      <td><span id="${mdfChId}" class="field-chevron">◀</span> 🏡 ${field}</td>
       <td>اليوم: ${todayCount.toLocaleString()}</td>
       <td>${halls.length.toLocaleString()} قاعة</td>
       <td><b>${fieldMeds.length.toLocaleString()} سجل</b></td>
-      <td>${fieldMeds.length.toLocaleString()}</td>
-      <td>اضغط لعرض التفاصيل</td>
+      <td colspan="2"></td>
     </tr>
     <tr id="medDetail${i}" class="hidden"><td colspan="6">
-      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thLastType')}</th><th>${t('thLastMaterial')}</th><th>${t('thRecords')}</th><th>${t('thNote')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thLastType')}</th><th>${t('thLastMaterial')}</th><th>${t('thRecords')}</th><th>${t('thNote')}</th></tr></thead><tbody>${hallRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   el.innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thVaccToday')}</th><th>${t('thHalls')}</th><th>${t('thTotal')}</th><th>${t('thRecords')}</th><th>${t('thDetails')}</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">'+t('noRecords')+' '+t('lblMeds')+'</td></tr>'}</tbody>`;
@@ -4110,6 +4261,12 @@ function renderMort(){
   let morts=data.morts.filter(m=>{let b=data.batches.find(x=>x.id===m.batchId);return isAdmin()||(b&&canSeeField(b.field))}).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   let filterBatchId=$('mortBatchFilter')&&$('mortBatchFilter').value?+$('mortBatchFilter').value:0;
   if(filterBatchId)morts=morts.filter(m=>+m.batchId===filterBatchId);
+  let mHall=$('mortHallFilter')&&$('mortHallFilter').value?+$('mortHallFilter').value:0;
+  if(mHall)morts=morts.filter(m=>+m.hallId===mHall);
+  let mFrom=$('mortFromDate')&&$('mortFromDate').value;
+  let mTo=$('mortToDate')&&$('mortToDate').value;
+  if(mFrom)morts=morts.filter(m=>m.date>=mFrom);
+  if(mTo)morts=morts.filter(m=>m.date<=mTo);
   let fields=[...new Set(morts.map(m=>(data.batches.find(b=>b.id===m.batchId)||{}).field).filter(Boolean))];
   let rows=fields.map((field,i)=>{
     let fieldMorts=morts.filter(m=>(data.batches.find(b=>b.id===m.batchId)||{}).field===field);
@@ -4123,32 +4280,39 @@ function renderMort(){
       let hToday=hallMorts.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
       let dailyRows=hallMorts.map(m=>{
         let mb=data.batches.find(b=>b.id===m.batchId);
-        return `<tr>
+        return `<tr class="rec-daily-row">
           <td>${fmt(m.date)}</td>
           <td>${mb?mb.name:'—'}</td>
           <td>${m.ageDays!=null?m.ageDays+' يوم':'—'}</td>
           <td>${(+m.count||0).toLocaleString()}</td>
           <td>${m.reason||'—'}</td>
-          <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMort(${m.id})">حذف</button>`:'—'}</td>
+          <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditRecord('mort',${m.id})">تعديل</button> ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMort(${m.id})">حذف</button>`:''}</td>
         </tr>`;
       }).join('');
-      return `<tr class="selectable" onclick="toggleInlineDetails('mortHallDetail${i}_${j}')">
-        <td><b>${hall}</b></td>
+      // نسبة النجاح من الهلاك لهذه القاعة
+      let bForHall=hallMorts.length?data.batches.find(b=>b.id===hallMorts[0].batchId):null;
+      let hallAlloc=bForHall?batchAllocatedToHall(bForHall,hallMorts[0]?+hallMorts[0].hallId:0):0;
+      let survivalRate=hallAlloc>0?+(((hallAlloc-hTotal)/hallAlloc)*100).toFixed(1):null;
+      let survColor=survivalRate==null?'var(--ink3)':survivalRate>=95?'#16a34a':survivalRate>=90?'#f59e0b':'#dc2626';
+      let mchId=`mChev${i}_${j}`;
+      return `<tr class="selectable rec-hall-row" onclick="toggleInlineDetails('mortHallDetail${i}_${j}','${mchId}')">
+        <td><span id="${mchId}" class="hall-chevron" style="transition:transform .2s">◀</span> <b>${hall}</b></td>
         <td>${fmt(latest.date)}</td>
         <td>${hToday.toLocaleString()}</td>
         <td><b>${hTotal.toLocaleString()}</b></td>
+        <td><span style="font-weight:700;color:${survColor}">${survivalRate!=null?survivalRate+'% نجاة':'—'}</span></td>
         <td>${hallMorts.length.toLocaleString()}</td>
-        <td>اضغط لعرض السجلات اليومية</td>
       </tr>
       <tr id="mortHallDetail${i}_${j}" class="hidden"><td colspan="6">
-        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thCount')}</th><th>${t('thReason')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
+        <div class="tableWrap"><table><thead><tr><th>${t('thDate')}</th><th>${t('thBatch')}</th><th>${t('thAge')}</th><th>${t('thCount')}</th><th>${t('thReason')}</th><th>إجراء</th></tr></thead><tbody>${dailyRows}</tbody></table></div>
       </td></tr>`;
     }).join('');
-    return `<tr class="selectable" onclick="toggleInlineDetails('mortDetail${i}')" style="background:var(--bg)">
-      <td><b>🏡 ${field}</b></td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMorts.length.toLocaleString()}</td><td colspan="2">اضغط لعرض التفاصيل</td>
+    let mfChId=`mFChev${i}`;
+    return `<tr class="selectable rec-field-row" onclick="toggleInlineDetails('mortDetail${i}','${mfChId}')">
+      <td><span id="${mfChId}" class="field-chevron">◀</span> 🏡 ${field}</td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMorts.length.toLocaleString()} سجل</td><td colspan="2"></td>
     </tr>
     <tr id="mortDetail${i}" class="hidden"><td colspan="6">
-      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thMortToday')}</th><th>${t('thMortTotal')}</th><th>${t('thRecords')}</th><th>${t('thDetails')}</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thMortToday')}</th><th>${t('thMortTotal')}</th><th>نسبة النجاة</th><th>${t('thRecords')}</th></tr></thead><tbody>${detailRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   $('mortTable').innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thMortToday')}</th><th>${t('thMortTotal')}</th><th>${t('thRecords')}</th><th colspan="2">${t('thDetails')}</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:18px">'+t('noRecords')+' هلاك</td></tr>'}</tbody>`;
@@ -4181,8 +4345,10 @@ function addMarket(){
   if(b&&marketHallOptionsForBatch(b).length&&!hallId)return alert('اختر القاعة التي تم تسويقها');
   let count=num('marketCount');
   if(count<=0)return alert('أدخل عدد الطيور المسوقة');
-  if(hallId&&count>batchHallAlive(b,hallId))return alert('العدد أكبر من الحي داخل القاعة. الحي: '+batchHallAlive(b,hallId).toLocaleString());
-  data.markets.push({id:Date.now(),batchId:id,hallId:hallId,hall:hallObj?hallObj.name:'',date:val('marketDate')||today(),count:count,status:val('marketStatus'),note:val('marketNote')});
+  let aliveNow=hallId?batchHallAlive(b,hallId):calc(b).alive;
+  let overDiff=hallId&&count>aliveNow?aliveNow-count:0;
+  if(hallId&&count>aliveNow){if(!confirm('العدد ('+count.toLocaleString()+') أكبر من الحي داخل القاعة ('+aliveNow.toLocaleString()+'). الفرق ('+overDiff.toLocaleString()+') سيُسجَّل بالسالب. هل تريد المتابعة؟'))return;}
+  data.markets.push({id:Date.now(),batchId:id,hallId:hallId,hall:hallObj?hallObj.name:'',date:val('marketDate')||today(),count:count,status:val('marketStatus'),note:val('marketNote'),diff:overDiff||undefined});
   if(b)updateBatchArchiveStatus(b);
   save();renderAll();clearMarketForm();
 }
@@ -4210,7 +4376,15 @@ function renderMarket(){
       let hToday=hallMarkets.filter(m=>m.date===today()).reduce((s,m)=>s+(+m.count||0),0);
       let batches=[...new Set(hallMarkets.map(m=>(data.batches.find(b=>b.id===m.batchId)||{}).name).filter(Boolean))];
       let delBtns=hallMarkets.map(m=>`<button class="btn btn-danger btn-sm" title="${fmt(m.date)}" onclick="deleteMarket(${m.id})">حذف</button>`).join(' ');
-      return `<tr>
+      let mktDailyRows=hallMarkets.map(m=>`<tr>
+        <td>${fmt(m.date)}</td>
+        <td>${(+m.count||0).toLocaleString()}</td>
+        <td>${m.diff&&m.diff<0?`<span style="color:#dc2626;font-weight:700">${m.diff.toLocaleString()}</span>`:'—'}</td>
+        <td>${mktBadge(m.status||'—')}</td>
+        <td>${esc(m.note||'—')}</td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();openEditRecord('market',${m.id})">تعديل</button> ${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteMarket(${m.id})">حذف</button>`:''}</td>
+      </tr>`).join('');
+      return `<tr class="selectable" onclick="toggleInlineDetails('mktHallDetail_${i}_${hall.replace(/\s/g,'')}')">
         <td><b>${hall}</b></td>
         <td>${fmt(latest.date)}</td>
         <td>${hToday.toLocaleString()}</td>
@@ -4218,15 +4392,19 @@ function renderMarket(){
         <td>${hallMarkets.length.toLocaleString()}</td>
         <td>${batches.join(' / ')||'—'}</td>
         <td>${mktBadge(latest.status||'—')}</td>
+        <td>${esc(latest.note||'—')}</td>
         <td>${isDeveloperAdmin()?hallMarkets.map(m=>`<button class="btn btn-secondary btn-sm" onclick="editMarketCount(${m.id})">${(+m.count||0).toLocaleString()}</button>`).join(' '):'—'}</td>
         <td>${isAdmin()?delBtns:'—'}</td>
-      </tr>`;
+      </tr>
+      <tr id="mktHallDetail_${i}_${hall.replace(/\s/g,'')}" class="hidden"><td colspan="10">
+        <div class="tableWrap"><table><thead><tr><th>التاريخ</th><th>العدد</th><th>فرق</th><th>النوع</th><th>ملاحظة</th><th>إجراء</th></tr></thead><tbody>${mktDailyRows}</tbody></table></div>
+      </td></tr>`;
     }).join('');
     return `<tr class="selectable" onclick="toggleInlineDetails('marketDetail${i}')" style="background:var(--bg)">
       <td><b>🏡 ${field}</b></td><td>${todayCount.toLocaleString()}</td><td><b>${total.toLocaleString()}</b></td><td>${fieldMarkets.length.toLocaleString()}</td><td colspan="3">اضغط لعرض التفاصيل</td>
     </tr>
     <tr id="marketDetail${i}" class="hidden"><td colspan="7">
-      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thSaleToday')}</th><th>${t('thSaleTotal')}</th><th>${t('thRecords')}</th><th>${t('thBatches')}</th><th>${t('thLastType')}</th><th>${t('thAdjust')}</th><th>${t('thDelete')}</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+      <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thLastDate')}</th><th>${t('thSaleToday')}</th><th>${t('thSaleTotal')}</th><th>${t('thRecords')}</th><th>${t('thBatches')}</th><th>النوع</th><th>ملاحظة</th><th>تعديل</th><th>حذف</th></tr></thead><tbody>${detailRows}</tbody></table></div>
     </td></tr>`;
   }).join('');
   $('marketTable').innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thSaleToday')}</th><th>${t('thSaleTotal')}</th><th>${t('thRecords')}</th><th colspan="3">${t('thDetails')}</th></tr></thead><tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:18px">'+t('noRecords')+' تسويق</td></tr>'}</tbody>`;
@@ -4250,6 +4428,17 @@ function editMarketCount(id){
   save();renderAll();msg('تم تعديل عدد الطير المسوق');
 }
 
+function forceArchiveBatch(id){
+  if(!isAdmin())return;
+  let b=(data.batches||[]).find(x=>x.id===id);if(!b)return;
+  let c=calc(b);
+  let msg2=`أرشفة الوجبة: ${b.name}\nالطير الحي المتبقي: ${c.alive.toLocaleString()}\n\nسيتم تحويل الوجبة إلى "منتهية" وأرشفتها مع كافة بياناتها.\nهل أنت متأكد؟`;
+  if(!confirm(msg2))return;
+  b.status='منتهية';
+  b.archiveDate=b.archiveDate||today();
+  b.archivedManually=true;
+  save();renderAll();msg(`تمت أرشفة الوجبة: ${b.name} ✅`);
+}
 function updateBatchArchiveStatus(b){
   if(!b)return;
   let c=calc(b);
@@ -5569,7 +5758,7 @@ function batchHallSold(b,hallId){
 }
 function batchHallAlive(b,hallId){
   let alloc=batchAllocatedToHall(b,hallId);
-  return Math.max(0,alloc-batchHallMort(b,hallId)-batchHallSold(b,hallId));
+  return alloc-batchHallMort(b,hallId)-batchHallSold(b,hallId);
 }
 function batchHallAliveBeforeDate(b,hallId,date){
   let alloc=batchAllocatedToHall(b,hallId);
@@ -5651,24 +5840,39 @@ function showHallDetailsInBatch(hallId){
   let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
   let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
   let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
-  let weights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
-  let avg=weights.length?+(weights.reduce((s,w)=>s+(+w.avgWeight||0),0)/weights.length).toFixed(2):'—';
-  let expected=weights.length?+(weights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/weights.length).toFixed(2):'—';
-  let total=weights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  let mortRate=allocated>0?+(mort/allocated*100).toFixed(1):null;
+  let hallWts=(data.weights||[]).filter(w=>+w.hallId===h.id&&weightActualGrams(w)>0).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let lwhall=hallWts[0]||null;
+  let avgActual=lwhall?weightActualGrams(lwhall):0;
+  let avgGuide=lwhall?weightGuideGrams(lwhall):0;
+  let allWeights=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
+  let expected=allWeights.length?+(allWeights.reduce((s,w)=>s+(+w.expectedWeight||0),0)/allWeights.length).toFixed(2):'—';
+  let total=allWeights.reduce((s,w)=>s+(+w.totalWeight||0),0);
+  let lm=lastMedHall(h.id);
   let cells=[
-    ['الحقل',f?f.name:'—'],['القاعة',h.name],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
+    ['الحقل',f?esc(f.name):'—'],['القاعة',esc(h.name)],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
     ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['المتاح',remain.toLocaleString?remain.toLocaleString():remain],
-    ['هلاك القاعة',mort.toLocaleString()],['المسوق',sold.toLocaleString()],['آخر معدل وزن',avg==='—'?'—':avg+' كغ'],
-    ['الوزن المتوقع',expected==='—'?'—':expected+' كغ'],['مجموع الوزن',total?total.toLocaleString()+' كغ':'—']
+    ['هلاك القاعة',mort.toLocaleString()],['% الهلاك',mortRate!=null?mortRate+'%':'—'],['المسوق',sold.toLocaleString()],
+    ['علف اليوم',feedTotalHall(h.id,today()).toLocaleString()+' كغم'],['مجموع العلف',feedTotalHall(h.id).toLocaleString()+' كغم'],
+    ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?esc(lm.name):'—'],
+    ['آخر وزن قاعة',avgActual?avgActual+' غم':'—'],['الكايد المتوقع',avgGuide?avgGuide+' غم':'—'],
+    ['فرق الوزن',(avgActual&&avgGuide)?((avgActual-avgGuide)+' غم'):'—'],
+    ['الوزن المتوقع (كلي)',expected==='—'?'—':expected+' كغ'],['مجموع الوزن',total?total.toLocaleString()+' كغ':'—']
   ];
   let rows=batches.map(x=>{let c=calc(x),lw=latestWeightForBatch(x.id);return `<tr><td>${esc(x.name)}</td><td>${fmt(c.entryDate)}</td><td>${c.isLayer?fmtLayerAge(c.flockAge):c.flockAge+'/40'}</td><td>${batchAllocatedToHall(x,h.id).toLocaleString()}</td><td>${batchHallAlive(x,h.id).toLocaleString()}</td><td>${batchHallMort(x,h.id).toLocaleString()}</td><td>${batchHallSold(x,h.id).toLocaleString()}</td><td>${lw?lw.avgWeight+' كغ':'—'}</td></tr>`}).join('');
-  let detail=$('statsDetail');
-  if(detail)detail.innerHTML=`<div class="detailPanel">
-    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${esc(h.name)}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
+  let el=$('batchHallsPanel');if(!el)return;
+  let prev=el.querySelector('#_hallDetailInner');if(prev)prev.remove();
+  let div=document.createElement('div');
+  div.id='_hallDetailInner';
+  div.innerHTML=`<div class="detailPanel" style="margin-bottom:12px;border:1.5px solid var(--p,#0d9488)">
+    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${esc(h.name)}</span><button class="btn btn-secondary btn-sm" onclick="document.getElementById('_hallDetailInner').remove()">إغلاق ✕</button></div>
     <div class="detailGrid">${cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('')}</div>
     <div class="dp-sub">الوجبات داخل القاعة</div>
     <div class="tableWrap"><table><thead><tr><th>${t('thBatch')}</th><th>${t('thEntryDate')}</th><th>${t('thAge')}</th><th>${t('thCount')}</th><th>${t('thAlive')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thLastWeight')}</th></tr></thead><tbody>${rows||'<tr><td colspan="8">'+t('noActiveBatches')+'</td></tr>'}</tbody></table></div>
   </div>`;
+  let card=el.querySelector('.card');
+  if(card)card.insertBefore(div,card.children[1]||null);else el.prepend(div);
+  div.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function restoreSelectedBatchDetails(){
   let b=data.batches.find(x=>x.id===selectedBatchId);
@@ -5828,62 +6032,111 @@ function renderBatchHallsPanel(b){
     let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
     let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
     let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
-    let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
-    let lwList=batches.map(x=>latestWeightForBatch(x.id)).filter(Boolean);
-    let avg=lwList.length?+(lwList.reduce((s,w)=>s+(+w.avgWeight||0),0)/lwList.length).toFixed(2):'—';
-    let lm=lastMedHall(h.id);
-    return `<tr class="selectable" onclick="showHallDetailsInBatch(${h.id})">
-      <td><b>${esc(h.name)}</b></td><td>${cap?cap.toLocaleString():'—'}</td><td>${allocated.toLocaleString()}</td><td><b>${alive.toLocaleString()}</b></td>
-      <td>${remain.toLocaleString?remain.toLocaleString():remain}</td><td>${occ}</td><td>${mort.toLocaleString()}</td><td>${sold.toLocaleString()}</td>
+    // نسبة الهلاك
+    let mortRate=allocated>0?+(mort/allocated*100).toFixed(1):null;
+    let mortColor=mortRate==null?'var(--ink3)':mortRate<=3?'#16a34a':mortRate<=6?'#f59e0b':'#dc2626';
+    // آخر وزن للقاعة تحديداً
+    let hallWts=(data.weights||[]).filter(w=>+w.hallId===h.id&&weightActualGrams(w)>0).sort((a,bx)=>String(bx.date).localeCompare(String(a.date)));
+    let lwhall=hallWts[0]||null;
+    let lastActualG=lwhall?weightActualGrams(lwhall):0;
+    let lastGuideG=lwhall?weightGuideGrams(lwhall):0;
+    // نسبة الكايد
+    let guideSucc=lastActualG&&lastGuideG?+(lastActualG/lastGuideG*100).toFixed(1):null;
+    let guideColor=guideSucc==null?'var(--ink3)':guideSucc>=100?'#16a34a':'#dc2626';
+    // نسبة الرياضي
+    let mb=batches[0]||null;let ratio=1;
+    if(mb){let d0g=Math.round(expectedWeightForBatch(mb,0)*1000);if(mb.transferBirdWeight&&d0g>0)ratio=mb.transferBirdWeight/d0g;else if(mb.eggWeight&&d0g>0)ratio=(mb.eggWeight*0.67)/d0g;else{let bw=(data.weights||[]).filter(w=>w.batchId===mb.id&&weightActualGrams(w)>0&&weightGuideGrams(w)>0);if(bw.length)ratio=bw.reduce((s,w)=>s+weightActualGrams(w)/weightGuideGrams(w),0)/bw.length;}}
+    let mathPred=lastGuideG?Math.round(lastGuideG*ratio):0;
+    let mathSucc=lastActualG&&mathPred?+(lastActualG/mathPred*100).toFixed(1):null;
+    let mathColor=mathSucc==null?'var(--ink3)':mathSucc>=100?'#7c3aed':'#f59e0b';
+    return `<tr class="selectable" data-hallid="${h.id}" onclick="showHallDetailsInBatch(${h.id})">
+      <td><b>${esc(h.name)}</b></td>
+      <td>${allocated.toLocaleString()}</td>
+      <td><b>${alive.toLocaleString()}</b></td>
+      <td>${mort.toLocaleString()}</td>
+      <td><span style="font-weight:700;color:${mortColor}">${mortRate!=null?mortRate+'%':'—'}</span></td>
+      <td>${sold.toLocaleString()}</td>
       <td>${feedTotalHall(h.id,today()).toLocaleString()} / ${feedTotalHall(h.id).toLocaleString()} كغم</td>
       <td>${medsCountHall(h.id,today()).toLocaleString()} اليوم</td>
-      <td>${lm?esc(lm.name):'—'}</td>
-      <td>${avg==='—'?'—':avg+' كغ'}</td>
+      <td>${lastActualG?lastActualG+' غم':'—'}</td>
+      <td><span style="font-weight:700;color:${guideColor}">${guideSucc!=null?guideSucc+'%':'—'}</span></td>
+      <td><span style="font-weight:700;color:${mathColor}">${mathSucc!=null?mathSucc+'%':'—'}</span></td>
       <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();showHallDetailsInBatch(${h.id})">تفاصيل</button></td>
     </tr>`;
   }).join('');
-  let summary=`<div class="detailPanel" style="margin-bottom:12px">
-    <div class="dp-head"><span class="dp-title">🏡 مجموع الحقل: ${esc(b.field)}</span></div>
-    <div class="detailGrid">
-      <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
-      <div class="dCell"><div class="dc-label">مجموع الطيور</div><div class="dc-val">${ft.allocated.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">الحي الكلي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">علف اليوم</div><div class="dc-val">${ft.feedToday.toLocaleString()} كغم</div></div>
-      <div class="dCell"><div class="dc-label">مجموع العلف</div><div class="dc-val">${ft.feedTotal.toLocaleString()} كغم</div></div>
-      <div class="dCell"><div class="dc-label">لقاحات/أدوية اليوم</div><div class="dc-val">${ft.medsToday}</div></div>
-      <div class="dCell"><div class="dc-label">مجموع اللقاحات/الأدوية</div><div class="dc-val">${ft.medsTotal}</div></div>
+  window._batchHallsPanelBatch=b;
+  let fieldGridHtml=`
+    <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
+    <div class="dCell"><div class="dc-label">مجموع الطيور</div><div class="dc-val">${ft.allocated.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">الحي الكلي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">علف اليوم</div><div class="dc-val">${ft.feedToday.toLocaleString()} كغم</div></div>
+    <div class="dCell"><div class="dc-label">مجموع العلف</div><div class="dc-val">${ft.feedTotal.toLocaleString()} كغم</div></div>
+    <div class="dCell"><div class="dc-label">لقاحات/أدوية اليوم</div><div class="dc-val">${ft.medsToday}</div></div>
+    <div class="dCell"><div class="dc-label">مجموع اللقاحات/الأدوية</div><div class="dc-val">${ft.medsTotal}</div></div>`;
+  el.innerHTML=`<div class="card"><div class="cardTitle"><span class="material-symbols-outlined ct-icon">meeting_room</span> تفاصيل قاعات ${esc(b.field)}</div>
+    <div class="detailPanel" id="_hallSummaryPanel" style="margin-bottom:12px">
+      <div class="dp-head">
+        <span class="dp-title" id="_hallSummaryTitle">🏡 مجموع الحقل: ${esc(b.field)}</span>
+        <button id="_hallSummaryBack" class="btn btn-secondary btn-sm" style="display:none" onclick="resetHallSummaryToField()">↩ مجموع الحقل</button>
+      </div>
+      <div class="detailGrid" id="_hallSummaryGrid">${fieldGridHtml}</div>
     </div>
-  </div>`;
-  el.innerHTML=`<div class="card"><div class="cardTitle"><span class="material-symbols-outlined ct-icon">meeting_room</span> تفاصيل قاعات ${esc(b.field)}</div>${summary}
-    <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thCapacity')}</th><th>${t('thCount')}</th><th>${t('thAlive')}</th><th>${t('thAvailable')}</th><th>${t('thOccupancy')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thFeedTodayTotal')}</th><th>${t('thVaccToday')}</th><th>${t('thLastMaterial')}</th><th>${t('thLastWeight')}</th><th>${t('thAction')}</th></tr></thead><tbody>${rows||'<tr><td colspan="13">'+t('noHalls')+'</td></tr>'}</tbody></table></div></div>`;
+    <div class="tableWrap"><table><thead><tr><th>${t('thHall')}</th><th>${t('thCount')}</th><th>${t('thAlive')}</th><th>${t('thMort')}</th><th>% الهلاك</th><th>${t('thSold')}</th><th>${t('thFeedTodayTotal')}</th><th>${t('thVaccToday')}</th><th>آخر وزن/قاعة</th><th>% كايد</th><th>% رياضي</th><th>${t('thAction')}</th></tr></thead><tbody>${rows||'<tr><td colspan="12">'+t('noHalls')+'</td></tr>'}</tbody></table></div></div>`;
 }
 function showHallDetailsInBatch(hallId){
+  let titleEl=$('_hallSummaryTitle'),gridEl=$('_hallSummaryGrid'),backEl=$('_hallSummaryBack'),panel=$('_hallSummaryPanel');
+  if(!titleEl||!gridEl)return;
   let h=data.halls.find(x=>x.id===+hallId);if(!h)return;
   let f=data.fields.find(x=>x.id===h.fieldId);
-  let batches=visibleBatches().filter(x=>x.transferDate&&!calc(x).completed&&batchAllocatedToHall(x,h.id)>0);
+  let cb=window._batchHallsPanelBatch;
+  let batches=cb?[cb].filter(x=>batchAllocatedToHall(x,h.id)>0):[];
   let allocated=batches.reduce((s,x)=>s+batchAllocatedToHall(x,h.id),0);
   let alive=batches.reduce((s,x)=>s+batchHallAlive(x,h.id),0);
   let mort=batches.reduce((s,x)=>s+batchHallMort(x,h.id),0);
   let sold=batches.reduce((s,x)=>s+batchHallSold(x,h.id),0);
-  let cap=+h.capacity||0,remain=cap?Math.max(0,cap-allocated):'—',occ=cap?((allocated/cap)*100).toFixed(1)+'%':'—';
-  let weights=batches.map(x=>(data.weights||[]).filter(w=>w.batchId===x.id&&+w.hallId===h.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]).filter(Boolean);
-  let avgActual=weights.length?Math.round(weights.reduce((s,w)=>s+weightActualGrams(w),0)/weights.length):0;
-  let avgGuide=weights.length?Math.round(weights.reduce((s,w)=>s+weightGuideGrams(w),0)/weights.length):0;
+  let mortRate=allocated>0?+(mort/allocated*100).toFixed(1):null;
+  let hallWts=(data.weights||[]).filter(w=>+w.hallId===h.id&&(cb?+w.batchId===cb.id:true)&&weightActualGrams(w)>0).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let lwhall=hallWts[0]||null;
+  let avgActual=lwhall?weightActualGrams(lwhall):0;
+  let avgGuide=lwhall?weightGuideGrams(lwhall):0;
   let lm=lastMedHall(h.id);
   let cells=[
-    ['الحقل',f?esc(f.name):'—'],['القاعة',esc(h.name)],['السعة',cap?cap.toLocaleString():'—'],['الإشغال',occ],
-    ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],['هلاك القاعة',mort.toLocaleString()],
+    ['الحقل',f?esc(f.name):'—'],['القاعة',`<b>${esc(h.name)}</b>`],
+    ['عدد القاعة',allocated.toLocaleString()],['الحي داخل القاعة',alive.toLocaleString()],
+    ['هلاك القاعة',mort.toLocaleString()],['% الهلاك',mortRate!=null?`<b style="color:${mortRate<=3?'#16a34a':mortRate<=6?'#f59e0b':'#dc2626'}">${mortRate}%</b>`:'—'],
+    ['المسوق',sold.toLocaleString()],
     ['علف اليوم',feedTotalHall(h.id,today()).toLocaleString()+' كغم'],['مجموع العلف',feedTotalHall(h.id).toLocaleString()+' كغم'],
     ['لقاحات/أدوية اليوم',medsCountHall(h.id,today())],['آخر مادة',lm?esc(lm.name):'—'],
-    ['الوزن الفعلي',avgActual?avgActual+' غم':'—'],['الكايد (المتوقع)',avgGuide?avgGuide+' غم':'—'],
-    ['فرق الوزن',(avgActual&&avgGuide)?((avgActual-avgGuide)+' غم'):'—']
+    ['آخر وزن/قاعة',avgActual?avgActual+' غم':'—'],['الكايد (المتوقع)',avgGuide?avgGuide+' غم':'—'],
+    ['فرق الوزن',(avgActual&&avgGuide)?`<b style="color:${avgActual>=avgGuide?'#16a34a':'#dc2626'}">${avgActual-avgGuide} غم</b>`:'—']
   ];
-  let detail=$('statsDetail');
-  if(detail)detail.innerHTML=`<div class="detailPanel">
-    <div class="dp-head"><span class="dp-title">🚪 تفاصيل القاعة: ${esc(h.name)}</span><button class="btn btn-secondary btn-sm" onclick="restoreSelectedBatchDetails()">رجوع لتفاصيل الوجبة</button></div>
-    <div class="detailGrid">${cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('')}</div>
-  </div>`;
+  titleEl.textContent='🚪 تفاصيل القاعة: '+h.name;
+  gridEl.innerHTML=cells.map(x=>`<div class="dCell"><div class="dc-label">${x[0]}</div><div class="dc-val">${x[1]}</div></div>`).join('');
+  if(backEl)backEl.style.display='';
+  if(panel)panel.style.borderColor='var(--p,#0d9488)';
+  // highlight selected row
+  let tbl=$('batchHallsPanel');
+  if(tbl)tbl.querySelectorAll('tr[data-hallid]').forEach(r=>{r.classList.remove('selectedRow');if(r.dataset.hallid==hallId)r.classList.add('selectedRow');});
+}
+function resetHallSummaryToField(){
+  let b=window._batchHallsPanelBatch;if(!b)return;
+  let titleEl=$('_hallSummaryTitle'),gridEl=$('_hallSummaryGrid'),backEl=$('_hallSummaryBack'),panel=$('_hallSummaryPanel');
+  if(!titleEl||!gridEl)return;
+  let ft=fieldTotals(b.field);
+  titleEl.textContent='🏡 مجموع الحقل: '+b.field;
+  gridEl.innerHTML=`
+    <div class="dCell"><div class="dc-label">عدد القاعات</div><div class="dc-val">${ft.halls.length}</div></div>
+    <div class="dCell"><div class="dc-label">مجموع الطيور</div><div class="dc-val">${ft.allocated.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">الحي الكلي</div><div class="dc-val">${ft.alive.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">هلاك كل القاعات</div><div class="dc-val">${ft.mort.toLocaleString()}</div></div>
+    <div class="dCell"><div class="dc-label">علف اليوم</div><div class="dc-val">${ft.feedToday.toLocaleString()} كغم</div></div>
+    <div class="dCell"><div class="dc-label">مجموع العلف</div><div class="dc-val">${ft.feedTotal.toLocaleString()} كغم</div></div>
+    <div class="dCell"><div class="dc-label">لقاحات/أدوية اليوم</div><div class="dc-val">${ft.medsToday}</div></div>
+    <div class="dCell"><div class="dc-label">مجموع اللقاحات/الأدوية</div><div class="dc-val">${ft.medsTotal}</div></div>`;
+  if(backEl)backEl.style.display='none';
+  if(panel)panel.style.borderColor='';
+  let tbl=$('batchHallsPanel');if(tbl)tbl.querySelectorAll('tr[data-hallid].selectedRow').forEach(r=>r.classList.remove('selectedRow'));
 }
 
 function fieldMorts(fieldName){
@@ -6017,6 +6270,35 @@ function renderChartsPage(fieldName=''){
   if(fieldName)renderFieldChart(fieldName,hallId);
   else if($('fieldChartPanel'))$('fieldChartPanel').innerHTML='<div class="warnBox free" style="display:block">اختر حقلاً لعرض المخطط البياني.</div>';
 }
+function buildWeightSuccessDash(){
+  let activeBatches=visibleBatches().filter(b=>calc(b).transferred&&!calc(b).completed);
+  if(!activeBatches.length)return '';
+  let rows=activeBatches.map(b=>{
+    let wsr=batchWeightSuccessRates(b);
+    let gc=wsr.guide==null?'var(--ink3)':wsr.guide>=100?'#16a34a':'#dc2626';
+    let mc=wsr.math==null?'var(--ink3)':wsr.math>=100?'#7c3aed':'#f59e0b';
+    let lw=latestWeightForBatch(b.id);
+    let lastAge=lw&&lw.ageDays!=null?lw.ageDays+' يوم':'—';
+    let lastActual=lw?weightActualGrams(lw)+' غم':'—';
+    let lastGuide=lw?weightGuideGrams(lw)+' غم':'—';
+    return `<tr>
+      <td><b>${esc(b.name)}</b></td>
+      <td>${esc(b.field||'—')}</td>
+      <td>${lastAge}</td>
+      <td>${lastActual}</td>
+      <td>${lastGuide}</td>
+      <td style="font-weight:800;color:${gc}">${wsr.guide!=null?wsr.guide+'%':'—'}</td>
+      <td style="font-weight:800;color:${mc}">${wsr.math!=null?wsr.math+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:16px;border-top:3px solid #2563eb">
+    <div class="cardTitle"><span class="material-symbols-outlined ct-icon">monitor_weight</span> نسبة نجاح الأوزان — كل الوجبات النشطة</div>
+    <div class="tableWrap"><table>
+      <thead><tr><th>الوجبة</th><th>الحقل</th><th>آخر عمر مسجل</th><th>آخر وزن فعلي</th><th>الكايد</th><th style="color:#16a34a">نجاح / كايد</th><th style="color:#7c3aed">نجاح / رياضي</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
+}
 function buildFieldsDashboard(){
   let fields=data.fields.filter(f=>canSeeField(f.name));
   if(!fields.length)return selectedDetails(null);
@@ -6123,6 +6405,162 @@ function showFieldDetails(fieldName){
     requestAnimationFrame(animateCards);
   };
 })();
+
+// ── EDIT RECORD MODAL ──
+let _editType='',_editId=0;
+
+function openEditRecord(type,id){
+  _editType=type;_editId=id;
+  let modal=$('editRecordModal');
+  let titles={weight:'تعديل سجل الوزن',feed:'تعديل سجل العلف',med:'تعديل سجل الدواء/اللقاح',mort:'تعديل سجل الهلاك',market:'تعديل سجل التسويق'};
+  $('editModalTitle').textContent=titles[type]||'تعديل السجل';
+  let body='';
+  if(type==='weight'){
+    let r=(data.weights||[]).find(x=>x.id===id);if(!r)return;
+    let b=(data.batches||[]).find(x=>x.id===r.batchId);
+    let bName=b?b.name:'';
+    body=`
+      <div class="formGrid">
+        <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))} " readonly style="background:#f1f5f9;color:#64748b"></div>
+        <div class="formGroup"><label>التاريخ</label><input id="em_date" type="date" value="${r.date||''}"></div>
+        <div class="formGroup"><label>عمر الطير (يوم)</label><input id="em_ageDays" type="number" value="${r.ageDays!=null?r.ageDays:''}"></div>
+        <div class="formGroup"><label>الحي (طير)</label><input id="em_alive" type="number" value="${r.alive||''}"></div>
+        <div class="formGroup"><label>الوزن الفعلي (غم)</label><input id="em_actual" type="number" value="${r.actual_weight_grams||''}"></div>
+        <div class="formGroup"><label>الكايد (غم)</label><input id="em_guide" type="number" value="${r.guideWeightGrams||''}"></div>
+        <div class="formGroup" style="grid-column:1/-1"><label>ملاحظة</label><input id="em_note" type="text" value="${esc(r.note||'')}"></div>
+      </div>`;
+  } else if(type==='feed'){
+    let r=(data.feeds||[]).find(x=>x.id===id);if(!r)return;
+    let b=(data.batches||[]).find(x=>x.id===r.batchId);
+    let bName=b?b.name:'';
+    let ftOpts=['بادئ','نامي','ناهي','بادئ+نامي','نامي+ناهي'].map(t=>`<option${r.feedType===t?' selected':''}>${t}</option>`).join('');
+    body=`
+      <div class="formGrid">
+        <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))}" readonly style="background:#f1f5f9;color:#64748b"></div>
+        <div class="formGroup"><label>التاريخ</label><input id="em_date" type="date" value="${r.date||''}"></div>
+        <div class="formGroup"><label>عمر الطير (يوم)</label><input id="em_ageDays" type="number" value="${r.ageDays!=null?r.ageDays:''}"></div>
+        <div class="formGroup"><label>نوع العلف</label><select id="em_feedType">${ftOpts}</select></div>
+        <div class="formGroup"><label>الكمية (كغم)</label><input id="em_qty" type="number" step="0.01" value="${r.qty||''}"></div>
+        <div class="formGroup" style="grid-column:1/-1"><label>ملاحظة</label><input id="em_note" type="text" value="${esc(r.note||'')}"></div>
+      </div>`;
+  } else if(type==='med'){
+    let r=(data.meds||[]).find(x=>x.id===id);if(!r)return;
+    let b=(data.batches||[]).find(x=>x.id===r.batchId);
+    let bName=b?b.name:'';
+    body=`
+      <div class="formGrid">
+        <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))}" readonly style="background:#f1f5f9;color:#64748b"></div>
+        <div class="formGroup"><label>التاريخ</label><input id="em_date" type="date" value="${r.date||''}"></div>
+        <div class="formGroup"><label>عمر الطير (يوم)</label><input id="em_ageDays" type="number" value="${r.ageDays!=null?r.ageDays:''}"></div>
+        <div class="formGroup"><label>النوع</label><input id="em_type" type="text" value="${esc(r.type||'')}"></div>
+        <div class="formGroup"><label>الاسم / المادة</label><input id="em_name" type="text" value="${esc(r.name||'')}"></div>
+        <div class="formGroup"><label>الجرعة</label><input id="em_dose" type="text" value="${esc(r.dose||'')}"></div>
+        <div class="formGroup"><label>الكمية</label><input id="em_qty" type="number" step="0.01" value="${r.qty||''}"></div>
+        <div class="formGroup" style="grid-column:1/-1"><label>ملاحظة</label><input id="em_note" type="text" value="${esc(r.note||'')}"></div>
+      </div>`;
+  } else if(type==='mort'){
+    let r=(data.morts||[]).find(x=>x.id===id);if(!r)return;
+    let b=(data.batches||[]).find(x=>x.id===r.batchId);
+    let bName=b?b.name:'';
+    body=`
+      <div class="formGrid">
+        <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))}" readonly style="background:#f1f5f9;color:#64748b"></div>
+        <div class="formGroup"><label>التاريخ</label><input id="em_date" type="date" value="${r.date||''}"></div>
+        <div class="formGroup"><label>عمر الطير (يوم)</label><input id="em_ageDays" type="number" value="${r.ageDays!=null?r.ageDays:''}"></div>
+        <div class="formGroup"><label>العدد</label><input id="em_count" type="number" value="${r.count||''}"></div>
+        <div class="formGroup" style="grid-column:1/-1"><label>السبب</label><input id="em_reason" type="text" value="${esc(r.reason||'')}"></div>
+      </div>`;
+  } else if(type==='market'){
+    let r=(data.markets||[]).find(x=>x.id===id);if(!r)return;
+    let b=(data.batches||[]).find(x=>x.id===r.batchId);
+    let bName=b?b.name:'';
+    let stOpts=['تسويق إلى المجزرة','بيع مباشر','تحويل','أخرى'].map(s=>`<option${r.status===s?' selected':''}>${s}</option>`).join('');
+    body=`
+      <div class="formGrid">
+        <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))}" readonly style="background:#f1f5f9;color:#64748b"></div>
+        <div class="formGroup"><label>التاريخ</label><input id="em_date" type="date" value="${r.date||''}"></div>
+        <div class="formGroup"><label>العدد</label><input id="em_count" type="number" value="${r.count||''}"></div>
+        <div class="formGroup"><label>النوع</label><select id="em_status">${stOpts}</select></div>
+        <div class="formGroup" style="grid-column:1/-1"><label>ملاحظة</label><input id="em_note" type="text" value="${esc(r.note||'')}"></div>
+      </div>`;
+  }
+  $('editModalBody').innerHTML=body;
+  modal.classList.add('show');
+}
+
+function closeEditRecord(){
+  $('editRecordModal').classList.remove('show');
+  _editType='';_editId=0;
+}
+
+function saveEditRecord(){
+  if(!_editType||!_editId)return;
+  let v=id=>$(id)?$(id).value:'';
+  let n=id=>$(id)?+$(id).value||0:0;
+
+  if(_editType==='weight'){
+    let r=(data.weights||[]).find(x=>x.id===_editId);if(!r)return;
+    r.date=v('em_date')||r.date;
+    let agV=v('em_ageDays');r.ageDays=agV!==''?+agV:r.ageDays;
+    r.alive=n('em_alive')||r.alive;
+    let actual=n('em_actual');let guide=n('em_guide');
+    if(actual)r.actual_weight_grams=actual;
+    if(guide)r.guideWeightGrams=guide;
+    if(actual&&guide){r.achievementPct=+(actual/guide*100).toFixed(1);r.diff=+(r.achievementPct-100).toFixed(1);}
+    if(actual){r.avgWeight=+(actual/1000).toFixed(3);}
+    r.note=v('em_note');
+
+  } else if(_editType==='feed'){
+    let r=(data.feeds||[]).find(x=>x.id===_editId);if(!r)return;
+    r.date=v('em_date')||r.date;
+    let agV=v('em_ageDays');r.ageDays=agV!==''?+agV:r.ageDays;
+    r.feedType=v('em_feedType')||r.feedType;
+    let qty=n('em_qty');if(qty)r.qty=qty;
+    r.note=v('em_note');
+    if(r.qty&&r.hallId){let b=(data.batches||[]).find(x=>x.id===r.batchId);if(b){let alive=batchHallAlive(b,+r.hallId);r.gramsPerBird=alive?parseFloat((r.qty*1000/alive).toFixed(2)):0;}}
+
+  } else if(_editType==='med'){
+    let r=(data.meds||[]).find(x=>x.id===_editId);if(!r)return;
+    r.date=v('em_date')||r.date;
+    let agV=v('em_ageDays');r.ageDays=agV!==''?+agV:r.ageDays;
+    r.type=v('em_type')||r.type;
+    r.name=v('em_name')||r.name;
+    r.dose=v('em_dose');
+    let qty=n('em_qty');if(qty)r.qty=qty;
+    r.note=v('em_note');
+
+  } else if(_editType==='mort'){
+    let r=(data.morts||[]).find(x=>x.id===_editId);if(!r)return;
+    r.date=v('em_date')||r.date;
+    let agV=v('em_ageDays');r.ageDays=agV!==''?+agV:r.ageDays;
+    let cnt=n('em_count');if(cnt)r.count=cnt;
+    r.reason=v('em_reason');
+
+  } else if(_editType==='market'){
+    let r=(data.markets||[]).find(x=>x.id===_editId);if(!r)return;
+    r.date=v('em_date')||r.date;
+    let cnt=n('em_count');if(cnt)r.count=cnt;
+    r.status=v('em_status')||r.status;
+    r.note=v('em_note');
+  }
+
+  save();renderAll();closeEditRecord();msg('تم حفظ التعديل');
+}
 </script>
+
+<!-- EDIT RECORD MODAL -->
+<div id="editRecordModal" class="editModalOverlay" onclick="if(event.target===this)closeEditRecord()">
+  <div class="editModalBox">
+    <div class="editModalHead">
+      <h3 id="editModalTitle">تعديل السجل</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeEditRecord()">✕</button>
+    </div>
+    <div class="editModalBody" id="editModalBody"></div>
+    <div class="editModalFoot">
+      <button class="btn btn-primary" onclick="saveEditRecord()">💾 حفظ التعديل</button>
+      <button class="btn btn-secondary" onclick="closeEditRecord()">إلغاء</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
