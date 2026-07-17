@@ -1,0 +1,19 @@
+{
+  "name": "chicken-field-system",
+  "version": "2.0.0",
+  "description": "نظام إدارة حقول الدواجن - تطبيق ويب (Frontend) + Backend API + SQL Server",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "start.bat",
+    "dev": "node backend/server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "adm-zip": "^0.5.17",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "mssql": "^11.0.1",
+    "openai": "^6.45.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

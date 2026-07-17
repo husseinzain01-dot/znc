@@ -1,0 +1,42 @@
+const { sql } = require('../db');
+const { createCrudRouter } = require('./crud');
+
+// id الوجبة يُولَّد من الواجهة (Date.now()) للحفاظ على التوافق مع البيانات القديمة
+module.exports = createCrudRouter({
+  table: 'dbo.batches',
+  entity: 'batches',
+  orderBy: 'created_at DESC',
+  filters: ['field_id', 'field_name', 'type'],
+  columns: [
+    { name: 'id', type: sql.BigInt, isId: true, required: true, label: 'معرّف الوجبة' },
+    { name: 'name', type: sql.NVarChar(150) },
+    { name: 'type', type: sql.NVarChar(20) },
+    { name: 'field_id', type: sql.Int },
+    { name: 'field_name', type: sql.NVarChar(150) },
+    { name: 'hall', type: sql.NVarChar(150) },
+    { name: 'hatch_date', type: sql.Date },
+    { name: 'transfer_date', type: sql.Date },
+    { name: 'field_entry_date', type: sql.Date },
+    { name: 'bird_strain', type: sql.NVarChar(100) },
+    { name: 'eggs', type: sql.Int },
+    { name: 'set_eggs', type: sql.Int },
+    { name: 'bad_eggs', type: sql.Int },
+    { name: 'hatched', type: sql.Int },
+    { name: 'vaccine_deaths', type: sql.Int },
+    { name: 'isolated_birds', type: sql.Int },
+    { name: 'net_hatch', type: sql.Int },
+    { name: 'field_birds', type: sql.Int },
+    { name: 'fixed_hatch_rate', type: sql.Decimal(6, 2) },
+    { name: 'layer_init_weeks', type: sql.Int },
+    { name: 'layer_init_days', type: sql.Int },
+    { name: 'layer_source', type: sql.NVarChar(20) },
+    { name: 'alert_age', type: sql.Int },
+    { name: 'market_age', type: sql.Int },
+    { name: 'transfer_bird_weight', type: sql.Decimal(10, 2) },
+    { name: 'extra_json', type: sql.NVarChar(sql.MAX) },
+    { name: 'created_at', type: sql.DateTime2, computed: true },
+    { name: 'updated_at', type: sql.DateTime2, computed: true },
+    { name: 'created_by', type: sql.NVarChar(100) },
+    { name: 'updated_by', type: sql.NVarChar(100) },
+  ],
+});

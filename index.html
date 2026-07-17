@@ -1,0 +1,819 @@
+﻿<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>زهور الوطن — نظام إدارة الوجبات</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+
+<!-- LOGIN -->
+<div id="loginBox" class="login">
+  <div class="loginCard">
+    <div class="loginLogo"><span class="material-symbols-outlined" style="font-size:32px;color:#fff;font-variation-settings:'FILL' 1,'wght' 500">egg</span></div>
+    <h2 data-i18n="appName">زهور الوطن</h2>
+    <p data-i18n="appSub">نظام إدارة الوجبات والحقول</p>
+    <form onsubmit="loginNow();return false;" style="display:contents">
+    <div class="fld">
+      <label data-i18n="username">البريد الإلكتروني أو اسم المستخدم</label>
+      <input id="loginUser" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="fld">
+      <label data-i18n="password">كلمة المرور</label>
+      <input id="loginPass" type="password" autocomplete="current-password">
+    </div>
+    <button type="submit" class="btnPrimary" data-i18n="login">تسجيل الدخول</button>
+    </form>
+    <p id="loginMsg"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="layout hidden">
+  <!-- Overlay للموبايل -->
+  <div class="sideOverlay" id="sideOverlay" onclick="toggleSide()"></div>
+
+  <aside class="side">
+    <div class="sideTop">
+      <div class="brand">
+        <div class="brandIcon"><span class="material-symbols-outlined" style="font-size:18px;color:#fff;font-variation-settings:'FILL' 1,'wght' 500">egg</span></div>
+        <div class="brandTexts"><div class="brandName" data-i18n="appName">زهور الوطن</div><div class="brandSub" data-i18n="appSub2">للإنتاج الزراعي</div></div>
+      </div>
+      <button class="hamburger" onclick="toggleSide()" title="إخفاء/إظهار القائمة">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="sideVer">v27.0</div>
+    </div>
+    <nav class="sideNav" id="sideNav">
+      <!-- rendered by buildNav() -->
+    </nav>
+    <div class="sideBottom">
+      <div class="userChip">
+        <div class="userAvatar" id="userAvatar">—</div>
+        <div class="userInfo">
+          <div class="userName" id="userNameDisplay">—</div>
+          <div class="userRole" id="userRoleDisplay">—</div>
+        </div>
+      </div>
+      <button class="navOut" onclick="logout()"><span class="material-symbols-outlined" style="font-size:18px">logout</span><span class="navOutText" data-i18n="logout">تسجيل الخروج</span></button>
+      <button class="langToggle" onclick="toggleLang()" id="langBtn" title="Switch Language">
+        <span class="material-symbols-outlined" style="font-size:16px">translate</span>
+        <span id="langBtnTxt">EN</span>
+      </button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="pageHeader">
+      <div style="display:flex;align-items:center;gap:10px">
+        <h1 id="title">لوحة المعلومات</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="dbState" style="display:none"></div>
+        <button onclick="toggleLang()" id="langBtnHeader"
+          style="display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--ink2);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.3px">
+          <span class="material-symbols-outlined" style="font-size:16px">translate</span>
+          <span id="langBtnTxt2">EN</span>
+        </button>
+      </div>
+    </div>
+    <!-- INNER PAGE BREADCRUMB BAR -->
+    <div id="innerPageBar" class="innerPageBar hidden">
+      <button class="ipb-back" onclick="show('dash',null)"><span class="material-symbols-outlined" style="font-size:15px">dashboard</span> <span data-i18n="backHome">الرئيسية</span></button>
+      <span class="ipb-sep">›</span>
+      <span class="ipb-title" id="innerPageTitle"></span>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="dash" class="page">
+      <div id="statsCards" class="statsGrid"></div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">inventory</span> <span data-i18n="ctActiveBatches">الوجبات النشطة</span></div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث عن الوجبة</label><input id="batchSearch" placeholder="اكتب اسم الوجبة أو الحقل أو القاعة" oninput="renderBatches()"></div>
+        </div>
+        <div class="tableWrap"><table id="batchTable"></table></div>
+      </div>
+      <div id="statsDetail"></div>
+      <div id="batchHallsPanel"></div>
+    </section>
+
+    <!-- CHARTS -->
+    <section id="charts" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">bar_chart</span> <span data-i18n="ctFieldChart">مخطط بياني لحالة الحقل</span></div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="chartField" onchange="onChartFieldChange()"></select></div>
+          <div class="formGroup"><label data-i18n="lblHall">القاعة</label><select id="chartHall" onchange="renderChartsPage()"><option value="">${t('allHalls')}</option></select></div>
+        </div>
+        <div id="fieldChartPanel"></div>
+      </div>
+    </section>
+
+    <!-- ADD BATCH (admin only) -->
+    <section id="batch" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">egg</span> <span data-i18n="ctNewBatch">تسجيل وجبة تفقيس</span></div>
+        <input type="hidden" id="editId">
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الوجبة *</label><input id="bName" placeholder="مثال: وجبة يونيو 1"></div>
+          <div class="formGroup"><label>تاريخ استلام البيض</label><input id="eggReceiveDate" type="date"></div>
+          <div class="formGroup"><label>تاريخ الترقيد *</label><input id="hatchDate" type="date"></div>
+          <div class="formGroup"><label data-i18n="lblType">النوع</label><select id="bType" onchange="toggleLayerFields()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
+          <div class="formGroup"><label data-i18n="lblStrain">سلالة الطير</label><select id="birdStrain"><option>Ross 308</option><option>Ross 708</option><option>Cobb 500</option><option>Cobb 700</option><option>Arbor Acres</option><option>Hubbard</option><option>Indian River</option><option>Sasso (بلدي مطور)</option><option>Lohmann Brown</option><option>Lohmann LSL</option><option>Hy-Line Brown</option><option>Hy-Line W-36</option><option>ISA Brown</option><option>Bovans Brown</option><option>Bovans White</option><option>Dekalb White</option><option>Novogen Brown</option><option>H&N Brown</option><option>بياض تجاري</option></select></div>
+          <div class="formGroup"><label data-i18n="lblSupplier">المورد</label><input id="batchSupplier" list="supplierList" placeholder="اسم المورد"></div>
+          <div class="formGroup"><label data-i18n="lblCompany">الشركة</label><input id="batchCompany" list="companyList" placeholder="اسم الشركة"></div>
+          <datalist id="supplierList"></datalist>
+          <datalist id="companyList"></datalist>
+          <div class="formGroup"><label>الحقل المراد النقل إليه</label><select id="batchTargetField"></select></div>
+          <div class="formGroup"><label>معدل وزن البيضة (غم)</label><input id="eggWeight" type="number" min="0" step="0.1" placeholder="مثال: 62.5"></div>
+          <div class="formGroup"><label>عمر الأم (أسبوع)</label><input id="motherAge" type="number" min="0" placeholder="مثال: 35"></div>
+          <div class="formGroup"><label>البيض الداخل</label><input id="eggs" type="number" min="0" oninput="updateSetEggs()"></div>
+          <div class="formGroup"><label>البيض التالف</label><input id="badEggs" type="number" min="0" value="0" oninput="updateSetEggs()"></div>
+          <div class="formGroup"><label>عدد البيض المرقد</label><input id="setEggs" type="number" min="0" readonly></div>
+          <!-- حقول البياض الإضافية -->
+          <div class="formGroup hidden" id="grpLayerSource"><label>مصدر الوجبة</label><select id="layerSource" onchange="toggleLayerAge()"><option value="مفقس">من المفقس (عمر = 0 عند الدخول)</option><option value="شراء">شراء دجاج جاهز (عمر يدوي)</option></select></div>
+          <div class="formGroup hidden" id="grpLayerAge"><label>عمر الطير عند الشراء (أسبوع)</label><input id="layerInitWeeks" type="number" min="0" value="0" placeholder="أسابيع"></div>
+          <div class="formGroup hidden" id="grpLayerAgeDays"><label>+ أيام إضافية</label><input id="layerInitDays" type="number" min="0" max="6" value="0" placeholder="0-6"></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="note"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveBatch()">💾 حفظ الوجبة</button>
+          <button class="btn btn-secondary" onclick="clearForm()">مسح</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUPPLIERS -->
+    <section id="suppliers" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">business</span> <span data-i18n="ctSuppliers">الموردين والشركات</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">تتجمع هذه القائمة تلقائياً من بيانات وجبات التفقيس.</p>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث</label><input id="supplierSearch" placeholder="اكتب اسم المورد أو الشركة أو السلالة" oninput="renderSuppliers()"></div>
+        </div>
+        <div id="supplierStats" class="statsGrid"></div>
+        <div class="tableWrap"><table id="suppliersTable"></table></div>
+      </div>
+    </section>
+
+
+    <!-- LAYER PURCHASE (admin only) -->
+    <section id="layerPurchase" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">storefront</span> <span data-i18n="ctBuyLayer">شراء طير البياض</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">عملية مستقلة عن نقل الفقسة. اختر الحقل والقاعة، ولا يسمح النظام بتجاوز الطاقة الاستيعابية للقاعة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الوجبة *</label><input id="lpName" placeholder="مثال: بياض شراء 1"></div>
+          <div class="formGroup"><label>تاريخ الدخول إلى الحقل *</label><input id="lpDate" type="date"></div>
+          <div class="formGroup"><label>الحقل *</label><select id="lpField" onchange="onLayerPurchaseFieldChange()"></select></div>
+          <div class="formGroup"><label>القاعة *</label><select id="lpHall" onchange="checkLayerPurchaseCapacity()"></select></div>
+          <div class="formGroup"><label>عدد الطير الداخل *</label><input id="lpBirds" type="number" min="1" oninput="checkLayerPurchaseCapacity()"></div>
+          <div class="formGroup"><label>عمر الطير عند الشراء (أسبوع)</label><input id="lpWeeks" type="number" min="0" value="0"></div>
+          <div class="formGroup"><label>+ أيام إضافية</label><input id="lpDays" type="number" min="0" max="6" value="0"></div>
+          <div class="formGroup"><label>وزن الطير عند الدخول (غرام)</label><input id="lpChickWeight" type="number" min="0"></div>
+          <div class="formGroup"><label>معدل الوزن الحالي (كغ)</label><input id="lpAvgWeight" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="lpNote"></div>
+        </div>
+        <div id="lpWarn" class="warnBox"></div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveLayerPurchase()">💾 حفظ شراء البياض</button>
+          <button class="btn btn-secondary" onclick="clearLayerPurchaseForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">list_alt</span> <span data-i18n="ctLayerList">وجبات البياض المشتراة</span></div>
+        <div class="tableWrap"><table id="layerPurchaseTable"></table></div>
+      </div>
+    </section>
+
+    <!-- TRANSFER (admin only) -->
+    <section id="transfer" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">swap_horiz</span> <span data-i18n="ctTransfer">نقل الفقسة إلى الحقل</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblBatch">الوجبة</label><select id="transferBatch" onchange="fillTransferPreview()"></select></div>
+          <div class="formGroup"><label>تاريخ دخول الحقل</label><input id="transferDate" type="date"></div>
+          <div class="formGroup">
+            <label>الحقل المستهدف</label>
+            <select id="transferField" onchange="onTransferFieldChange()"></select>
+            <div id="fieldWarn" class="warnBox"></div>
+          </div>
+          <!-- قاعة — تظهر فقط للحقول التي تحتوي قاعات -->
+          <div class="formGroup" id="grpTransferHall">
+            <label>القاعة المراد إضافة الطير إليها</label>
+            <select id="transferHall" onchange="checkFieldOccupancy()"></select>
+          </div>
+          <div class="formGroup"><label>إجمالي البيض المرقد (المفحوص)</label><input id="transferExamined" type="number" min="0" oninput="updateTransferCandle()"></div>
+          <div class="formGroup"><label>صافي عدد الطير</label><input id="transferNet" type="number" min="0" oninput="updateTransferAll()"></div>
+          <div class="formGroup"><label>نسبة الفحص الضوئي %</label><input id="transferCandle" type="number" min="0" max="100" step="0.01" readonly placeholder="تحسب تلقائياً"></div>
+          <div class="formGroup"><label>عدد التالف بعد الفحص الضوئي</label><input id="transferDamaged" type="number" min="0" readonly placeholder="تحسب تلقائياً"></div>
+          <div class="formGroup"><label>هلاك اللقاح</label><input id="vaccineDeaths" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
+          <div class="formGroup"><label>الطير العزل داخل المفقس</label><input id="isolatedBirds" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
+          <div class="formGroup"><label>الطير غير صالح للتربية</label><input id="unfitBirds" type="number" min="0" value="0" oninput="updateTransferIsolation()"></div>
+          <div class="formGroup"><label>الطير الجاهز للنقل</label><div style="display:flex;gap:8px;align-items:center"><div id="transferReadyNet" style="flex:1;font-size:1rem;font-weight:700;color:var(--green,#16a34a);background:var(--green2,#dcfce7);border-radius:var(--r2,8px);padding:6px 10px;text-align:center">—</div><button type="button" class="btn btn-secondary" style="white-space:nowrap;font-size:12px" onclick="distributeToAllHalls()" title="توزيع الطير بالتساوي على جميع قاعات الحقل">⚖️ وزّع على القاعات</button></div></div>
+          <div class="formGroup"><label>نسبة العزل الضوئي %</label><input id="transferIsolationRate" type="number" min="0" max="100" step="0.01" readonly placeholder="تحسب تلقائياً"></div>
+          <div class="formGroup"><label>عدد الطير المراد نقله الآن</label><input id="fieldBirds" type="number" min="0" oninput="checkFieldOccupancy()"></div>
+          <div class="formGroup"><label>وزن الطير عند النقل (غرام)</label><input id="transferBirdWeight" type="number" min="0" placeholder="مثال: 42"></div>
+          <div class="formGroup"><label>عمر تنبيه الحقل (يوم)</label><input id="transferAlertAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
+          <div class="formGroup"><label>عمر التسويق المتوقع (يوم)</label><input id="transferMarketAge" type="number" min="1" value="35" title="يُملأ تلقائياً من الوجبة عند الجلب"></div>
+          <div class="formGroup"><label>مسؤول الوجبة / المشرف</label><input id="transferSupervisor" placeholder="اسم المشرف المسؤول"></div>
+          <div class="formGroup"><label>الدكتور البيطري</label><input id="transferVet" placeholder="اسم الدكتور البيطري"></div>
+
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveTransfer()">✅ تأكيد النقل</button>
+          <button class="btn btn-secondary" onclick="fillTransferPreview()">جلب بيانات الوجبة</button>
+        </div>
+        <div id="transferPreview" style="margin-top:16px"></div>
+        <div style="margin-top:18px">
+          <div class="cardTitle" style="margin-bottom:10px"><span class="material-symbols-outlined ct-icon">move_down</span> <span data-i18n="ctTransferList">الوجبات المنقولة</span></div>
+          <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">اضغط على أي وجبة منقولة لتعديل بيانات النقل. التعديل للمدير فقط.</p>
+          <div class="tableWrap"><table id="transferredTable"></table></div>
+          <div id="transferAllocationsSummary" style="margin-top:14px"></div>
+          
+        </div>
+      </div>
+    </section>
+
+    <!-- MORTALITY -->
+    <section id="mort" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> <span data-i18n="ctLogMort">تسجيل هلاك — قاعة واحدة</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="mortField" onchange="onMortFieldChange()"></select></div>
+          <div class="formGroup"><label data-i18n="lblBatch">الوجبة</label><select id="mortBatch" onchange="onMortBatchChange()"></select></div>
+          <div class="formGroup"><label>القاعة التي حدث بها الهلاك</label><select id="mortHall"></select></div>
+          <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="mortDate" type="date" oninput="updateMortAge()" onchange="updateMortAge()"></div>
+          <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="mortAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
+          <div class="formGroup"><label data-i18n="lblCount">العدد</label><input id="mortCount" type="number" min="1"></div>
+          <div class="formGroup"><label data-i18n="lblReason">السبب</label><input id="mortReason"></div>
+        </div>
+        <div class="formActions"><button class="btn btn-danger" onclick="addMort()">تسجيل الهلاك</button></div>
+      </div>
+      <!-- هلاك جماعي لكل القاعات -->
+      <div class="card" style="border-top:3px solid #dc2626">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">heart_minus</span> تسجيل هلاك جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">اختر الوجبة والتاريخ — أدخل عدد الهلاك لكل قاعة ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="mortBulkField" onchange="onMortBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="mortBulkBatch" onchange="buildMortHallsGrid();updateBulkAge('mortBulkBatch','mortBulkDate','mortBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="mortBulkDate" type="date" onchange="buildMortHallsGrid();updateBulkAge('mortBulkBatch','mortBulkDate','mortBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="mortBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
+          <div class="formGroup"><label>السبب العام</label><input id="mortBulkReason" placeholder="اختياري — يُطبّق على كل القاعات"></div>
+        </div>
+        <div id="mortHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-danger" onclick="saveAllMorts()">💾 حفظ هلاك جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearMortBulkForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">clinical_notes</span> <span data-i18n="ctMortLog">سجل الهلاكات</span></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="mortBatchFilter" onchange="renderMort();fillRecHallFilter('mort')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="mortHallFilter" onchange="renderMort()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="mortFromDate" onchange="renderMort()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="mortToDate" onchange="renderMort()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('mort')">✕ مسح</button>
+        </div>
+        <div class="tableWrap"><table id="mortTable"></table></div>
+      </div>
+    </section>
+
+    <!-- MARKET -->
+    <section id="market" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">sell</span> <span data-i18n="ctLogSale">تسجيل عملية تسويق</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblBatch">الوجبة</label><select id="marketBatch" onchange="fillMarketHalls()"></select></div>
+          <div class="formGroup"><label>القاعة التي تم تسويقها</label><select id="marketHall"></select></div>
+          <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="marketDate" type="date" oninput="updateMarketAge()" onchange="updateMarketAge()"></div>
+          <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="marketAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
+          <div class="formGroup"><label data-i18n="lblCount">العدد</label><input id="marketCount" type="number" min="0"></div>
+          <div class="formGroup"><label>نوع العملية</label><select id="marketStatus"><option>بيعت جزئياً</option><option>تسويق إلى المجزرة</option><option>منتهية</option><option>منقولة</option></select></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="marketNote"></div>
+        </div>
+        <div class="formActions"><button class="btn btn-success" onclick="addMarket()">حفظ العملية</button></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">receipt_long</span> <span data-i18n="ctSaleLog">سجل التسويق</span></div>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>فرز حسب الوجبة</label><select id="marketBatchFilter" onchange="renderMarket()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="marketTable"></table></div>
+      </div>
+    </section>
+
+    <!-- FIELDS (admin only) -->
+    <section id="fields" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">home_work</span> <span data-i18n="ctAddField">إضافة / تعديل حقل</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم الحقل *</label><input id="fName" placeholder="مثال: حقل اللحم 1"></div>
+          <div class="formGroup"><label data-i18n="lblType">النوع</label><select id="fType"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option><option value="تربية">تربية</option></select></div>
+          <div class="formGroup"><label>السعة القصوى الإجمالية (طير)</label><input id="fCapacity" type="number" min="0" placeholder="اختياري — أو يُجمع من القاعات"></div>
+        </div>
+        <input type="hidden" id="fEditId">
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveField()">💾 حفظ الحقل</button>
+          <button class="btn btn-secondary" onclick="clearFieldForm()">مسح</button>
+        </div>
+      </div>
+
+      <!-- قاعات الحقل -->
+      <div class="card" id="hallsCard" style="display:none">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">meeting_room</span> إدارة قاعات الحقل: <span id="hallsFieldName" style="color:var(--p)">—</span></div>
+        <div class="formGrid" id="hallForm">
+          <div class="formGroup"><label>اسم القاعة *</label><input id="hName" placeholder="مثال: قاعة A"></div>
+          <div class="formGroup"><label>الطاقة الاستيعابية (طير)</label><input id="hCapacity" type="number" min="0" placeholder="اختياري"></div>
+          
+          
+          
+        </div>
+        <input type="hidden" id="hEditId">
+        <input type="hidden" id="hFieldId">
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveHall()">💾 حفظ القاعة</button>
+          <button class="btn btn-secondary" onclick="clearHallForm()">مسح</button>
+        </div>
+        <div class="tableWrap" style="margin-top:14px"><table id="hallsTable"></table></div>
+      </div>
+
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">domain</span> <span data-i18n="ctFieldsList">قائمة الحقول</span></div>
+        <div class="tableWrap"><table id="fieldsTable"></table></div>
+      </div>
+    </section>
+
+    <!-- USERS (admin only) -->
+    <section id="users" class="page hidden">
+      <div class="card" style="text-align:center;padding:40px 20px">
+        <span class="material-symbols-outlined" style="font-size:48px;color:var(--ink3);display:block;margin-bottom:12px">manage_accounts</span>
+        <div style="font-size:16px;font-weight:700;margin-bottom:8px">إدارة المستخدمين</div>
+        <div style="font-size:13px;color:var(--ink3);margin-bottom:20px">المستخدمون يُضافون ويُدارون عبر Supabase Dashboard مباشرةً لضمان الأمان.</div>
+        <a href="https://supabase.com/dashboard/project/tvuymajwnrzlibxzfdhy/auth/users" target="_blank"
+           style="display:inline-block;background:#7c3aed;color:#fff;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;text-decoration:none">
+          فتح Supabase Auth
+        </a>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section id="cal" class="page hidden">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div class="cardTitle" style="margin:0"><span class="material-symbols-outlined ct-icon">calendar_month</span> <span data-i18n="ctCal">الروزنامة</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <select id="calFilter" onchange="renderCalendar()" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--r2);font-family:inherit;font-size:13px;background:#fff"></select>
+            <button class="btn btn-secondary btn-sm" onclick="moveMonth(-1)">&#8250; السابق</button>
+            <span id="monthTitle" style="font-weight:700;font-size:14px;min-width:120px;text-align:center"></span>
+            <button class="btn btn-secondary btn-sm" onclick="moveMonth(1)">التالي &#8249;</button>
+          </div>
+        </div>
+        <div id="calendar" class="calGrid"></div>
+      </div>
+    </section>
+
+
+
+    <!-- FEED -->
+    <section id="feed" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">grass</span> <span data-i18n="ctFeedHalls">استهلاك العلف — قاعة واحدة</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="feedDate" type="date" oninput="updateFeedAge()" onchange="updateFeedAge()"></div>
+          <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="feedField" onchange="onFeedFieldChange()"></select></div>
+          <div class="formGroup"><label data-i18n="lblHall">القاعة</label><select id="feedHall" onchange="updateFeedAge()"></select></div>
+          <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="feedAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
+          <div class="formGroup"><label>نوع العلف</label><select id="feedType"><option value="">-- اختر --</option><option>بادئ</option><option>نامي</option><option>ناهي</option><option>بادئ + نامي</option><option>نامي + ناهي</option></select></div>
+          <div class="formGroup"><label>الكمية كغم</label><input id="feedQty" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="feedNote"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveFeed()">💾 حفظ العلف</button>
+          <button class="btn btn-secondary" onclick="clearFeedForm()">مسح</button>
+        </div>
+      </div>
+      <!-- علف جماعي لكل القاعات -->
+      <div class="card" style="border-top:3px solid #16a34a">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">grass</span> تسجيل علف جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل نوع العلف المشترك ثم كمية كل قاعة، ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="feedBulkField" onchange="onFeedBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="feedBulkBatch" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="feedBulkDate" type="date" onchange="buildFeedHallsGrid();updateBulkAge('feedBulkBatch','feedBulkDate','feedBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="feedBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
+          <div class="formGroup"><label>نوع العلف</label><select id="feedBulkType"><option value="">-- اختر --</option><option>بادئ</option><option>نامي</option><option>ناهي</option><option>بادئ + نامي</option><option>نامي + ناهي</option></select></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="feedBulkNote" placeholder="اختياري"></div>
+        </div>
+        <div id="feedHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllFeeds()">💾 حفظ علف جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearFeedBulkForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">format_list_bulleted</span> <span data-i18n="ctFeedLog">سجل العلف</span></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="feedBatchFilter" onchange="renderFeed();fillRecHallFilter('feed')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="feedHallFilter" onchange="renderFeed()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="feedFromDate" onchange="renderFeed()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="feedToDate" onchange="renderFeed()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('feed')">✕ مسح</button>
+        </div>
+        <div class="tableWrap"><table id="feedTable"></table></div>
+      </div>
+    </section>
+
+    <!-- MEDS -->
+    <section id="meds" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">vaccines</span> <span data-i18n="ctMedsHalls">الأدوية واللقاحات — قاعة واحدة</span></div>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="medDate" type="date" oninput="updateMedAge()" onchange="updateMedAge()"></div>
+          <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="medField" onchange="onMedFieldChange()"></select></div>
+          <div class="formGroup"><label data-i18n="lblHall">القاعة</label><select id="medHall" onchange="updateMedAge()"></select></div>
+          <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="medAge" type="number" min="0" readonly placeholder="يحسب تلقائياً"></div>
+          <div class="formGroup"><label data-i18n="lblType">النوع</label><select id="medType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
+          <div class="formGroup"><label>اسم المادة</label><input id="medName" placeholder="مثال: نيوكاسل / AD3E"></div>
+          <div class="formGroup"><label>الجرعة</label><input id="medDose"></div>
+          <div class="formGroup"><label>الكمية</label><input id="medQty" type="number" min="0" step="0.01"></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="medNote"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveMed()">💾 حفظ المادة</button>
+          <button class="btn btn-secondary" onclick="clearMedForm()">مسح</button>
+        </div>
+      </div>
+      <!-- أدوية/لقاحات جماعية لكل القاعات -->
+      <div class="card" style="border-top:3px solid #7c3aed">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">vaccines</span> تطبيق دواء / لقاح على جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">أدخل بيانات المادة مرة واحدة — ستُطبَّق على جميع القاعات المختارة. يمكن تخصيص الكمية لكل قاعة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="medBulkField" onchange="onMedBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="medBulkBatch" onchange="buildMedHallsGrid();updateBulkAge('medBulkBatch','medBulkDate','medBulkAge')"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="medBulkDate" type="date" onchange="buildMedHallsGrid();updateBulkAge('medBulkBatch','medBulkDate','medBulkAge')"></div>
+          <div class="formGroup"><label>عمر الطير (يوم)</label><input id="medBulkAge" type="number" readonly placeholder="يحسب تلقائياً" style="background:var(--card2);font-weight:700;color:#7c3aed"></div>
+          <div class="formGroup"><label>النوع</label><select id="medBulkType"><option>لقاح</option><option>دواء</option><option>فيتامين</option><option>تعقيم</option></select></div>
+          <div class="formGroup"><label>اسم المادة *</label><input id="medBulkName" placeholder="مثال: نيوكاسل / AD3E"></div>
+          <div class="formGroup"><label>الجرعة</label><input id="medBulkDose" placeholder="مثال: 1 مل / طير"></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="medBulkNote" placeholder="اختياري"></div>
+        </div>
+        <div id="medHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllMeds()">💾 حفظ المادة لجميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearMedBulkForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">medication</span> <span data-i18n="ctMedsLog">سجل الأدوية واللقاحات</span></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="medBatchFilter" onchange="renderMeds();fillRecHallFilter('med')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="medHallFilter" onchange="renderMeds()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="medFromDate" onchange="renderMeds()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="medToDate" onchange="renderMeds()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('med')">✕ مسح</button>
+        </div>
+        <div class="tableWrap"><table id="medTable"></table></div>
+      </div>
+    </section>
+
+    <!-- WEIGHTS -->
+    <section id="weights" class="page hidden">
+      <!-- الفورم الأساسي — قاعة واحدة -->
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">scale</span> <span data-i18n="ctWeightHalls">تسجيل وزن قاعة</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">سجل وزن القاعة والوزن المتوقع. يظهر آخر وزن في لوحة المعلومات وتفاصيل الوجبة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label data-i18n="lblField">الحقل</label><select id="wField" onchange="onWeightFieldChange()"></select></div>
+          <div class="formGroup"><label data-i18n="lblHall">القاعة</label><select id="wHall" onchange="onWeightHallChange()"></select></div>
+          <div class="formGroup"><label>الوجبة داخل القاعة</label><select id="wBatch" onchange="fillWeightDefaults()"></select></div>
+          <div class="formGroup"><label data-i18n="lblStrain">سلالة الطير</label><input id="wStrain" readonly></div>
+          <div class="formGroup"><label data-i18n="lblDate">التاريخ</label><input id="wDate" type="date" onchange="fillWeightDefaults()"></div>
+          <div class="formGroup"><label>عدد الطير الحي بالقاعة</label><input id="wAlive" type="number" min="0" readonly></div>
+          <div class="formGroup"><label data-i18n="lblBirdAge">عمر الطير (يوم)</label><input id="wAgeDays" type="number" readonly></div>
+          <div class="formGroup"><label>الوزن الفعلي بالغرام</label><input id="wAvg" type="number" min="0" step="1" oninput="calcWeightTotal()"></div>
+          <div class="formGroup"><label>كايد الوزن حسب العمر (غرام)</label><input id="wExpected" type="number" min="0" step="1" readonly></div>
+          <div class="formGroup"><label>نسبة تحقيق الكايد %</label><input id="wDiff" type="text" readonly></div>
+          <div class="formGroup"><label data-i18n="lblNote">ملاحظة</label><input id="wNote"></div>
+        </div>
+        <div id="wGuideTable" style="margin-top:10px"></div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveWeightRecord()">💾 حفظ الوزن</button>
+          <button class="btn btn-secondary" onclick="clearWeightForm()">مسح</button>
+        </div>
+      </div>
+      <!-- فورم جديد — إدخال جميع القاعات مرة واحدة -->
+      <div class="card" style="border-top:3px solid #2563eb">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">table_rows</span> إدخال أوزان جميع القاعات دفعة واحدة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">اختر الوجبة والتاريخ — ستظهر جميع القاعات مع حقل وزن لكل قاعة. أدخل الأوزان ثم احفظ الكل مرة واحدة.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الحقل</label><select id="wBulkField" onchange="onBulkFieldChange()"></select></div>
+          <div class="formGroup"><label>الوجبة</label><select id="wBulkBatch" onchange="buildWeightHallsGrid()"></select></div>
+          <div class="formGroup"><label>التاريخ</label><input id="wBulkDate" type="date" onchange="buildWeightHallsGrid()"></div>
+          <div class="formGroup"><label>ملاحظة عامة</label><input id="wBulkNote" placeholder="اختياري — تُطبّق على كل القاعات"></div>
+        </div>
+        <div id="wHallsGrid" style="margin-top:14px"></div>
+        <div class="formActions" style="margin-top:10px">
+          <button class="btn btn-primary" onclick="saveAllWeights()">💾 حفظ أوزان جميع القاعات</button>
+          <button class="btn btn-secondary" onclick="clearBulkWeightForm()">مسح</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">monitor_weight</span> <span data-i18n="ctWeightLog">سجل أوزان القاعات</span></div>
+        <div class="filterBar">
+          <div class="formGroup"><label>الوجبة</label><select id="weightBatchFilter" onchange="renderWeights();fillRecHallFilter('weight')"></select></div>
+          <div class="formGroup"><label>القاعة</label><select id="weightHallFilter" onchange="renderWeights()"><option value="">كل القاعات</option></select></div>
+          <div class="formGroup"><label>من تاريخ</label><input type="date" id="weightFromDate" onchange="renderWeights()"></div>
+          <div class="formGroup"><label>إلى تاريخ</label><input type="date" id="weightToDate" onchange="renderWeights()"></div>
+          <button class="btn btn-secondary btn-sm clearBtn" onclick="clearRecFilters('weight')">✕ مسح</button>
+        </div>
+        <div class="tableWrap"><table id="weightsTable"></table></div>
+      </div>
+    </section>
+
+
+    <!-- GUIDE REFERENCE -->
+    <section id="guideRef" class="page hidden">
+      <div class="card" id="guideRefCard">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">menu_book</span> <span data-i18n="ctGuide">دليل الكايد (الوزن القياسي حسب العمر)</span></div>
+        <div class="formGrid" style="margin-bottom:10px">
+          <div class="formGroup"><label data-i18n="lblType">النوع</label><select id="guideRefType" onchange="onGuideRefTypeChange()"><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
+          <div class="formGroup"><label>السلالة</label><select id="guideRefStrain" onchange="renderGuideRefTable()"></select></div>
+        </div>
+        <div id="guideRefTable"></div>
+      </div>
+    </section>
+
+    <!-- FIELD CYCLE -->
+    <section id="fieldCycle" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">autorenew</span> <span data-i18n="ctCycle">دورة الحقل</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">حالة كل حقل بناءً على دورة 40 يوم من تاريخ دخول الطير، و20 يوم صيانة بعد آخر تسويق.</p>
+        <div class="tableWrap"><table id="fieldCycleTable"></table></div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="reports" class="page hidden">
+
+      <!-- أدوات التصفية والتصدير -->
+      <div class="card noPrint">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">summarize</span> <span data-i18n="ctReports">مركز التقارير</span></div>
+        <div class="formGrid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px">
+          <div class="formGroup">
+            <label>نوع التقرير</label>
+            <select id="rptType" onchange="renderReports()">
+              <option value="batches">الوجبات</option>
+              <option value="mort">الهلاك</option>
+              <option value="weights">الأوزان</option>
+              <option value="feed">استهلاك العلف</option>
+              <option value="meds">الأدوية واللقاحات</option>
+              <option value="fields">تقرير الحقول</option>
+              <option value="halls">تقرير القاعات</option>
+              <option value="supervisor">تقرير المشرفين</option>
+              <option value="vet">تقرير الأطباء البيطريين</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label data-i18n="lblField">الحقل</label>
+            <select id="rptField" onchange="onReportFieldChange()">
+              <option value="">${t('allFields')}</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label data-i18n="lblHall">القاعة</label>
+            <select id="rptHall" onchange="renderReports()">
+              <option value="">${t('allHalls')}</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label data-i18n="lblBatch">الوجبة</label>
+            <select id="rptBatch" onchange="renderReports()">
+              <option value="">${t('allBatches')}</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>الحالة / النوع</label>
+            <select id="rptStatus" onchange="renderReports()">
+              <option value="">${t('allItems')}</option>
+            </select>
+          </div>
+          <div class="formGroup">
+            <label>بحث نصي</label>
+            <input id="rptSearch" placeholder="اسم وجبة / قاعة / مادة" oninput="renderReports()">
+          </div>
+          <div class="formGroup">
+            <label>من تاريخ</label>
+            <input id="rptFrom" type="date" onchange="renderReports()">
+          </div>
+          <div class="formGroup">
+            <label>إلى تاريخ</label>
+            <input id="rptTo" type="date" onchange="renderReports()">
+          </div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-secondary" onclick="clearReportFilters()">مسح الفلاتر</button>
+          <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
+          <button class="btn btn-primary" onclick="exportRptExcel()">📊 تصدير Excel</button>
+          <button class="btn btn-danger" onclick="exportRptPDF()">📄 تصدير PDF</button>
+          <button class="btn btn-success" id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
+          <label class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
+        </div>
+      </div>
+
+      <!-- ملخص سريع -->
+      <div id="rptSummaryCards" class="statsGrid" style="margin-bottom:12px"></div>
+
+      <!-- جدول التقرير -->
+      <div class="card">
+        <div class="cardTitle" id="rptTitle">—</div>
+        <div class="tableWrap"><table id="reportTable"></table></div>
+      </div>
+
+    </section>
+
+    <!-- AI ANALYSIS -->
+    <section id="aiAnalysis" class="page hidden">
+      <!-- ══ بطاقة الإدخال ══ -->
+      <div class="card" style="margin-bottom:14px;border-top:3px solid #7c3aed">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon" style="color:#7c3aed">psychology</span> <span style="background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:800">مستشار الدواجن الذكي</span></div>
+        <div class="formGrid" style="margin-bottom:10px">
+          <div class="formGroup">
+            <label>اختر الوجبة</label>
+            <select id="aiaBatch" onchange="onAiaBatchChange()"><option value="">-- اختر --</option></select>
+          </div>
+          <div class="formGroup">
+            <label>وزن البيضة المرقدة (غم) <span style="font-size:10px;color:#7c3aed">🥚 أساس التوقع</span></label>
+            <input id="aiaEggWeight" type="number" min="40" max="80" placeholder="مثال: 62" oninput="runAiAnalysis()">
+          </div>
+          <div class="formGroup">
+            <label>وزن الطير عند النقل (غم) <span style="font-size:10px;color:#2563eb">🐣 نقطة البداية</span></label>
+            <input id="aiaTransferWeight" type="number" min="30" max="100" placeholder="مثال: 42" oninput="runAiAnalysis()">
+          </div>
+          <div class="formGroup">
+            <label>الهدف عند التسويق (غم)</label>
+            <input id="aiaTargetWeight" type="number" min="1000" max="5000" placeholder="مثال: 2500" value="2500" oninput="runAiAnalysis()">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button onclick="runAiAnalysis()" style="background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;border:0;border-radius:9px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;font-family:inherit">
+            <span class="material-symbols-outlined" style="font-size:20px">calculate</span> تحليل رياضي
+          </button>
+        </div>
+      </div>
+      <div id="aiaResults"></div>
+    </section>
+
+    <!-- ARCHIVE -->
+    <section id="archive" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">inventory_2</span> <span data-i18n="ctArchive">أرشيف الوجبات المنتهية</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:14px">الوجبات التي وصل الحي المتبقي فيها إلى صفر.</p>
+        <div class="formGrid" style="margin-bottom:12px">
+          <div class="formGroup"><label>بحث عن الوجبة</label><input id="archiveSearch" placeholder="اكتب اسم الوجبة أو الحقل أو القاعة" oninput="renderArchive()"></div>
+          <div class="formGroup"><label>اختيار الوجبة</label><select id="archiveBatchFilter" onchange="renderArchive()"></select></div>
+          <div class="formGroup"><label>اختيار الحقل</label><select id="archiveFieldFilter" onchange="onArchiveFieldFilterChange()"></select></div>
+          <div class="formGroup"><label>اختيار القاعة</label><select id="archiveHallFilter" onchange="renderArchive()"></select></div>
+        </div>
+        <div class="tableWrap"><table id="archiveTable"></table></div>
+      </div>
+    </section>
+
+    <!-- COMPARE BATCHES -->
+    <section id="compare" class="page hidden">
+      <div class="pageHeader"><h1>📊 مقارنة بين الوجبات</h1></div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="formGrid">
+          <div class="formGroup"><label>نوع الوجبات</label><select id="cmpType" onchange="renderCompare()"><option value="all">الكل</option><option value="لحم">لحم (broiler)</option><option value="بياض">بياض (layer)</option></select></div>
+          <div class="formGroup"><label>الحقل</label><select id="cmpField" onchange="renderCompare()"></select></div>
+          <div class="formGroup"><label>الحالة</label><select id="cmpStatus" onchange="renderCompare()"><option value="all">الكل</option><option value="active">نشطة</option><option value="done">منتهية</option></select></div>
+          <div class="formGroup"><label>ترتيب حسب</label><select id="cmpSort" onchange="renderCompare()"><option value="success">نسبة النجاح</option><option value="alive">الحي</option><option value="mort">الهلاك</option><option value="weight">الوزن</option><option value="hatch">نسبة الفقس</option><option value="date">تاريخ الترقيد</option></select></div>
+        </div>
+      </div>
+      <div id="cmpSummary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
+      <div class="card">
+        <div class="tableWrap"><table id="cmpTable"></table></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS (admin only) -->
+    <section id="settings" class="page hidden">
+      <div class="card">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">settings</span> <span data-i18n="ctSettings">الإعدادات</span></div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">تغيير بيانات دخول حساب المدير الرئيسي.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>اسم المستخدم الجديد</label><input id="newUser" autocomplete="off"></div>
+          <div class="formGroup"><label>كلمة المرور الجديدة</label><input id="newPass" type="password" autocomplete="new-password"></div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="saveCreds()">حفظ بيانات الدخول</button>
+          <button class="btn btn-danger" onclick="wipeAll()">⚠️ مسح كل البيانات</button>
+        </div>
+        <p style="font-size:12px;color:var(--ink3);margin-top:14px">البيانات محفوظة في المتصفح. خذ نسخة احتياطية قبل مسح بيانات المتصفح.</p>
+      </div>
+
+      <!-- تصحيح تاريخ الدخول وإعادة حساب الأعمار -->
+      <div class="card" style="border-top:3px solid #f59e0b">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">event_repeat</span> تصحيح تاريخ دخول الوجبة وإعادة حساب الأعمار</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">إذا أدخلت تاريخ دخول خاطئ، صحّح التاريخ هنا ثم اضغط "إعادة حساب" لتحديث عمر الطير في جميع سجلات الوجبة (أعلاف، أدوية، هلاك، أوزان، وكايد الأوزان).</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label>
+            <select id="fixBatch" onchange="onFixBatchChange()">
+              <option value="">-- اختر الوجبة --</option>
+            </select>
+          </div>
+          <div class="formGroup"><label>تاريخ الدخول الحالي</label>
+            <input id="fixCurrentDate" readonly style="background:var(--card2);color:var(--ink3)">
+          </div>
+          <div class="formGroup"><label>تاريخ الدخول الصحيح</label>
+            <input id="fixNewDate" type="date">
+          </div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="applyFixEntryDate()">🔄 تصحيح التاريخ وإعادة حساب الأعمار</button>
+        </div>
+        <div id="fixResult" style="margin-top:12px;font-size:13px;color:#16a34a;font-weight:600"></div>
+      </div>
+
+      <!-- إعادة حساب الكايد -->
+      <div class="card" style="border-top:3px solid #16a34a">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">autorenew</span> إعادة حساب الكايد</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">يعيد احتساب الوزن القياسي (الكايد) لجميع سجلات الأوزان بناءً على السلالة الرسمية لكل وجبة.</p>
+        <div class="formActions">
+          <button class="btn btn-warning" onclick="if(confirm('سيتم إعادة حساب كايد جميع سجلات الأوزان بناءً على السلالة الرسمية. هل أنت متأكد؟'))recalcAllGuideWeights()">🔄 إعادة حساب الكايد لجميع السجلات</button>
+        </div>
+      </div>
+
+      <!-- تعديل بيانات الوجبة -->
+      <div class="card" style="border-top:3px solid #0ea5e9">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">edit_note</span> تعديل بيانات الوجبة</div>
+        <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">تعديل المشرف، الدكتور البيطري، ووزن البيضة لأي وجبة دون المساس ببقية البيانات.</p>
+        <div class="formGrid">
+          <div class="formGroup"><label>الوجبة</label>
+            <select id="editInfoBatch" onchange="onEditInfoBatchChange()">
+              <option value="">-- اختر الوجبة --</option>
+            </select>
+          </div>
+          <div class="formGroup"><label>المشرف</label>
+            <input id="editInfoSupervisor" placeholder="اسم المشرف">
+          </div>
+          <div class="formGroup"><label>الدكتور البيطري</label>
+            <input id="editInfoVet" placeholder="اسم الدكتور البيطري">
+          </div>
+          <div class="formGroup"><label>وزن البيضة (غرام)</label>
+            <input id="editInfoEggWeight" type="number" min="0" step="0.1" placeholder="مثال: 62.5">
+          </div>
+        </div>
+        <div class="formActions">
+          <button class="btn btn-primary" onclick="applyEditBatchInfo()">💾 حفظ التعديلات</button>
+        </div>
+        <div id="editInfoResult" style="margin-top:12px;font-size:13px;color:#16a34a;font-weight:600"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<div id="calDayOverlay" class="calFloatOverlay hidden" onclick="closeCalendarDayDetails()">
+  <div class="calFloat" onclick="event.stopPropagation()">
+    <div class="calFloatHead">
+      <h3 id="calDayTitle">تفاصيل اليوم</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeCalendarDayDetails()">إغلاق</button>
+    </div>
+    <div id="calDayBody"></div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/validation.js"></script>
+<script src="js/permissions.js"></script>
+<script src="js/lang.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/nav.js"></script>
+<script src="js/render.js"></script>
+<script src="js/modules/batches.js"></script>
+<script src="js/modules/weights.js"></script>
+<script src="js/modules/feed-meds.js"></script>
+<script src="js/modules/batch-detail.js"></script>
+<script src="js/modules/mortality.js"></script>
+<script src="js/modules/marketing.js"></script>
+<script src="js/modules/reports.js"></script>
+<script src="js/modules/halls.js"></script>
+<script src="js/modules/users.js"></script>
+<script src="js/modules/settings.js"></script>
+<script src="js/components/calendar.js"></script>
+<script src="js/components/modal.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
