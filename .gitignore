@@ -1,0 +1,30 @@
+node_modules/
+dist/
+out/
+
+# Environment variables — لا ترفع هذه الملفات أبداً
+.env
+.env.local
+.env.production
+
+# نسخ احتياطية مؤقتة
+update_backups/
+*.zip
+_full_app.js
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Claude Code session files
+.claude/
+
+# Temporary mojibake scripts
+mojibake_*.js
