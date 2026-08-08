@@ -329,11 +329,6 @@ function deleteTransfer(batchId){
   b.hallAllocations=[];
   b.fieldBirds=0;
   b.transferBirdWeight=0;
-  b.hatched='';
-  b.vaccineDeaths=0;
-  b.isolatedBirds=0;
-  b.netHatch=0;
-  b.fixedHatchRate=0;
   b.status='نشطة';
 
   selectedBatchId=b.id;
