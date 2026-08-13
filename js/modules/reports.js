@@ -407,6 +407,88 @@ function renderReports(){
       {l:'إجمالي اللقاحات اليوم',v:halls.reduce((s,h)=>s+medsCountHall(h.id,today()),0).toLocaleString()},
     ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val">${x.v}</div></div>`).join('');
     el.innerHTML=`<thead><tr><th>${t('thField')}</th><th>${t('thHall')}</th><th>${t('thCapacity')}</th><th>${t('thTotalBirds')}</th><th>${t('thAlive')}</th><th>${t('thMort')}</th><th>${t('thSold')}</th><th>${t('thOccupancy')}</th><th>${t('thFeedToday')}</th><th>${t('thTotalFeed')}</th><th>${t('thVaccToday')}</th><th>${t('thLastMaterial')}</th><th>${t('thLastWeight')}</th><th>${t('thBatches')}</th></tr></thead><tbody>${rows}</tbody>`;
+
+  }else if(type==='batch_detail'){
+    if(title)title.textContent='📋 تقرير وجبة كاملة';
+    if(!batchId){
+      if(summary)summary.innerHTML='';
+      el.innerHTML=`<tbody><tr><td style="text-align:center;color:var(--ink3);padding:40px;font-size:15px">اختر وجبة من قائمة "الوجبة" أعلاه لعرض تقريرها الكامل</td></tr></tbody>`;
+      return;
+    }
+    let b=data.batches.find(x=>x.id===batchId);
+    if(!b){if(summary)summary.innerHTML='';el.innerHTML=`<tbody><tr><td style="text-align:center;color:var(--ink3);padding:40px">لم يتم إيجاد الوجبة</td></tr></tbody>`;return;}
+    let c=calc(b);
+    let hallIds=batchHallIds(b);
+    let eggs=+b.eggs||0,badEggs=+b.badEggs||0;
+    let setEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-badEggs);
+    let hatched=c.hatched||0,netHatch=c.netHatch||0,hatchLoss=c.hatchLoss||0;
+    let vaccineDeaths=+b.vaccineDeaths||0,isolated=+b.isolatedBirds||0,unfitBirds=+b.unfitBirds||0;
+    let hatchRatePct=setEggs>0?((hatched/setEggs)*100).toFixed(2):'—';
+    let netRatePct=setEggs>0?((netHatch/setEggs)*100).toFixed(2):'—';
+    let inHall=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+    let weights=(data.weights||[]).filter(x=>x.batchId===b.id||(x.field===b.field&&inHall(x))).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+    let feeds=(data.feeds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+    let meds=(data.meds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+    let morts=(data.morts||[]).filter(x=>+x.batchId===b.id).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+    let markets=(data.markets||[]).filter(x=>+x.batchId===b.id).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+    let totalMort=morts.reduce((s,x)=>s+(+x.count||0),0);
+    let totalSold=markets.reduce((s,x)=>s+(+x.count||0),0);
+    let totalFeedKg=feeds.reduce((s,x)=>s+(+x.qty||0),0);
+    let hallLabel=Array.isArray(b.hallAllocations)&&b.hallAllocations.length?b.hallAllocations.map(a=>esc(a.hall)).join(' / '):esc(b.hall||'—');
+    let srVal=+successRate(b);
+    let srCol=srVal>=90?'#16a34a':srVal>=80?'#d97706':'#dc2626';
+    if(summary)summary.innerHTML=[
+      {l:'الوجبة',v:esc(b.name),c:'#0f172a'},
+      {l:'النوع',v:esc(b.type||'—'),c:'#0f172a'},
+      {l:'الحالة',v:c.completed?'منتهية':c.transferred?'في الحقل':'في المفقس',c:c.completed?'#64748b':c.transferred?'#16a34a':'#2563eb'},
+      {l:'نسبة الفقس',v:hatchRatePct+'%',c:'#7c3aed'},
+      {l:'الصافي للنقل',v:netHatch.toLocaleString(),c:'#7c3aed'},
+      {l:'في الحقل',v:(c.fieldBirds||0).toLocaleString(),c:'#0891b2'},
+      {l:'الحي الآن',v:c.alive.toLocaleString(),c:'#16a34a'},
+      {l:'الهلاك',v:totalMort.toLocaleString(),c:'#dc2626'},
+      {l:'المسوق',v:totalSold.toLocaleString(),c:'#d97706'},
+      {l:'نسبة النجاح',v:srVal+'%',c:srCol},
+      {l:'إجمالي العلف',v:totalFeedKg.toLocaleString()+' كغم',c:'#ca8a04'},
+    ].map(x=>`<div class="statCard"><div class="sc-label">${x.l}</div><div class="sc-val" style="color:${x.c}">${x.v}</div></div>`).join('');
+    let nd=(n)=>`<tr><td colspan="${n}" style="text-align:center;color:var(--ink3);padding:8px">لا توجد سجلات</td></tr>`;
+    let weightRows=weights.map(x=>{
+      let actual=+(x.actual_weight_grams||x.avgWeight||0),guide=+(x.guideWeightGrams||0);
+      let diff=actual&&guide?actual-guide:null,dCol=diff!=null?(diff>=0?'#16a34a':'#dc2626'):'';
+      let pct=guide?((actual/guide)*100).toFixed(1):null;
+      return `<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${x.ageDays!=null?x.ageDays+' يوم':'—'}</td><td style="font-weight:700;color:#2563eb">${actual?actual+'غم':'—'}</td><td style="color:#64748b">${guide?guide+'غم':'—'}</td><td style="color:${dCol};font-weight:700">${diff!=null?(diff>0?'+':'')+diff+'غم':''} ${pct!=null?'('+pct+'%)':''}</td><td>${(+x.alive||0).toLocaleString()||'—'}</td></tr>`;
+    }).join('');
+    let feedRows=feeds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${esc(x.feedType||'—')}</td><td><b>${(+x.qty||0).toLocaleString()} كغم</b></td><td>${esc(x.note||'—')}</td></tr>`).join('');
+    let medRows=meds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td><span class="badge ${x.type==='لقاح'?'b-violet':x.type==='دواء'?'b-red':x.type==='فيتامين'?'b-green':'b-gray'}">${esc(x.type)}</span></td><td><b>${esc(x.name)}</b></td><td>${esc(x.dose||'—')}</td><td>${(+x.qty||0).toLocaleString()}</td><td>${esc(x.note||'—')}</td></tr>`).join('');
+    let mortRows=morts.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td style="color:#dc2626;font-weight:700">${(+x.count||0).toLocaleString()}</td><td>${esc(x.reason||'—')}</td></tr>`).join('');
+    let marketRows=markets.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td style="color:#d97706;font-weight:700">${(+x.count||0).toLocaleString()}</td><td>${esc(x.status||'—')}</td><td>${x.price!=null?esc(''+x.price):'—'}</td><td>${esc(x.note||'—')}</td></tr>`).join('');
+    el.innerHTML=`<tbody><tr><td style="padding:0">
+      <div style="padding:14px 0 6px;font-weight:700;font-size:15px;color:#7c3aed;display:flex;align-items:center;gap:6px"><span class="material-symbols-outlined" style="font-size:20px">egg</span> بيانات المفقس</div>
+      <div class="detailGrid" style="margin-bottom:14px">
+        <div class="dCell"><div class="dc-label">تاريخ الفقس</div><div class="dc-val">${fmt(b.hatchDate)||'—'}</div></div>
+        <div class="dCell"><div class="dc-label">تاريخ النقل</div><div class="dc-val">${fmt(b.transferDate)||'—'}</div></div>
+        <div class="dCell"><div class="dc-label">الحقل</div><div class="dc-val">${esc(b.field||'—')}</div></div>
+        <div class="dCell"><div class="dc-label">القاعات</div><div class="dc-val">${hallLabel}</div></div>
+        <div class="dCell"><div class="dc-label">إجمالي البيض</div><div class="dc-val">${eggs.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">البيض الفاسد</div><div class="dc-val">${badEggs.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">المخصص للفقس</div><div class="dc-val">${setEggs.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">المفقوس</div><div class="dc-val" style="font-weight:700">${hatched.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">نسبة الفقس</div><div class="dc-val" style="color:#7c3aed;font-weight:700">${hatchRatePct}%</div></div>
+        <div class="dCell"><div class="dc-label">هلاك اللقاح</div><div class="dc-val">${vaccineDeaths.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">معزولة</div><div class="dc-val">${isolated.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">غير صالحة</div><div class="dc-val">${unfitBirds.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">إجمالي الخسائر</div><div class="dc-val">${hatchLoss.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">الصافي للنقل</div><div class="dc-val" style="color:#16a34a;font-weight:700">${netHatch.toLocaleString()}</div></div>
+        <div class="dCell"><div class="dc-label">نسبة الصافي</div><div class="dc-val" style="color:#16a34a;font-weight:700">${netRatePct}%</div></div>
+        ${b.transferBirdWeight?`<div class="dCell"><div class="dc-label">وزن الكتكوت</div><div class="dc-val">${b.transferBirdWeight} غم</div></div>`:''}
+        ${b.supervisor?`<div class="dCell"><div class="dc-label">المشرف</div><div class="dc-val">${esc(b.supervisor)}</div></div>`:''}
+        ${b.vet?`<div class="dCell"><div class="dc-label">الطبيب البيطري</div><div class="dc-val">${esc(b.vet)}</div></div>`:''}
+      </div>
+      <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th colspan="7" style="background:#eff6ff;color:#2563eb;text-align:right">⚖️ سجلات الأوزان (${weights.length})</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>العمر</th><th>الوزن الفعلي</th><th>الكايد</th><th>الفرق / نسبة التحقق</th><th>الحي</th></tr></thead><tbody>${weightRows||nd(7)}</tbody></table></div>
+      <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th colspan="5" style="background:#fefce8;color:#ca8a04;text-align:right">🌾 سجلات العلف (${feeds.length}) — إجمالي: ${totalFeedKg.toLocaleString()} كغم</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead><tbody>${feedRows||nd(5)}</tbody></table></div>
+      <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th colspan="7" style="background:#faf5ff;color:#7c3aed;text-align:right">💉 سجلات الأدوية واللقاحات (${meds.length})</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>المادة</th><th>الجرعة</th><th>الكمية</th><th>ملاحظة</th></tr></thead><tbody>${medRows||nd(7)}</tbody></table></div>
+      <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th colspan="4" style="background:#fef2f2;color:#dc2626;text-align:right">💔 سجلات الهلاك (${morts.length}) — إجمالي: ${totalMort.toLocaleString()} طير</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>السبب</th></tr></thead><tbody>${mortRows||nd(4)}</tbody></table></div>
+      <div class="tableWrap"><table class="tbl"><thead><tr><th colspan="6" style="background:#fff7ed;color:#d97706;text-align:right">🛒 سجلات التسويق (${markets.length}) — إجمالي: ${totalSold.toLocaleString()} طير</th></tr><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>النوع</th><th>السعر</th><th>ملاحظة</th></tr></thead><tbody>${marketRows||nd(6)}</tbody></table></div>
+    </td></tr></tbody>`;
   }
 }
 
