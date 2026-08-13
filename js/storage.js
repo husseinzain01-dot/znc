@@ -23,6 +23,7 @@ function load(){
       migrateWeightsToGrams();
       _applyGuideWeights();
       data.subUsers=data.subUsers||[];
+      data.markets=(data.markets||[]).map(m=>({...m,status:'تسويق إلى المجزرة'}));
     }
     let ls=localStorage.getItem(STORE+'_lastSave');
     $('dbState').textContent=ls?t('dbLastSave')+': '+new Date(ls).toLocaleString('ar-IQ',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):t('dbReady');
