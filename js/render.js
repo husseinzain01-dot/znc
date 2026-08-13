@@ -324,7 +324,7 @@ function selectedDetails(b){
     ['المسوق',`<span ${_dp('sold')}>${c.sold.toLocaleString()}</span>`],
     ['الحي المتبقي',`<span ${_dp('alive')}>${c.alive.toLocaleString()}</span>`,'dc-accent'],
     ['نسبة النجاح',successRate(b)+'%','dc-accent'],
-    ['آخر وزن (الفعلي)',lw?(weightActualGrams(lw)+' غم'):'—','dc-accent'],
+    ['آخر وزن (الفعلي)',`<span ${_dp('lw')}>${lw?(weightActualGrams(lw)+' غم'):'—'}</span>`,'dc-accent'],
     ['الوزن المتوقع (الكايد)',lw?(weightGuideGrams(lw)+' غم'):'—'],
     ['فرق الوزن',lw?((weightActualGrams(lw)-weightGuideGrams(lw))+' غم'):'—'],
     ['الحالة',c.completed?'منتهية':(b.status||'نشطة')],

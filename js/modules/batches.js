@@ -462,20 +462,25 @@ function selectHallDetail(bId,hallId){
   let upd=(f,v)=>document.querySelectorAll(`[data-dpbatch="${bId}"][data-dpfield="${f}"]`).forEach(el=>el.textContent=v);
   if(!+hallId){
     let c=calc(b);
+    let lw=latestWeightForBatch(b.id);
     upd('hall',b.hall||'—');
     upd('birds',(c.fieldBirds||0).toLocaleString());
     upd('mort',c.mort.toLocaleString());
     upd('sold',c.sold.toLocaleString());
     upd('alive',c.alive.toLocaleString());
+    upd('lw',lw?(weightActualGrams(lw)+' غم'):'—');
     return;
   }
   let hid=+hallId;
   let a=(b.hallAllocations||[]).find(x=>+x.hallId===hid)||{};
+  let hallLw=(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===hid)
+    .sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];
   upd('hall',a.hall||b.hall||'قاعة '+hid);
   upd('birds',batchAllocatedToHall(b,hid).toLocaleString());
   upd('mort',batchHallMort(b,hid).toLocaleString());
   upd('sold',batchHallSold(b,hid).toLocaleString());
   upd('alive',batchHallAlive(b,hid).toLocaleString());
+  upd('lw',hallLw?(weightActualGrams(hallLw)+' غم'):'—');
 }
 
 // ── TRANSFER ──
