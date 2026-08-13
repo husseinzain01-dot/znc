@@ -277,13 +277,19 @@ function _rptMortHtml(b,c,inRange,hallFilter=0){
   let reasonCards=Object.entries(byReason).sort((a,z)=>z[1]-a[1]).slice(0,6).map(([r,n])=>
     `<div class="statCard"><div class="statVal" style="color:#dc2626">${n.toLocaleString()}</div><div class="statLbl">${r}</div></div>`
   ).join('');
+  // عدد الطيور لكل قاعة من hallAllocations
+  let hallBirdsMap={};
+  if(Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    b.hallAllocations.forEach(a=>{hallBirdsMap[a.hall||'']=(+a.birds||0);});
+  }
   let hallCards=Object.entries(byHall).map(([h,n])=>{
-    let pct=initBirds?(n/initBirds*100).toFixed(2):0;
+    let hallBirds=hallBirdsMap[h]||initBirds;
+    let pct=hallBirds?(n/hallBirds*100).toFixed(2):0;
     let hCol=+pct>5?'#dc2626':+pct>3?'#d97706':'#16a34a';
     return`<div class="statCard" style="border-right:3px solid ${hCol}">
       <div class="statVal" style="color:#dc2626">${n.toLocaleString()}</div>
-      <div style="font-size:10px;color:${hCol};font-weight:700">${pct}%</div>
-      <div class="statLbl">${h}</div>
+      <div style="font-size:11px;color:${hCol};font-weight:700;margin-top:2px">${pct}%</div>
+      <div class="statLbl">${h}${hallBirdsMap[h]?' ('+hallBirdsMap[h].toLocaleString()+' طير)':''}</div>
     </div>`;
   }).join('');
   return`<div class="card" style="margin-bottom:12px">
