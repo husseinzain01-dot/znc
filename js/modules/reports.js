@@ -1023,57 +1023,17 @@ function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;le
 
 // ── ARCHIVE ──
 function archiveBatchDetails(b){
-  let hallIds=batchHallIds(b);
-  let inHall=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
-  let weights=(data.weights||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  let feeds=(data.feeds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  let meds=(data.meds||[]).filter(x=>x.field===b.field&&inHall(x)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  let morts=(data.morts||[]).filter(x=>+x.batchId===b.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  let markets=(data.markets||[]).filter(x=>+x.batchId===b.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  let tr=(rows,empty,cols)=>rows||`<tr><td colspan="${cols}" style="text-align:center;color:var(--ink3)"> ${empty}</td></tr>`;
-  let weightRows=weights.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${x.avgWeight||'—'} كغ</td><td>${x.expectedWeight||'—'} كغ</td><td>${(+x.totalWeight||0).toLocaleString()} كغ</td></tr>`).join('');
-  let feedRows=feeds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${esc(x.feedType||'—')}</td><td>${(+x.qty||0).toLocaleString()} كغم</td></tr>`).join('');
-  let medRows=meds.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${esc(x.type||'—')}</td><td>${esc(x.name||'—')}</td><td>${esc(x.dose||'—')}</td><td>${(+x.qty||0).toLocaleString()}</td></tr>`).join('');
-  let mortRows=morts.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${(+x.count||0).toLocaleString()}</td><td>${esc(x.reason||'—')}</td></tr>`).join('');
-  let marketRows=markets.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td><td>${(+x.count||0).toLocaleString()}</td><td>${esc(x.status||'—')}</td><td>${esc(x.note||'—')}</td></tr>`).join('');
   let c=calc(b);
-  let eggs=+b.eggs||0,badEggs=+b.badEggs||0,setEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-badEggs);
-  let hatched=c.hatched||0,netHatch=c.netHatch||0,hatchLoss=c.hatchLoss||0;
-  let vaccineDeaths=+b.vaccineDeaths||0,isolated=+b.isolatedBirds||0,unfitBirds=+b.unfitBirds||0;
-  let hatchRatePct=setEggs>0?((hatched/setEggs)*100).toFixed(2):'—';
-  let netRatePct=setEggs>0?((netHatch/setEggs)*100).toFixed(2):'—';
-  return `<div class="detailGrid" style="margin-bottom:12px">
-    <div class="dCell"><div class="dc-label">الحقل</div><div class="dc-val">${esc(b.field||'—')}</div></div>
-    <div class="dCell"><div class="dc-label">تاريخ الأرشفة</div><div class="dc-val">${fmt(b.archiveDate||today())}</div></div>
-    <div class="dCell"><div class="dc-label">القاعات</div><div class="dc-val">${hallIds.length}</div></div>
-    <div class="dCell"><div class="dc-label">الحالة</div><div class="dc-val">منتهية</div></div>
-  </div>
-  <div class="card" style="margin-bottom:12px;border-right:4px solid #7c3aed">
-    <div class="cardTitle" style="color:#7c3aed"><span class="material-symbols-outlined ct-icon">egg</span> بيانات المفقس</div>
-    <div class="detailGrid" style="margin-bottom:10px">
-      <div class="dCell"><div class="dc-label">تاريخ الفقس</div><div class="dc-val">${fmt(b.hatchDate)||'—'}</div></div>
-      <div class="dCell"><div class="dc-label">تاريخ النقل</div><div class="dc-val">${fmt(b.transferDate)||'—'}</div></div>
-      <div class="dCell"><div class="dc-label">إجمالي البيض</div><div class="dc-val">${eggs.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">البيض الفاسد</div><div class="dc-val">${badEggs.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">البيض المخصص للفقس</div><div class="dc-val">${setEggs.toLocaleString()}</div></div>
-      ${b.candleDate?`<div class="dCell"><div class="dc-label">تاريخ الشمع</div><div class="dc-val">${fmt(b.candleDate)}</div></div>`:''}
-      ${b.candleBadEggs?`<div class="dCell"><div class="dc-label">مكشوف بالشمع</div><div class="dc-val">${(+b.candleBadEggs).toLocaleString()}</div></div>`:''}
-      <div class="dCell"><div class="dc-label">المفقوس</div><div class="dc-val" style="font-weight:700">${hatched.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">نسبة الفقس</div><div class="dc-val" style="font-weight:700;color:#7c3aed">${hatchRatePct}%</div></div>
-      <div class="dCell"><div class="dc-label">هلاك اللقاح</div><div class="dc-val">${vaccineDeaths.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">طيور معزولة</div><div class="dc-val">${isolated.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">طيور غير صالحة</div><div class="dc-val">${unfitBirds.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">إجمالي الخسائر</div><div class="dc-val">${hatchLoss.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">الصافي للنقل</div><div class="dc-val" style="font-weight:700;color:#16a34a">${netHatch.toLocaleString()}</div></div>
-      <div class="dCell"><div class="dc-label">نسبة الصافي</div><div class="dc-val" style="font-weight:700;color:#16a34a">${netRatePct}%</div></div>
-      ${b.transferBirdWeight?`<div class="dCell"><div class="dc-label">وزن الكتكوت</div><div class="dc-val">${b.transferBirdWeight} غم</div></div>`:''}
-    </div>
-  </div>
-  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="5">${t('secWeights')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thActual')}</th><th>${t('thGuide')}</th><th>${t('thTotal')}</th></tr></thead><tbody>${tr(weightRows,t('noWeights'),5)}</tbody></table></div>
-  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="4">${t('secFeed')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thType')}</th><th>${t('thQty')}</th></tr></thead><tbody>${tr(feedRows,t('noFeed'),4)}</tbody></table></div>
-  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="6">${t('secMeds')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thType')}</th><th>${t('thMaterial')}</th><th>${t('thDose')}</th><th>${t('thQty')}</th></tr></thead><tbody>${tr(medRows,t('noMeds'),6)}</tbody></table></div>
-  <div class="tableWrap" style="margin-bottom:10px"><table><thead><tr><th colspan="4">${t('secMort')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thCount')}</th><th>${t('thReason')}</th></tr></thead><tbody>${tr(mortRows,t('noMort'),4)}</tbody></table></div>
-  <div class="tableWrap"><table><thead><tr><th colspan="5">${t('secMarket')}</th></tr><tr><th>${t('thDate')}</th><th>${t('thHall')}</th><th>${t('thCount')}</th><th>${t('thType')}</th><th>${t('thNote')}</th></tr></thead><tbody>${tr(marketRows,t('noSales'),5)}</tbody></table></div>`;
+  // بدون فلتر تاريخ — كل بيانات الوجبة تظهر
+  let inRange=()=>true;
+  return _rptKPIs(b,c)+
+    _rptHatchHtml(b,c)+
+    _rptWeightsHtml(b,inRange,0)+
+    _rptMarketWeightsHtml(b,inRange,0)+
+    _rptFeedHtml(b,inRange,0)+
+    _rptMedsHtml(b,inRange,0)+
+    _rptMortHtml(b,c,inRange,0)+
+    _rptMarketHtml(b,inRange,0);
 }
 // ===== AI ANALYSIS =====
 function buildDailyGrowthCurve(b,transferW,eggW,wRecs){
