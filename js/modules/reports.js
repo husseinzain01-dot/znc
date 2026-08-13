@@ -1,4 +1,365 @@
 ﻿// ── REPORTS ──
+// ── NEW BATCH-CENTRIC REPORT SYSTEM ──
+let _rptSec='all';
+
+function setRptSection(s){
+  _rptSec=s;
+  document.querySelectorAll('.rptTab').forEach(t=>t.classList.toggle('act',t.dataset.sec===s));
+  renderBatchReport();
+}
+
+function renderBatchReport(){
+  // تحديث قائمة الوجبات
+  let sel=$('rptBatch');
+  if(sel){
+    let prev=sel.value;
+    let batches=isAdmin()?data.batches:visibleBatches();
+    sel.innerHTML='<option value="">-- اختر وجبة لعرض تقريرها --</option>'+
+      batches.map(b=>{
+        let c=calc(b);
+        let st=c.completed?'منتهية':c.transferred?'في الحقل':'بالمفقس';
+        return`<option value="${b.id}">${esc(b.name)} — ${esc(b.field||'—')} (${st})</option>`;
+      }).join('');
+    if(prev)sel.value=prev;
+  }
+  let area=$('batchReportArea');if(!area)return;
+  let batchId=sel&&sel.value?+sel.value:0;
+  let from=$('rptFrom')?$('rptFrom').value:'';
+  let to=$('rptTo')?$('rptTo').value:'';
+  let inRange=d=>(!from||d>=from)&&(!to||d<=to);
+
+  if(!batchId){
+    area.innerHTML=`<div class="card" style="text-align:center;padding:60px 20px">
+      <span class="material-symbols-outlined" style="font-size:60px;color:var(--ink3);display:block;margin-bottom:12px">description</span>
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;color:var(--ink)">اختر وجبة من القائمة أعلاه</div>
+      <div style="font-size:13px;color:var(--ink3)">ستظهر هنا جميع تفاصيلها — المفقس، الأوزان، العلف، الأدوية، الهلاك، التسويق</div>
+    </div>`;
+    return;
+  }
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!b){area.innerHTML='';return;}
+  let c=calc(b);
+  let html=_rptKPIs(b,c);
+  if(_rptSec==='all'||_rptSec==='hatch')   html+=_rptHatchHtml(b,c);
+  if(_rptSec==='all'||_rptSec==='weights') html+=_rptWeightsHtml(b,inRange);
+  if(_rptSec==='all'||_rptSec==='feed')    html+=_rptFeedHtml(b,inRange);
+  if(_rptSec==='all'||_rptSec==='meds')    html+=_rptMedsHtml(b,inRange);
+  if(_rptSec==='all'||_rptSec==='mort')    html+=_rptMortHtml(b,c,inRange);
+  if(_rptSec==='all'||_rptSec==='market')  html+=_rptMarketHtml(b,inRange);
+  area.innerHTML=html;
+}
+
+function _rptKPIs(b,c){
+  let eggs=+b.eggs||0,setEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-(+b.badEggs||0));
+  let hatched=c.hatched||0,netHatch=c.netHatch||0;
+  let hRate=setEggs>0?((hatched/setEggs)*100).toFixed(1)+'%':'—';
+  let nRate=setEggs>0?((netHatch/setEggs)*100).toFixed(1)+'%':'—';
+  let sr=+successRate(b);
+  let srCol=sr>=90?'#16a34a':sr>=80?'#d97706':'#dc2626';
+  let st=c.completed?'منتهية':c.transferred?'في الحقل':'بالمفقس';
+  let stCol=c.completed?'#64748b':c.transferred?'#16a34a':'#2563eb';
+  let hallLabel=Array.isArray(b.hallAllocations)&&b.hallAllocations.length
+    ?b.hallAllocations.map(a=>esc(a.hall)).join(' / ')
+    :esc(b.hall||'—');
+  return`<div class="card" style="margin-bottom:12px;border-top:3px solid var(--p)">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <div>
+        <div style="font-size:20px;font-weight:800">${esc(b.name)}</div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${esc(b.type||'—')} · ${esc(b.field||'—')} · ${hallLabel}${b.supervisor?' · '+esc(b.supervisor):''}${b.vet?' · د.'+esc(b.vet):''}</div>
+      </div>
+      <span style="margin-right:auto;background:${stCol}18;color:${stCol};border-radius:8px;padding:4px 14px;font-weight:700;font-size:13px">${st}</span>
+    </div>
+    <div class="statsGrid">
+      <div class="statCard" style="border-right:4px solid #7c3aed"><div class="statVal" style="color:#7c3aed">${hRate}</div><div class="statLbl">نسبة الفقس</div></div>
+      <div class="statCard" style="border-right:4px solid #7c3aed"><div class="statVal" style="color:#7c3aed">${nRate}</div><div class="statLbl">نسبة الصافي</div></div>
+      <div class="statCard" style="border-right:4px solid #7c3aed"><div class="statVal">${netHatch.toLocaleString()}</div><div class="statLbl">الصافي للنقل</div></div>
+      <div class="statCard" style="border-right:4px solid #0891b2"><div class="statVal">${(c.fieldBirds||0).toLocaleString()}</div><div class="statLbl">في الحقل</div></div>
+      <div class="statCard" style="border-right:4px solid #16a34a"><div class="statVal" style="color:#16a34a">${c.alive.toLocaleString()}</div><div class="statLbl">الحي الآن</div></div>
+      <div class="statCard" style="border-right:4px solid #dc2626"><div class="statVal" style="color:#dc2626">${c.mort.toLocaleString()}</div><div class="statLbl">الهلاك</div></div>
+      <div class="statCard" style="border-right:4px solid #d97706"><div class="statVal" style="color:#d97706">${c.sold.toLocaleString()}</div><div class="statLbl">المسوق</div></div>
+      <div class="statCard" style="border-right:4px solid ${srCol}"><div class="statVal" style="color:${srCol}">${sr}%</div><div class="statLbl">نسبة النجاح</div></div>
+    </div>
+  </div>`;
+}
+
+function _rptHatchHtml(b,c){
+  let eggs=+b.eggs||0,badEggs=+b.badEggs||0;
+  let setEggs=(+b.setEggs||0)>0?+b.setEggs:Math.max(0,eggs-badEggs);
+  let hatched=c.hatched||0,netHatch=c.netHatch||0,hatchLoss=c.hatchLoss||0;
+  let vd=+b.vaccineDeaths||0,iso=+b.isolatedBirds||0,unfit=+b.unfitBirds||0;
+  let hRate=setEggs>0?((hatched/setEggs)*100).toFixed(2)+'%':'—';
+  let nRate=setEggs>0?((netHatch/setEggs)*100).toFixed(2)+'%':'—';
+  let hallLabel=Array.isArray(b.hallAllocations)&&b.hallAllocations.length
+    ?b.hallAllocations.map(a=>`<span class="badge b-teal">${esc(a.hall)}</span> <span style="font-size:11px;color:var(--ink3)">${(+a.birds||0).toLocaleString()} طير</span>`).join('  ')
+    :(b.hall?`<span class="badge b-teal">${esc(b.hall)}</span>`:'—');
+  let cell=(lbl,val,col='')=>`<div class="hatchCell"><div class="hc-lbl">${lbl}</div><div class="hc-val" style="color:${col||'var(--ink)'}">${val}</div></div>`;
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#7c3aed"><span class="material-symbols-outlined">egg</span> بيانات المفقس</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:13px">
+      <div><span style="color:var(--ink3)">تاريخ الفقس:</span> <b>${fmt(b.hatchDate)||'—'}</b></div>
+      <div><span style="color:var(--ink3)">تاريخ النقل:</span> <b>${fmt(b.transferDate)||'—'}</b></div>
+      <div><span style="color:var(--ink3)">الحقل:</span> <b>${esc(b.field||'—')}</b></div>
+      <div><span style="color:var(--ink3)">القاعات:</span> ${hallLabel}</div>
+      ${b.transferBirdWeight?`<div><span style="color:var(--ink3)">وزن الكتكوت:</span> <b>${b.transferBirdWeight} غم</b></div>`:''}
+      ${b.supervisor?`<div><span style="color:var(--ink3)">المشرف:</span> <b>${esc(b.supervisor)}</b></div>`:''}
+      ${b.vet?`<div><span style="color:var(--ink3)">الطبيب البيطري:</span> <b>${esc(b.vet)}</b></div>`:''}
+    </div>
+    <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--ink3)">▸ البيض</div>
+    <div class="hatchGrid" style="margin-bottom:14px">
+      ${cell('إجمالي البيض',eggs.toLocaleString())}
+      ${cell('البيض الفاسد',badEggs.toLocaleString(),'#dc2626')}
+      ${cell('المخصص للفقس',setEggs.toLocaleString(),'#2563eb')}
+      ${b.candleDate?cell('مكشوف بالشمع',(+b.candleBadEggs||0).toLocaleString(),'#d97706'):''}
+    </div>
+    <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--ink3)">▸ نتيجة الفقس</div>
+    <div class="hatchGrid" style="margin-bottom:14px">
+      ${cell('المفقوس',hatched.toLocaleString(),'#0891b2')}
+      ${cell('نسبة الفقس',hRate,'#7c3aed')}
+      ${cell('هلاك اللقاح',vd.toLocaleString(),'#dc2626')}
+      ${cell('معزولة',iso.toLocaleString(),'#d97706')}
+      ${cell('غير صالحة',unfit.toLocaleString(),'#d97706')}
+      ${cell('إجمالي الخسائر',hatchLoss.toLocaleString(),'#dc2626')}
+    </div>
+    <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--ink3)">▸ الصافي للنقل</div>
+    <div class="hatchGrid">
+      ${cell('الصافي للنقل',netHatch.toLocaleString(),'#16a34a')}
+      ${cell('نسبة الصافي',nRate,'#16a34a')}
+      ${b.transferBirdWeight?cell('وزن الكتكوت',b.transferBirdWeight+' غم','#0891b2'):''}
+    </div>
+  </div>`;
+}
+
+function _rptWeightsHtml(b,inRange){
+  let hallIds=batchHallIds(b);
+  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let recs=(data.weights||[]).filter(x=>(x.batchId===b.id||(x.field===b.field&&inH(x)))&&inRange(x.date))
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let actuals=recs.map(x=>+(x.actual_weight_grams||x.avgWeight||0)).filter(v=>v>0);
+  let guides=recs.map(x=>+(x.guideWeightGrams||0)).filter(v=>v>0);
+  let avgA=actuals.length?Math.round(actuals.reduce((s,v)=>s+v,0)/actuals.length):0;
+  let avgG=guides.length?Math.round(guides.reduce((s,v)=>s+v,0)/guides.length):0;
+  let avgR=avgA&&avgG?((avgA/avgG)*100).toFixed(1):null;
+  let avgRCol=avgR?(+avgR>=100?'#16a34a':+avgR>=90?'#d97706':'#dc2626'):'';
+  let rows=recs.map(x=>{
+    let actual=+(x.actual_weight_grams||x.avgWeight||0),guide=+(x.guideWeightGrams||0);
+    let diff=actual&&guide?actual-guide:null,dCol=diff!=null?(diff>=0?'#16a34a':'#dc2626'):'';
+    let pct=guide?((actual/guide)*100).toFixed(1):null;
+    let pCol=pct?(+pct>=100?'#16a34a':+pct>=90?'#d97706':'#dc2626'):'';
+    return`<tr>
+      <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
+      <td style="text-align:center">${x.ageDays!=null?x.ageDays+' يوم':'—'}</td>
+      <td style="font-weight:700;color:#2563eb;text-align:center">${actual?actual.toLocaleString()+' غم':'—'}</td>
+      <td style="color:var(--ink3);text-align:center">${guide?guide.toLocaleString()+' غم':'—'}</td>
+      <td style="color:${dCol};font-weight:700;text-align:center">${diff!=null?(diff>0?'+':'')+diff.toLocaleString()+' غم':'—'}</td>
+      <td style="color:${pCol};font-weight:700;text-align:center">${pct!=null?pct+'%':'—'}</td>
+      <td style="text-align:center">${(+x.alive||0).toLocaleString()||'—'}</td>
+      <td>${esc(x.note||'—')}</td>
+    </tr>`;
+  }).join('');
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#2563eb"><span class="material-symbols-outlined">scale</span> سجلات الأوزان</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+      <div class="statCard"><div class="statVal" style="color:#2563eb">${avgA?avgA.toLocaleString()+' غم':'—'}</div><div class="statLbl">متوسط الوزن الفعلي</div></div>
+      <div class="statCard"><div class="statVal" style="color:var(--ink3)">${avgG?avgG.toLocaleString()+' غم':'—'}</div><div class="statLbl">متوسط الكايد</div></div>
+      <div class="statCard"><div class="statVal" style="color:${avgRCol}">${avgR?avgR+'%':'—'}</div><div class="statLbl">متوسط التحقق</div></div>
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العمر</th><th>الوزن الفعلي</th><th>الكايد</th><th>الفرق</th><th>نسبة التحقق</th><th>الحي</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات أوزان</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function _rptFeedHtml(b,inRange){
+  let hallIds=batchHallIds(b);
+  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let recs=(data.feeds||[]).filter(x=>x.field===b.field&&inH(x)&&inRange(x.date))
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let total=recs.reduce((s,x)=>s+(+x.qty||0),0);
+  let byType={};recs.forEach(x=>{byType[x.feedType||'غير محدد']=(byType[x.feedType||'غير محدد']||0)+(+x.qty||0);});
+  let rows=recs.map(x=>`<tr>
+    <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
+    <td>${esc(x.feedType||'—')}</td>
+    <td style="font-weight:700;color:#ca8a04;text-align:center">${(+x.qty||0).toLocaleString()} كغم</td>
+    <td>${esc(x.note||'—')}</td>
+  </tr>`).join('');
+  let typeCards=Object.entries(byType).map(([t,q])=>
+    `<div class="statCard"><div class="statVal" style="color:#ca8a04">${q.toLocaleString()}<span style="font-size:12px"> كغم</span></div><div class="statLbl">${t}</div></div>`
+  ).join('');
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#ca8a04"><span class="material-symbols-outlined">grass</span> سجلات العلف</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+      <div class="statCard"><div class="statVal" style="color:#ca8a04">${total.toLocaleString()} كغم</div><div class="statLbl">الإجمالي</div></div>
+      ${typeCards}
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات علف</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function _rptMedsHtml(b,inRange){
+  let hallIds=batchHallIds(b);
+  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let recs=(data.meds||[]).filter(x=>x.field===b.field&&inH(x)&&inRange(x.date))
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let byType={};recs.forEach(x=>{byType[x.type||'—']=(byType[x.type||'—']||0)+1;});
+  let rows=recs.map(x=>{
+    let badgeCls=x.type==='لقاح'?'b-violet':x.type==='دواء'?'b-red':x.type==='فيتامين'?'b-green':'b-gray';
+    return`<tr>
+      <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
+      <td><span class="badge ${badgeCls}">${esc(x.type||'—')}</span></td>
+      <td><b>${esc(x.name||'—')}</b></td>
+      <td>${esc(x.dose||'—')}</td>
+      <td style="text-align:center">${(+x.qty||0).toLocaleString()}</td>
+      <td>${esc(x.note||'—')}</td>
+    </tr>`;
+  }).join('');
+  let typeCards=Object.entries(byType).map(([t,n])=>
+    `<div class="statCard"><div class="statVal" style="color:#7c3aed">${n}</div><div class="statLbl">${t}</div></div>`
+  ).join('');
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#7c3aed"><span class="material-symbols-outlined">vaccines</span> سجلات الأدوية واللقاحات</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">إجمالي الجرعات</div></div>
+      ${typeCards}
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>النوع</th><th>المادة</th><th>الجرعة</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات أدوية</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function _rptMortHtml(b,c,inRange){
+  let recs=(data.morts||[]).filter(x=>+x.batchId===b.id&&inRange(x.date))
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let total=recs.reduce((s,x)=>s+(+x.count||0),0);
+  let initBirds=c.fieldBirds||1;
+  let phases={early:0,mid:0,late:0};
+  let byReason={};
+  recs.forEach(x=>{
+    let cnt=+x.count||0;
+    let age=x.ageDays!=null?+x.ageDays:(x.date&&b.fieldEntryDate?Math.round((new Date(x.date)-new Date(b.fieldEntryDate))/864e5):null);
+    if(age!=null){if(age<=7)phases.early+=cnt;else if(age<=21)phases.mid+=cnt;else phases.late+=cnt;}
+    if(x.reason)byReason[x.reason]=(byReason[x.reason]||0)+cnt;
+  });
+  let mortPct=initBirds?(total/initBirds*100).toFixed(2):0;
+  let pCol=+mortPct>5?'#dc2626':+mortPct>3?'#d97706':'#16a34a';
+  let rows=recs.map(x=>`<tr>
+    <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
+    <td style="color:#dc2626;font-weight:700;text-align:center">${(+x.count||0).toLocaleString()}</td>
+    <td>${esc(x.reason||'—')}</td>
+    <td>${esc(x.note||'—')}</td>
+  </tr>`).join('');
+  let reasonCards=Object.entries(byReason).sort((a,z)=>z[1]-a[1]).slice(0,5).map(([r,n])=>
+    `<div class="statCard"><div class="statVal" style="color:#dc2626">${n.toLocaleString()}</div><div class="statLbl">${r}</div></div>`
+  ).join('');
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">heart_minus</span> سجلات الهلاك</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+      <div class="statCard"><div class="statVal" style="color:#dc2626">${total.toLocaleString()}</div><div class="statLbl">إجمالي الهلاك</div></div>
+      <div class="statCard"><div class="statVal" style="color:${pCol}">${mortPct}%</div><div class="statLbl">نسبة الهلاك</div></div>
+      <div class="statCard" style="border-right:3px solid #ef4444"><div class="statVal">${phases.early.toLocaleString()}</div><div class="statLbl">مبكر (0-7 يوم)</div></div>
+      <div class="statCard" style="border-right:3px solid #f97316"><div class="statVal">${phases.mid.toLocaleString()}</div><div class="statLbl">متوسط (8-21 يوم)</div></div>
+      <div class="statCard" style="border-right:3px solid #7c3aed"><div class="statVal">${phases.late.toLocaleString()}</div><div class="statLbl">متأخر (21+ يوم)</div></div>
+      ${reasonCards}
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>السبب</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات هلاك</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function _rptMarketHtml(b,inRange){
+  let recs=(data.markets||[]).filter(x=>+x.batchId===b.id&&inRange(x.date))
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let totalSold=recs.reduce((s,x)=>s+(+x.count||0),0);
+  let byType={};recs.forEach(x=>{byType[x.status||'—']=(byType[x.status||'—']||0)+(+x.count||0);});
+  let rows=recs.map(x=>`<tr>
+    <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
+    <td style="font-weight:700;color:#d97706;text-align:center">${(+x.count||0).toLocaleString()}</td>
+    <td>${esc(x.status||'—')}</td>
+    <td style="text-align:center">${x.price!=null?esc(''+x.price):'—'}</td>
+    <td>${esc(x.note||'—')}</td>
+  </tr>`).join('');
+  let typeCards=Object.entries(byType).map(([t,n])=>
+    `<div class="statCard"><div class="statVal" style="color:#d97706">${n.toLocaleString()}</div><div class="statLbl">${t}</div></div>`
+  ).join('');
+  return`<div class="card" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#d97706"><span class="material-symbols-outlined">storefront</span> سجلات التسويق</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+      <div class="statCard"><div class="statVal" style="color:#d97706">${totalSold.toLocaleString()}</div><div class="statLbl">إجمالي المسوق</div></div>
+      ${typeCards}
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>النوع</th><th>السعر</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات تسويق</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function exportBatchPDF(){
+  let area=$('batchReportArea');if(!area||!area.innerHTML.trim())return msg('⚠ اختر وجبة أولاً');
+  let batchId=$('rptBatch')&&$('rptBatch').value?+$('rptBatch').value:0;
+  let b=batchId?data.batches.find(x=>x.id===batchId):null;
+  let title=b?b.name:'تقرير الوجبة';
+  let win=window.open('','_blank');
+  win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
+    <title>${title}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;700&display=swap');
+      *{box-sizing:border-box}body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;padding:20px;color:#0f172a;font-size:12px;background:#fff}
+      h2{font-size:18px;font-weight:800;margin-bottom:4px}.meta{font-size:11px;color:#64748b;margin-bottom:16px}
+      .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:12px}
+      .secHdr{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;padding:0 0 8px;border-bottom:2px solid #e2e8f0;margin-bottom:10px}
+      .statsGrid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+      .statCard{border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;min-width:100px;text-align:center}
+      .statVal{font-size:17px;font-weight:800;color:#0d9488}.statLbl{font-size:10px;color:#64748b;margin-top:2px}
+      .hatchGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+      .hatchCell{background:#f8fafc;border-radius:8px;padding:10px;text-align:center;border:1px solid #e2e8f0}
+      .hc-lbl{font-size:10px;color:#64748b;margin-bottom:4px}.hc-val{font-size:17px;font-weight:800}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th{background:#f8fafc;border:1px solid #e2e8f0;padding:6px 8px;font-weight:700;text-align:right}
+      td{border:1px solid #e2e8f0;padding:6px 8px;text-align:right}
+      tr:nth-child(even) td{background:#f8fafc}
+      .badge{padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600;display:inline-block;background:#f1f5f9;color:#334155}
+      @media print{button{display:none!important}}
+    </style></head><body>
+    <h2>📋 ${title}</h2>
+    <p class="meta">زهور الوطن — ${new Date().toLocaleDateString('ar-IQ',{year:'numeric',month:'long',day:'numeric'})}</p>
+    ${area.innerHTML}
+    <div style="margin-top:20px;text-align:center">
+      <button onclick="window.print()" style="padding:10px 28px;background:#0d9488;color:#fff;border:0;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit">🖨️ طباعة / حفظ PDF</button>
+    </div></body></html>`);
+  win.document.close();
+}
+
+function exportBatchExcel(){
+  let area=$('batchReportArea');if(!area||!area.innerHTML.trim())return msg('⚠ اختر وجبة أولاً');
+  let batchId=$('rptBatch')&&$('rptBatch').value?+$('rptBatch').value:0;
+  let b=batchId?data.batches.find(x=>x.id===batchId):null;
+  let tables=[...area.querySelectorAll('table.tbl')];
+  if(!tables.length)return msg('⚠ لا توجد جداول للتصدير');
+  let csv='﻿';
+  tables.forEach(tbl=>{
+    let hdr=[...tbl.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    let rows=[...tbl.querySelectorAll('tbody tr')].map(tr=>[...tr.querySelectorAll('td')].map(td=>td.textContent.trim()));
+    csv+=[hdr,...rows].map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n')+'\n\n';
+  });
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`تقرير_${b?b.name:'وجبة'}_${today()}.csv`;
+  a.click();
+  msg('تم تصدير Excel');
+}
+
 // ── REPORTS ENGINE ──
 function rptFilteredData(){
   let type=$('rptType')?$('rptType').value:'batches';
@@ -65,6 +426,7 @@ function clearReportFilters(){
 }
 
 function renderReports(){
+  renderBatchReport();
   renderReportFilters();
 
   let{type,field,hallId,batchId,status,inRange,inField,inHall,textMatch}=rptFilteredData();

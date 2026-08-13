@@ -372,6 +372,18 @@ tbody tr:active td{background:#ccfbf1}
   main{padding:0}
   .card{box-shadow:none;border:1px solid #ddd}
 }
+/* ── REPORT TABS ── */
+.rptTab{padding:7px 16px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--ink2);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;white-space:nowrap}
+.rptTab:hover{border-color:var(--p);color:var(--p)}
+.rptTab.act{background:var(--p);color:#fff;border-color:var(--p);box-shadow:0 2px 8px rgba(13,148,136,.25)}
+/* ── HATCH DETAIL CARDS ── */
+.hatchGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:4px}
+.hatchCell{background:var(--card2,#f8fafc);border-radius:10px;padding:12px 10px;text-align:center;border:1px solid var(--border)}
+.hatchCell .hc-lbl{font-size:11px;color:var(--ink3);margin-bottom:5px}
+.hatchCell .hc-val{font-size:19px;font-weight:800}
+/* ── SECTION HEADER ── */
+.secHdr{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding:10px 0 8px;border-bottom:2px solid var(--border);margin-bottom:12px}
+.secHdr .material-symbols-outlined{font-size:20px}
 /* LTR mode (English) */
 [dir="ltr"] .side{border-right:1px solid rgba(255,255,255,.07);border-left:none}
 [dir="ltr"] .nav{text-align:left}

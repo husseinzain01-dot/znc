@@ -562,79 +562,65 @@
     <!-- REPORTS -->
     <section id="reports" class="page hidden">
 
-      <!-- أدوات التصفية والتصدير -->
-      <div class="card noPrint">
-        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">summarize</span> <span data-i18n="ctReports">مركز التقارير</span></div>
-        <div class="formGrid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px">
-          <div class="formGroup">
-            <label>نوع التقرير</label>
-            <select id="rptType" onchange="renderReports()">
-              <option value="batches">الوجبات</option>
-              <option value="mort">الهلاك</option>
-              <option value="weights">الأوزان</option>
-              <option value="feed">استهلاك العلف</option>
-              <option value="meds">الأدوية واللقاحات</option>
-              <option value="fields">تقرير الحقول</option>
-              <option value="halls">تقرير القاعات</option>
-              <option value="supervisor">تقرير المشرفين</option>
-              <option value="vet">تقرير الأطباء البيطريين</option>
-              <option value="batch_detail">📋 تقرير وجبة كاملة</option>
+      <!-- لوحة التحكم -->
+      <div class="card noPrint" style="margin-bottom:14px">
+        <div class="cardTitle"><span class="material-symbols-outlined ct-icon">description</span> مركز التقارير</div>
+
+        <!-- اختيار الوجبة + فلتر التاريخ -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+          <div class="formGroup" style="flex:2;min-width:220px">
+            <label style="font-weight:700">اختر الوجبة</label>
+            <select id="rptBatch" onchange="renderBatchReport()" style="font-size:14px;font-weight:600">
+              <option value="">-- اختر وجبة لعرض تقريرها --</option>
             </select>
           </div>
-          <div class="formGroup">
-            <label data-i18n="lblField">الحقل</label>
-            <select id="rptField" onchange="onReportFieldChange()">
-              <option value="">${t('allFields')}</option>
-            </select>
-          </div>
-          <div class="formGroup">
-            <label data-i18n="lblHall">القاعة</label>
-            <select id="rptHall" onchange="renderReports()">
-              <option value="">${t('allHalls')}</option>
-            </select>
-          </div>
-          <div class="formGroup">
-            <label data-i18n="lblBatch">الوجبة</label>
-            <select id="rptBatch" onchange="renderReports()">
-              <option value="">${t('allBatches')}</option>
-            </select>
-          </div>
-          <div class="formGroup">
-            <label>الحالة / النوع</label>
-            <select id="rptStatus" onchange="renderReports()">
-              <option value="">${t('allItems')}</option>
-            </select>
-          </div>
-          <div class="formGroup">
-            <label>بحث نصي</label>
-            <input id="rptSearch" placeholder="اسم وجبة / قاعة / مادة" oninput="renderReports()">
-          </div>
-          <div class="formGroup">
+          <div class="formGroup" style="min-width:140px">
             <label>من تاريخ</label>
-            <input id="rptFrom" type="date" onchange="renderReports()">
+            <input id="rptFrom" type="date" onchange="renderBatchReport()">
           </div>
-          <div class="formGroup">
+          <div class="formGroup" style="min-width:140px">
             <label>إلى تاريخ</label>
-            <input id="rptTo" type="date" onchange="renderReports()">
+            <input id="rptTo" type="date" onchange="renderBatchReport()">
+          </div>
+          <div style="padding-bottom:2px">
+            <button class="btn btn-secondary btn-sm" onclick="$('rptBatch').value='';$('rptFrom').value='';$('rptTo').value='';renderBatchReport()">مسح</button>
           </div>
         </div>
-        <div class="formActions">
-          <button class="btn btn-secondary" onclick="clearReportFilters()">مسح الفلاتر</button>
+
+        <!-- تابات الأقسام -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px" id="rptTabs">
+          <button class="rptTab act" data-sec="all"     onclick="setRptSection('all')">📋 كل التفاصيل</button>
+          <button class="rptTab"     data-sec="hatch"   onclick="setRptSection('hatch')">🥚 المفقس</button>
+          <button class="rptTab"     data-sec="weights" onclick="setRptSection('weights')">⚖️ الأوزان</button>
+          <button class="rptTab"     data-sec="feed"    onclick="setRptSection('feed')">🌾 العلف</button>
+          <button class="rptTab"     data-sec="meds"    onclick="setRptSection('meds')">💉 الأدوية</button>
+          <button class="rptTab"     data-sec="mort"    onclick="setRptSection('mort')">💔 الهلاك</button>
+          <button class="rptTab"     data-sec="market"  onclick="setRptSection('market')">🛒 التسويق</button>
+        </div>
+
+        <!-- أدوات التصدير -->
+        <div class="formActions" style="margin-top:0">
           <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة</button>
-          <button class="btn btn-primary" onclick="exportRptExcel()">📊 تصدير Excel</button>
-          <button class="btn btn-danger" onclick="exportRptPDF()">📄 تصدير PDF</button>
-          <button class="btn btn-success" id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
-          <label class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
+          <button class="btn btn-danger"    onclick="exportBatchPDF()">📄 تصدير PDF</button>
+          <button class="btn btn-primary"   onclick="exportBatchExcel()">📊 تصدير Excel</button>
+          <button class="btn btn-success"   id="backupBtn" onclick="backup()">💾 نسخة احتياطية</button>
+          <label  class="btn btn-secondary" id="restoreBtn" style="cursor:pointer">📂 استرجاع<input type="file" accept=".json" style="display:none" onchange="restore(event)"></label>
         </div>
       </div>
 
-      <!-- ملخص سريع -->
-      <div id="rptSummaryCards" class="statsGrid" style="margin-bottom:12px"></div>
+      <!-- منطقة العرض -->
+      <div id="batchReportArea"></div>
 
-      <!-- جدول التقرير -->
-      <div class="card">
-        <div class="cardTitle" id="rptTitle">—</div>
-        <div class="tableWrap"><table id="reportTable"></table></div>
+      <!-- عناصر مخفية للتوافق مع دوال قديمة -->
+      <div style="display:none">
+        <select id="rptType"><option value="batches">batches</option></select>
+        <select id="rptField"></select>
+        <select id="rptHall"></select>
+        <select id="rptStatus"></select>
+        <input  id="rptSearch">
+        <div    id="rptSummaryCards"></div>
+        <div    id="rptTitle"></div>
+        <table  id="reportTable"></table>
       </div>
 
     </section>
