@@ -346,14 +346,9 @@ function _rptMortHtml(b,c,inRange,hallFilter=0){
 }
 
 function _rptMarketHtml(b,inRange,hallFilter=0){
-  // كل عمليات التسويق — بدون فلتر تاريخ إذا ما في نطاق محدد
-  let allRecs=(data.markets||[]).filter(x=>+x.batchId===b.id);
-  let recs=hallFilter?allRecs.filter(x=>+x.hallId===hallFilter):allRecs;
-  // فلتر التاريخ يطبق فقط إذا محدد
-  let from=$('rptFrom')?$('rptFrom').value:'';
-  let to=$('rptTo')?$('rptTo').value:'';
-  if(from||to)recs=recs.filter(x=>inRange(x.date));
-  recs=recs.sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  // كل عمليات التسويق للوجبة — بدون فلتر قاعة أو تاريخ، تظهر الكل دائماً
+  let recs=(data.markets||[]).filter(x=>x.batchId==b.id)
+    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let totalSold=recs.reduce((s,x)=>s+(+x.count||0),0);
   let byType={};let byHall={};
   recs.forEach(x=>{

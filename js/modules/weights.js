@@ -430,7 +430,12 @@ function deleteWeight(id){
 
 // ── الأوزان المسوقة ──
 function onMwBatchChange(){
+  let id=$('mwBatch')?+$('mwBatch').value:0;
+  // جلب إجمالي الطيور المسوقة لهذه الوجبة تلقائياً
+  let totalSold=(data.markets||[]).filter(x=>x.batchId==id).reduce((s,x)=>s+(+x.count||0),0);
+  if($('mwCount')&&totalSold)$('mwCount').value=totalSold;
   calcMwAge();
+  calcMwAvg();
 }
 function calcMwAge(){
   let id=$('mwBatch')?+$('mwBatch').value:0;
