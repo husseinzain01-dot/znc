@@ -1043,7 +1043,21 @@ function archiveBatchDetails(b){
     <div class="hb-right"><button class="btn btn-secondary btn-sm" onclick="printArchiveBatch(${b.id})">🖨️ طباعة</button></div>
   </div>`;
   let cards=stats.map(x=>`<div class="statCard"><div class="sc-val">${x.v}</div><div class="sc-label">${x.l}</div></div>`).join('');
-  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b)+batchHallsPanelHtml(b);
+  // بطاقات الأوزان المسوقة
+  let mwRecs=(data.marketWeights||[]).filter(x=>x.batchId==b.id).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  let mwCards=mwRecs.length?`<div class="card" style="margin-top:12px">
+    <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">storefront</span> الأوزان المسوقة</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
+      ${mwRecs.map(r=>`<div class="statCard" style="border-top:3px solid #dc2626;min-width:130px;text-align:center">
+        <div style="font-size:10px;color:var(--ink3);margin-bottom:4px">${fmt(r.date)}${r.age!=null?' — يوم '+r.age:''}</div>
+        <div style="font-size:13px;font-weight:700;color:#1d4ed8">${(+r.count||0).toLocaleString()} طير</div>
+        <div style="font-size:15px;font-weight:800;color:#dc2626;margin:2px 0">${(+r.totalKg||0).toLocaleString()} كغ</div>
+        <div style="font-size:11px;color:#7c3aed;font-weight:700">${r.avgKg} كغ/طير</div>
+        ${r.note?`<div style="font-size:10px;color:var(--ink3);margin-top:3px">${esc(r.note)}</div>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`:'';
+  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b)+batchHallsPanelHtml(b)+mwCards;
 }
 
 function batchHallsPanelHtml(b){
