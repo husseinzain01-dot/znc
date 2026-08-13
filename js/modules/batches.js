@@ -446,7 +446,9 @@ function batchAllocatedToHall(b,hallId){
   return (+b.hallId===+hallId)?(+b.fieldBirds||0):0;
 }
 function batchHallAlive(b,hallId){
-  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
+  let c=calc(b);
+  if(c.completed)return 0;
+  let alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
   if(!alloc||!base)return 0;
   let ratio=alloc/base;
   let loss=Math.round((c.mort+c.sold)*ratio);
