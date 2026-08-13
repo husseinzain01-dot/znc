@@ -1024,16 +1024,53 @@ function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;le
 // ── ARCHIVE ──
 function archiveBatchDetails(b){
   let c=calc(b);
-  // بدون فلتر تاريخ — كل بيانات الوجبة تظهر
-  let inRange=()=>true;
-  return _rptKPIs(b,c)+
-    _rptHatchHtml(b,c)+
-    _rptWeightsHtml(b,inRange,0)+
-    _rptMarketWeightsHtml(b,inRange,0)+
-    _rptFeedHtml(b,inRange,0)+
-    _rptMedsHtml(b,inRange,0)+
-    _rptMortHtml(b,c,inRange,0)+
-    _rptMarketHtml(b,inRange,0);
+  let lw=latestWeightForBatch(b.id);
+  let wsr=batchWeightSuccessRates(b);
+  let srVal=+successRate(b);
+  let srCol=srVal>=90?'#16a34a':srVal>=80?'#d97706':'#dc2626';
+  let stats=[
+    {l:'عمر التفقيس',v:c.hatchAge+'/21'},
+    {l:'الصافي المنقول',v:(c.fieldBirds||0).toLocaleString()},
+    {l:'هلاك الحقل',v:c.mort.toLocaleString()},
+    {l:'المسوق',v:c.sold.toLocaleString()},
+    {l:'الحي المتبقي',v:c.alive.toLocaleString()},
+    {l:'نسبة النجاح',v:`<span style="color:${srCol};font-weight:800">${srVal}%</span>`},
+    {l:'آخر وزن (فعلي)',v:lw?(weightActualGrams(lw)+' غم'):'—'},
+    {l:'نسبة الوزن / كايد',v:wsr.guide!=null?wsr.guide+'%':'—'},
+  ];
+  let banner=`<div class="heroBanner" style="margin-bottom:10px">
+    <div><h2>📦 ${esc(b.name)}</h2><p>منتهية — أُرشفت ${fmt(b.archiveDate||'')} — ${esc(b.field||'—')}</p></div>
+    <div class="hb-right"><button class="btn btn-secondary btn-sm" onclick="printArchiveBatch(${b.id})">🖨️ طباعة</button></div>
+  </div>`;
+  let cards=stats.map(x=>`<div class="statCard"><div class="sc-val">${x.v}</div><div class="sc-label">${x.l}</div></div>`).join('');
+  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b);
+}
+
+function printArchiveBatch(id){
+  let b=(data.batches||[]).find(x=>x.id===id);if(!b)return;
+  let html=archiveBatchDetails(b);
+  let win=window.open('','_blank');
+  win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
+    <title>${esc(b.name)}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:Tahoma,Arial;padding:20px;color:#0f172a;font-size:12px;background:#fff}
+      .heroBanner{background:#f8fafc;border-radius:10px;padding:14px 18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+      .heroBanner h2{margin:0;font-size:16px;font-weight:800}.heroBanner p{margin:4px 0 0;font-size:11px;color:#64748b}
+      .statCard{border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;display:inline-block;min-width:100px;text-align:center;margin:3px}
+      .sc-val{font-size:15px;font-weight:800;color:#0d9488}.sc-label{font-size:10px;color:#64748b;margin-top:2px}
+      .detailPanel{margin-top:12px}.dp-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+      .dp-title{font-size:15px;font-weight:800}.dp-sub{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px}
+      .detailGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:8px}
+      .dCell{background:#f8fafc;border-radius:8px;padding:8px 10px;border:1px solid #e2e8f0}
+      .dc-label{font-size:10px;color:#64748b;margin-bottom:3px}.dc-val{font-size:13px;font-weight:700}
+      .dc-accent .dc-val{color:#0d9488}.badge{padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600}
+      button{display:none!important}
+    </style></head><body>
+    ${html}
+    <script>window.onload=function(){window.print()}<\/script>
+  </body></html>`);
+  win.document.close();
 }
 // ===== AI ANALYSIS =====
 function buildDailyGrowthCurve(b,transferW,eggW,wRecs){
