@@ -1024,10 +1024,13 @@ function restore(e){if(!isAdmin())return;let f=e.target.files[0];if(!f)return;le
 // ── ARCHIVE ──
 function archiveBatchDetails(b){
   let c=calc(b);
-  let lw=latestWeightForBatch(b.id);
   let wsr=batchWeightSuccessRates(b);
   let srVal=+successRate(b);
   let srCol=srVal>=90?'#16a34a':srVal>=80?'#d97706':'#dc2626';
+  let mwRecs=(data.marketWeights||[]).filter(x=>x.batchId==b.id);
+  let mwTotalKg=mwRecs.reduce((s,r)=>s+(+r.totalKg||0),0);
+  let mwTotalCount=mwRecs.reduce((s,r)=>s+(+r.count||0),0);
+  let mwAvg=mwTotalCount?(mwTotalKg/mwTotalCount).toFixed(2)+' كغ/طير':'—';
   let dp=f=>`data-dpbatch="${b.id}" data-dpfield="${f}"`;
   let stats=[
     {l:'عمر التفقيس',v:c.hatchAge+'/21'},
@@ -1036,7 +1039,7 @@ function archiveBatchDetails(b){
     {l:'المسوق',v:`<span ${dp('sold')}>${c.sold.toLocaleString()}</span>`},
     {l:'الحي المتبقي',v:`<span ${dp('alive')}>${c.alive.toLocaleString()}</span>`},
     {l:'نسبة النجاح',v:`<span style="color:${srCol};font-weight:800">${srVal}%</span>`},
-    {l:'آخر وزن (فعلي)',v:lw?(weightActualGrams(lw)+' غم'):'—'},
+    {l:'معدل الوزن المسوق',v:mwAvg},
     {l:'نسبة الوزن / كايد',v:wsr.guide!=null?wsr.guide+'%':'—'},
   ];
   let allocs=Array.isArray(b.hallAllocations)&&b.hallAllocations.length
@@ -1056,7 +1059,7 @@ function archiveBatchDetails(b){
   </div>`;
   let cards=stats.map(x=>`<div class="statCard"><div class="sc-val">${x.v}</div><div class="sc-label">${x.l}</div></div>`).join('');
   // بطاقات الأوزان المسوقة
-  let mwRecs=(data.marketWeights||[]).filter(x=>x.batchId==b.id).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  mwRecs=mwRecs.slice().sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let mwCards=mwRecs.length?`<div class="card" style="margin-top:12px">
     <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">storefront</span> الأوزان المسوقة</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px">
