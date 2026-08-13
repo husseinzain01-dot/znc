@@ -56,7 +56,7 @@ function renderBatchReport(){
   let c=calc(b);
   let html=_rptKPIs(b,c);
   if(_rptSec==='all'||_rptSec==='hatch')   html+=_rptHatchHtml(b,c);
-  if(_rptSec==='all'||_rptSec==='weights') html+=_rptWeightsHtml(b,inRange,hallFilter);
+  if(_rptSec==='all'||_rptSec==='weights') html+=_rptWeightsHtml(b,inRange,hallFilter)+_rptMarketWeightsHtml(b,inRange,hallFilter);
   if(_rptSec==='all'||_rptSec==='feed')    html+=_rptFeedHtml(b,inRange,hallFilter);
   if(_rptSec==='all'||_rptSec==='meds')    html+=_rptMedsHtml(b,inRange,hallFilter);
   if(_rptSec==='all'||_rptSec==='mort')    html+=_rptMortHtml(b,c,inRange,hallFilter);
@@ -184,6 +184,40 @@ function _rptWeightsHtml(b,inRange,hallFilter=0){
     <div class="tableWrap"><table class="tbl">
       <thead><tr><th>التاريخ</th><th>القاعة</th><th>العمر</th><th>الوزن الفعلي</th><th>الكايد</th><th>الفرق</th><th>نسبة التحقق</th><th>الحي</th><th>ملاحظة</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات أوزان</td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function _rptMarketWeightsHtml(b,inRange,hallFilter=0){
+  let recs=(data.marketWeights||[]).filter(x=>{
+    if(+x.batchId!==b.id)return false;
+    if(hallFilter&&+x.hallId!==hallFilter)return false;
+    return true;
+  }).sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+  if(!recs.length)return'';
+  let totalBirds=recs.reduce((s,x)=>s+(+x.count||0),0);
+  let totalKg=recs.reduce((s,x)=>s+(+x.totalKg||0),0);
+  let avgKg=totalBirds?(totalKg/totalBirds).toFixed(3):0;
+  let rows=recs.map(x=>`<tr>
+    <td>${fmt(x.date)}</td>
+    <td>${esc(x.hall||'—')}</td>
+    <td style="text-align:center">${x.age!=null?x.age+' يوم':'—'}</td>
+    <td style="font-weight:700;text-align:center">${(+x.count||0).toLocaleString()}</td>
+    <td style="font-weight:700;color:#dc2626;text-align:center">${(+x.totalKg||0).toLocaleString()} كغ</td>
+    <td style="font-weight:700;color:#7c3aed;text-align:center">${x.avgKg} كغ/طير</td>
+    <td>${esc(x.note||'—')}</td>
+  </tr>`).join('');
+  return`<div class="card" style="margin-bottom:12px;border-top:3px solid #dc2626">
+    <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">storefront</span> الأوزان المسوقة (وزن المجزرة)</div>
+    <div class="statsGrid" style="margin-bottom:12px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+      <div class="statCard"><div class="statVal" style="color:#1d4ed8">${totalBirds.toLocaleString()}</div><div class="statLbl">إجمالي الطيور المسوقة</div></div>
+      <div class="statCard"><div class="statVal" style="color:#dc2626">${totalKg.toLocaleString()} كغ</div><div class="statLbl">الوزن الكلي</div></div>
+      <div class="statCard"><div class="statVal" style="color:#7c3aed">${avgKg} كغ/طير</div><div class="statLbl">معدل الوزن</div></div>
+    </div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العمر</th><th>العدد</th><th>الوزن الكلي</th><th>معدل الوزن</th><th>ملاحظة</th></tr></thead>
+      <tbody>${rows}</tbody>
     </table></div>
   </div>`;
 }

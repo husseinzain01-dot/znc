@@ -428,3 +428,93 @@ function deleteWeight(id){
   }
 }
 
+// ── الأوزان المسوقة ──
+function onMwBatchChange(){
+  let id=$('mwBatch')?+$('mwBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let hallSel=$('mwHall');if(!hallSel)return;
+  if(b&&Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
+    hallSel.innerHTML=b.hallAllocations.map(a=>`<option value="${a.hallId}">${esc(a.hall||'قاعة')}</option>`).join('');
+  } else if(b&&b.hallId){
+    hallSel.innerHTML=`<option value="${b.hallId}">${esc(b.hall||'قاعة')}</option>`;
+  } else {
+    hallSel.innerHTML='<option value="">—</option>';
+  }
+  calcMwAge();
+}
+function calcMwAge(){
+  let id=$('mwBatch')?+$('mwBatch').value:0;
+  let b=data.batches.find(x=>x.id===id);
+  let d=$('mwDate')?$('mwDate').value:today();
+  if(b&&b.fieldEntryDate&&d){
+    let age=Math.round((new Date(d)-new Date(b.fieldEntryDate))/(1000*60*60*24));
+    if($('mwAge'))$('mwAge').value=age>=0?age:'';
+  } else {
+    if($('mwAge'))$('mwAge').value='';
+  }
+}
+function calcMwAvg(){
+  let cnt=+($('mwCount')?$('mwCount').value:0)||0;
+  let kg=+($('mwTotalKg')?$('mwTotalKg').value:0)||0;
+  let avg=$('mwAvgKg');if(!avg)return;
+  avg.value=(cnt&&kg)?(kg/cnt).toFixed(3)+' كغ/طير':'';
+}
+function addMarketWeight(){
+  let batchId=$('mwBatch')?+$('mwBatch').value:0;if(!batchId)return msg('⚠ اختر الوجبة أولاً');
+  let b=data.batches.find(x=>x.id===batchId);
+  if(!isAdmin()&&b&&!canSeeField(b.field))return msg('⛔ لا تملك صلاحية');
+  let hallId=$('mwHall')&&$('mwHall').value?+$('mwHall').value:null;
+  let hallObj=data.halls.find(h=>h.id===hallId);
+  let count=+($('mwCount')?$('mwCount').value:0)||0;
+  let totalKg=+($('mwTotalKg')?$('mwTotalKg').value:0)||0;
+  if(!count)return msg('⚠ أدخل عدد الطيور');
+  if(!totalKg)return msg('⚠ أدخل الوزن الكلي');
+  let date=$('mwDate')?$('mwDate').value:today();
+  let age=$('mwAge')?+$('mwAge').value||null:null;
+  let note=$('mwNote')?$('mwNote').value:'';
+  let avgKg=+(totalKg/count).toFixed(3);
+  data.marketWeights=data.marketWeights||[];
+  data.marketWeights.push({id:Date.now(),batchId,hallId,hall:hallObj?hallObj.name:(b?b.hall:''),date,age,count,totalKg,avgKg,note});
+  save();renderAll();clearMwForm();msg('تم حفظ وزن التسويق ✅');
+}
+function clearMwForm(){
+  if($('mwCount'))$('mwCount').value='';
+  if($('mwTotalKg'))$('mwTotalKg').value='';
+  if($('mwAvgKg'))$('mwAvgKg').value='';
+  if($('mwAge'))$('mwAge').value='';
+  if($('mwNote'))$('mwNote').value='';
+  if($('mwDate'))$('mwDate').value=today();
+}
+function renderMarketWeights(){
+  let el=$('marketWeightsTable');if(!el)return;
+  let filterBatchId=$('mwBatchFilter')&&$('mwBatchFilter').value?+$('mwBatchFilter').value:0;
+  let recs=(data.marketWeights||[]).filter(r=>{
+    let b=data.batches.find(x=>x.id===r.batchId);
+    if(!isAdmin()&&b&&!canSeeField(b.field))return false;
+    if(filterBatchId&&+r.batchId!==filterBatchId)return false;
+    return true;
+  }).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  let rows=recs.map(r=>{
+    let b=data.batches.find(x=>x.id===r.batchId);
+    return `<tr>
+      <td>${fmt(r.date)}</td>
+      <td>${esc(b?b.name:'—')}</td>
+      <td>${esc(r.hall||'—')}</td>
+      <td>${r.age!=null?r.age+' يوم':'—'}</td>
+      <td>${(+r.count||0).toLocaleString()}</td>
+      <td><b>${(+r.totalKg||0).toLocaleString()} كغ</b></td>
+      <td><b style="color:#dc2626">${r.avgKg} كغ/طير</b></td>
+      <td>${esc(r.note||'—')}</td>
+      <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteMarketWeight(${r.id})">حذف</button>`:'—'}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<thead><tr><th>التاريخ</th><th>الوجبة</th><th>القاعة</th><th>العمر</th><th>العدد</th><th>الوزن الكلي</th><th>معدل الوزن</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان مسوقة</td></tr>'}</tbody>`;
+}
+function deleteMarketWeight(id){
+  if(!isAdmin())return;
+  if(confirm('حذف سجل وزن التسويق؟')){
+    data.marketWeights=(data.marketWeights||[]).filter(r=>r.id!==id);
+    save();renderAll();msg('تم الحذف');
+  }
+}
+

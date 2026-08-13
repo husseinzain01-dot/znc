@@ -5,7 +5,7 @@ function renderAll(){
   renderMort();renderMarket();renderReports();
   renderArchive();renderCalendar();renderTransferredBatches();renderFields();renderSuppliers();
   renderUsers();renderUserFieldsList();renderLayerPurchase();renderWeights();renderFeed();renderMeds();
-  renderAiAnalysis();
+  renderAiAnalysis();renderMarketWeights();
   fillTransferPreview(false);
   // تحديث لوحة القاعات إذا كانت مفتوحة
   let openFieldId=+val('hFieldId');
@@ -43,6 +43,9 @@ function renderSelectors(){
   renderArchiveFilters();
 
 
+  let allActive=visibleBatches().filter(b=>!calc(b).completed);
+  if($('mwBatch'))$('mwBatch').innerHTML=allActive.filter(b=>b.transferDate).map(b=>`<option value="${b.id}">${esc(b.name)} — ${esc(b.field||'')}</option>`).join('');
+  if($('mwBatch'))onMwBatchChange();
   let activeTransferred=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed);
   if($('wBatch'))$('wBatch').innerHTML=activeTransferred.map(b=>{
     let label=b.hall?`${esc(b.name)} — ${esc(b.field)} / ${esc(b.hall)}`:`${esc(b.name)} — ${esc(b.field||'بلا حقل')}`;
@@ -131,7 +134,7 @@ function allVisibleBatchesForFilters(){
 function renderBatchRecordFilters(){
   let all=allVisibleBatchesForFilters();
   let opts='<option value="">'+t('allBatches')+'</option>'+all.map(b=>`<option value="${b.id}">${esc(b.name)}${b.field?' — '+esc(b.field):''}</option>`).join('');
-  ['feedBatchFilter','mortBatchFilter','marketBatchFilter','medBatchFilter','weightBatchFilter'].forEach(id=>{
+  ['feedBatchFilter','mortBatchFilter','marketBatchFilter','medBatchFilter','weightBatchFilter','mwBatchFilter'].forEach(id=>{
     let el=$(id);if(!el)return;
     let old=el.value;
     el.innerHTML=opts;

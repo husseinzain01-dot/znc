@@ -24,11 +24,13 @@ function load(){
       _applyGuideWeights();
       data.subUsers=data.subUsers||[];
       data.markets=(data.markets||[]).map(m=>({...m,status:m.status||'تسويق إلى المجزرة'}));
+      data.marketWeights=data.marketWeights||[];
     }
     let ls=localStorage.getItem(STORE+'_lastSave');
     $('dbState').textContent=ls?t('dbLastSave')+': '+new Date(ls).toLocaleString('ar-IQ',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):t('dbReady');
   }catch(e){msg('⚠ '+t('errLoad')+': '+e.message)}
   $('mortDate').value=today();$('marketDate').value=today();$('transferDate').value=today();
+  if($('mwDate'))$('mwDate').value=today();
   renderAll();
   pullCloud();
 }
