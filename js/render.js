@@ -312,16 +312,17 @@ function selectedDetails(b){
     ['نسبة الفقس',hatchRate(b)+'%','dc-accent'],
   ];
   let lw=latestWeightForBatch(b.id);
+  let _dp=f=>`data-dpbatch="${b.id}" data-dpfield="${f}"`;
   let fieldCells=[
     ['الحقل',esc(b.field||'—')],
-    ['القاعة',b.hall?`<span style="cursor:pointer;text-decoration:underline" onclick="showFieldHallsList('${String(b.field).replace(/'/g,"\\'")}')">${esc(b.hall)}</span>`:'—'],
+    ['القاعة',`<span ${_dp('hall')} style="cursor:pointer;text-decoration:underline" onclick="showFieldHallsList('${String(b.field).replace(/'/g,"\\'")}')">${esc(b.hall||'—')}</span>`],
     ['دخول الحقل',fmt(c.entryDate)],
     ['عمر الطير',c.transferred?(c.isLayer?fmtLayerAge(c.flockAge):(c.flockAge+'/40 يوم')):'—'],
-    ['الصافي المنقول',(c.fieldBirds||0).toLocaleString(),'dc-accent'],
+    ['الصافي المنقول',`<span ${_dp('birds')}>${(c.fieldBirds||0).toLocaleString()}</span>`,'dc-accent'],
     ['وزن الطير عند النقل',b.transferBirdWeight?b.transferBirdWeight+' غم':'—'],
-    ['هلاك الحقل',c.mort.toLocaleString()],
-    ['المسوق',c.sold.toLocaleString()],
-    ['الحي المتبقي',c.alive.toLocaleString(),'dc-accent'],
+    ['هلاك الحقل',`<span ${_dp('mort')}>${c.mort.toLocaleString()}</span>`],
+    ['المسوق',`<span ${_dp('sold')}>${c.sold.toLocaleString()}</span>`],
+    ['الحي المتبقي',`<span ${_dp('alive')}>${c.alive.toLocaleString()}</span>`,'dc-accent'],
     ['نسبة النجاح',successRate(b)+'%','dc-accent'],
     ['آخر وزن (الفعلي)',lw?(weightActualGrams(lw)+' غم'):'—','dc-accent'],
     ['الوزن المتوقع (الكايد)',lw?(weightGuideGrams(lw)+' غم'):'—'],

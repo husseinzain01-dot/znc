@@ -1028,16 +1028,28 @@ function archiveBatchDetails(b){
   let wsr=batchWeightSuccessRates(b);
   let srVal=+successRate(b);
   let srCol=srVal>=90?'#16a34a':srVal>=80?'#d97706':'#dc2626';
+  let dp=f=>`data-dpbatch="${b.id}" data-dpfield="${f}"`;
   let stats=[
     {l:'عمر التفقيس',v:c.hatchAge+'/21'},
-    {l:'الصافي المنقول',v:(c.fieldBirds||0).toLocaleString()},
-    {l:'هلاك الحقل',v:c.mort.toLocaleString()},
-    {l:'المسوق',v:c.sold.toLocaleString()},
-    {l:'الحي المتبقي',v:c.alive.toLocaleString()},
+    {l:'الصافي المنقول',v:`<span ${dp('birds')}>${(c.fieldBirds||0).toLocaleString()}</span>`},
+    {l:'هلاك الحقل',v:`<span ${dp('mort')}>${c.mort.toLocaleString()}</span>`},
+    {l:'المسوق',v:`<span ${dp('sold')}>${c.sold.toLocaleString()}</span>`},
+    {l:'الحي المتبقي',v:`<span ${dp('alive')}>${c.alive.toLocaleString()}</span>`},
     {l:'نسبة النجاح',v:`<span style="color:${srCol};font-weight:800">${srVal}%</span>`},
     {l:'آخر وزن (فعلي)',v:lw?(weightActualGrams(lw)+' غم'):'—'},
     {l:'نسبة الوزن / كايد',v:wsr.guide!=null?wsr.guide+'%':'—'},
   ];
+  let allocs=Array.isArray(b.hallAllocations)&&b.hallAllocations.length
+    ?b.hallAllocations
+    :(b.hallId?[{hallId:b.hallId,hall:b.hall}]:[]);
+  let hallOpts=allocs.map(a=>`<option value="${a.hallId}">${esc(a.hall||'قاعة '+a.hallId)}</option>`).join('');
+  let hallFilter=allocs.length>1?`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:var(--card2,#f8fafc);border-radius:8px;border:1px solid var(--border)">
+    <span style="font-size:12px;font-weight:600;color:var(--ink3)">عرض بيانات القاعة:</span>
+    <select onchange="selectHallDetail(${b.id},+this.value)" style="border-radius:6px;padding:4px 10px;border:1px solid var(--border);background:var(--bg);color:var(--ink);font-size:13px">
+      <option value="0">إجمالي الوجبة</option>
+      ${hallOpts}
+    </select>
+  </div>`:'';
   let banner=`<div class="heroBanner" style="margin-bottom:10px">
     <div><h2>📦 ${esc(b.name)}</h2><p>منتهية — أُرشفت ${fmt(b.archiveDate||'')} — ${esc(b.field||'—')}</p></div>
     <div class="hb-right"><button class="btn btn-secondary btn-sm" onclick="printArchiveBatch(${b.id})">🖨️ طباعة</button></div>
@@ -1057,7 +1069,7 @@ function archiveBatchDetails(b){
       </div>`).join('')}
     </div>
   </div>`:'';
-  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b)+batchHallsPanelHtml(b)+mwCards;
+  return banner+hallFilter+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b)+batchHallsPanelHtml(b)+mwCards;
 }
 
 function batchHallsPanelHtml(b){
@@ -1113,7 +1125,7 @@ function batchHallsPanelHtml(b){
         ${!hallWeights.length&&!hallMorts.length&&!hallMarkets.length?`<p style="color:var(--ink3);text-align:center;padding:10px">لا توجد بيانات مسجلة لهذه القاعة</p>`:''}
       </div>
     </td></tr>`;
-    return`<tr class="selectable" onclick="toggleInlineDetails('${detailId}')">
+    return`<tr class="selectable" onclick="toggleInlineDetails('${detailId}');selectHallDetail(${b.id},${hallId})">
       <td><b>${esc(a.hall||'—')}</b> <span style="font-size:10px;color:var(--ink3)">▼</span></td>
       <td style="text-align:center">${capVal?capVal.toLocaleString():'—'}</td>
       <td style="text-align:center;font-weight:700">${birds.toLocaleString()}</td>

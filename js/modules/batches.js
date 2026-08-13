@@ -445,22 +445,37 @@ function batchAllocatedToHall(b,hallId){
   }
   return (+b.hallId===+hallId)?(+b.fieldBirds||0):0;
 }
-function batchHallAlive(b,hallId){
-  let c=calc(b);
-  if(c.completed)return 0;
-  let alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
-  if(!alloc||!base)return 0;
-  let ratio=alloc/base;
-  let loss=Math.round((c.mort+c.sold)*ratio);
-  return Math.max(0,alloc-loss);
-}
 function batchHallMort(b,hallId){
-  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
-  return base?Math.round(c.mort*(alloc/base)):0;
+  return(data.morts||[]).filter(m=>+m.batchId===b.id&&+m.hallId===hallId).reduce((s,m)=>s+(+m.count||0),0);
 }
 function batchHallSold(b,hallId){
-  let c=calc(b),alloc=batchAllocatedToHall(b,hallId),base=c.fieldBirds||0;
-  return base?Math.round(c.sold*(alloc/base)):0;
+  return(data.markets||[]).filter(m=>m.batchId==b.id&&+m.hallId===hallId).reduce((s,m)=>s+(+m.count||0),0);
+}
+function batchHallAlive(b,hallId){
+  if(calc(b).completed)return 0;
+  let alloc=batchAllocatedToHall(b,hallId);
+  return Math.max(0,alloc-batchHallMort(b,hallId)-batchHallSold(b,hallId));
+}
+
+function selectHallDetail(bId,hallId){
+  let b=(data.batches||[]).find(x=>x.id===+bId);if(!b)return;
+  let upd=(f,v)=>document.querySelectorAll(`[data-dpbatch="${bId}"][data-dpfield="${f}"]`).forEach(el=>el.textContent=v);
+  if(!+hallId){
+    let c=calc(b);
+    upd('hall',b.hall||'—');
+    upd('birds',(c.fieldBirds||0).toLocaleString());
+    upd('mort',c.mort.toLocaleString());
+    upd('sold',c.sold.toLocaleString());
+    upd('alive',c.alive.toLocaleString());
+    return;
+  }
+  let hid=+hallId;
+  let a=(b.hallAllocations||[]).find(x=>+x.hallId===hid)||{};
+  upd('hall',a.hall||b.hall||'قاعة '+hid);
+  upd('birds',batchAllocatedToHall(b,hid).toLocaleString());
+  upd('mort',batchHallMort(b,hid).toLocaleString());
+  upd('sold',batchHallSold(b,hid).toLocaleString());
+  upd('alive',batchHallAlive(b,hid).toLocaleString());
 }
 
 // ── TRANSFER ──
