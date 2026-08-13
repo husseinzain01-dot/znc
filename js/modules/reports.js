@@ -8,13 +8,27 @@ function setRptSection(s){
   renderBatchReport();
 }
 
+function onRptBatchChange(){
+  // تحديث قائمة القاعات بعد اختيار الوجبة
+  let batchId=$('rptBatch')&&$('rptBatch').value?+$('rptBatch').value:0;
+  let hallSel=$('rptHall');
+  if(hallSel){
+    let b=batchId?data.batches.find(x=>x.id===batchId):null;
+    let hallIds=b?batchHallIds(b):[];
+    let halls=hallIds.map(id=>(data.halls||[]).find(h=>h.id===id)).filter(Boolean);
+    hallSel.innerHTML='<option value="">كل القاعات</option>'+
+      halls.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');
+  }
+  renderBatchReport();
+}
+
 function renderBatchReport(){
   // تحديث قائمة الوجبات
   let sel=$('rptBatch');
   if(sel){
     let prev=sel.value;
     let batches=isAdmin()?data.batches:visibleBatches();
-    sel.innerHTML='<option value="">-- اختر وجبة لعرض تقريرها --</option>'+
+    sel.innerHTML='<option value="">-- اختر وجبة --</option>'+
       batches.map(b=>{
         let c=calc(b);
         let st=c.completed?'منتهية':c.transferred?'في الحقل':'بالمفقس';
@@ -24,6 +38,7 @@ function renderBatchReport(){
   }
   let area=$('batchReportArea');if(!area)return;
   let batchId=sel&&sel.value?+sel.value:0;
+  let hallFilter=$('rptHall')&&$('rptHall').value?+$('rptHall').value:0;
   let from=$('rptFrom')?$('rptFrom').value:'';
   let to=$('rptTo')?$('rptTo').value:'';
   let inRange=d=>(!from||d>=from)&&(!to||d<=to);
@@ -41,11 +56,11 @@ function renderBatchReport(){
   let c=calc(b);
   let html=_rptKPIs(b,c);
   if(_rptSec==='all'||_rptSec==='hatch')   html+=_rptHatchHtml(b,c);
-  if(_rptSec==='all'||_rptSec==='weights') html+=_rptWeightsHtml(b,inRange);
-  if(_rptSec==='all'||_rptSec==='feed')    html+=_rptFeedHtml(b,inRange);
-  if(_rptSec==='all'||_rptSec==='meds')    html+=_rptMedsHtml(b,inRange);
-  if(_rptSec==='all'||_rptSec==='mort')    html+=_rptMortHtml(b,c,inRange);
-  if(_rptSec==='all'||_rptSec==='market')  html+=_rptMarketHtml(b,inRange);
+  if(_rptSec==='all'||_rptSec==='weights') html+=_rptWeightsHtml(b,inRange,hallFilter);
+  if(_rptSec==='all'||_rptSec==='feed')    html+=_rptFeedHtml(b,inRange,hallFilter);
+  if(_rptSec==='all'||_rptSec==='meds')    html+=_rptMedsHtml(b,inRange,hallFilter);
+  if(_rptSec==='all'||_rptSec==='mort')    html+=_rptMortHtml(b,c,inRange,hallFilter);
+  if(_rptSec==='all'||_rptSec==='market')  html+=_rptMarketHtml(b,inRange,hallFilter);
   area.innerHTML=html;
 }
 
@@ -65,7 +80,7 @@ function _rptKPIs(b,c){
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       <div>
         <div style="font-size:20px;font-weight:800">${esc(b.name)}</div>
-        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${esc(b.type||'—')} · ${esc(b.field||'—')} · ${hallLabel}${b.supervisor?' · '+esc(b.supervisor):''}${b.vet?' · د.'+esc(b.vet):''}</div>
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${esc(b.type||'—')} · ${esc(b.field||'—')} · ${hallLabel}${b.supervisor?' · '+esc(b.supervisor):''}${b.vet?' · د.'+esc(b.vet):''}${b.supplier?' · مورد: '+esc(b.supplier):''}${b.company?' · شركة: '+esc(b.company):''}</div>
       </div>
       <span style="margin-right:auto;background:${stCol}18;color:${stCol};border-radius:8px;padding:4px 14px;font-weight:700;font-size:13px">${st}</span>
     </div>
@@ -103,6 +118,8 @@ function _rptHatchHtml(b,c){
       ${b.transferBirdWeight?`<div><span style="color:var(--ink3)">وزن الكتكوت:</span> <b>${b.transferBirdWeight} غم</b></div>`:''}
       ${b.supervisor?`<div><span style="color:var(--ink3)">المشرف:</span> <b>${esc(b.supervisor)}</b></div>`:''}
       ${b.vet?`<div><span style="color:var(--ink3)">الطبيب البيطري:</span> <b>${esc(b.vet)}</b></div>`:''}
+      ${b.supplier?`<div><span style="color:var(--ink3)">المورد:</span> <b>${esc(b.supplier)}</b></div>`:''}
+      ${b.company?`<div><span style="color:var(--ink3)">الشركة:</span> <b>${esc(b.company)}</b></div>`:''}
     </div>
     <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--ink3)">▸ البيض</div>
     <div class="hatchGrid" style="margin-bottom:14px">
@@ -129,9 +146,9 @@ function _rptHatchHtml(b,c){
   </div>`;
 }
 
-function _rptWeightsHtml(b,inRange){
+function _rptWeightsHtml(b,inRange,hallFilter=0){
   let hallIds=batchHallIds(b);
-  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let inH=x=>(hallFilter?+x.hallId===hallFilter:(hallIds.length?hallIds.includes(+x.hallId):x.field===b.field));
   let recs=(data.weights||[]).filter(x=>(x.batchId===b.id||(x.field===b.field&&inH(x)))&&inRange(x.date))
     .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let actuals=recs.map(x=>+(x.actual_weight_grams||x.avgWeight||0)).filter(v=>v>0);
@@ -171,9 +188,9 @@ function _rptWeightsHtml(b,inRange){
   </div>`;
 }
 
-function _rptFeedHtml(b,inRange){
+function _rptFeedHtml(b,inRange,hallFilter=0){
   let hallIds=batchHallIds(b);
-  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let inH=x=>(hallFilter?+x.hallId===hallFilter:(hallIds.length?hallIds.includes(+x.hallId):x.field===b.field));
   let recs=(data.feeds||[]).filter(x=>x.field===b.field&&inH(x)&&inRange(x.date))
     .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let total=recs.reduce((s,x)=>s+(+x.qty||0),0);
@@ -201,9 +218,9 @@ function _rptFeedHtml(b,inRange){
   </div>`;
 }
 
-function _rptMedsHtml(b,inRange){
+function _rptMedsHtml(b,inRange,hallFilter=0){
   let hallIds=batchHallIds(b);
-  let inH=x=>hallIds.length?hallIds.includes(+x.hallId):x.field===b.field;
+  let inH=x=>(hallFilter?+x.hallId===hallFilter:(hallIds.length?hallIds.includes(+x.hallId):x.field===b.field));
   let recs=(data.meds||[]).filter(x=>x.field===b.field&&inH(x)&&inRange(x.date))
     .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let byType={};recs.forEach(x=>{byType[x.type||'—']=(byType[x.type||'—']||0)+1;});
@@ -234,18 +251,20 @@ function _rptMedsHtml(b,inRange){
   </div>`;
 }
 
-function _rptMortHtml(b,c,inRange){
-  let recs=(data.morts||[]).filter(x=>+x.batchId===b.id&&inRange(x.date))
-    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+function _rptMortHtml(b,c,inRange,hallFilter=0){
+  let allRecs=(data.morts||[]).filter(x=>+x.batchId===b.id&&inRange(x.date));
+  let recs=hallFilter?allRecs.filter(x=>+x.hallId===hallFilter):allRecs;
+  recs=recs.sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let total=recs.reduce((s,x)=>s+(+x.count||0),0);
   let initBirds=c.fieldBirds||1;
   let phases={early:0,mid:0,late:0};
-  let byReason={};
+  let byReason={};let byHall={};
   recs.forEach(x=>{
     let cnt=+x.count||0;
     let age=x.ageDays!=null?+x.ageDays:(x.date&&b.fieldEntryDate?Math.round((new Date(x.date)-new Date(b.fieldEntryDate))/864e5):null);
     if(age!=null){if(age<=7)phases.early+=cnt;else if(age<=21)phases.mid+=cnt;else phases.late+=cnt;}
     if(x.reason)byReason[x.reason]=(byReason[x.reason]||0)+cnt;
+    let hk=x.hall||'غير محدد';byHall[hk]=(byHall[hk]||0)+cnt;
   });
   let mortPct=initBirds?(total/initBirds*100).toFixed(2):0;
   let pCol=+mortPct>5?'#dc2626':+mortPct>3?'#d97706':'#16a34a';
@@ -255,20 +274,30 @@ function _rptMortHtml(b,c,inRange){
     <td>${esc(x.reason||'—')}</td>
     <td>${esc(x.note||'—')}</td>
   </tr>`).join('');
-  let reasonCards=Object.entries(byReason).sort((a,z)=>z[1]-a[1]).slice(0,5).map(([r,n])=>
+  let reasonCards=Object.entries(byReason).sort((a,z)=>z[1]-a[1]).slice(0,6).map(([r,n])=>
     `<div class="statCard"><div class="statVal" style="color:#dc2626">${n.toLocaleString()}</div><div class="statLbl">${r}</div></div>`
   ).join('');
+  let hallCards=Object.entries(byHall).map(([h,n])=>{
+    let pct=initBirds?(n/initBirds*100).toFixed(2):0;
+    let hCol=+pct>5?'#dc2626':+pct>3?'#d97706':'#16a34a';
+    return`<div class="statCard" style="border-right:3px solid ${hCol}">
+      <div class="statVal" style="color:#dc2626">${n.toLocaleString()}</div>
+      <div style="font-size:10px;color:${hCol};font-weight:700">${pct}%</div>
+      <div class="statLbl">${h}</div>
+    </div>`;
+  }).join('');
   return`<div class="card" style="margin-bottom:12px">
-    <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">heart_minus</span> سجلات الهلاك</div>
-    <div class="statsGrid" style="margin-bottom:12px">
+    <div class="secHdr" style="color:#dc2626"><span class="material-symbols-outlined">heart_minus</span> سجلات الهلاك${hallFilter?' — '+((data.halls||[]).find(h=>h.id===hallFilter)||{}).name:''}</div>
+    <div class="statsGrid" style="margin-bottom:10px">
       <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
       <div class="statCard"><div class="statVal" style="color:#dc2626">${total.toLocaleString()}</div><div class="statLbl">إجمالي الهلاك</div></div>
       <div class="statCard"><div class="statVal" style="color:${pCol}">${mortPct}%</div><div class="statLbl">نسبة الهلاك</div></div>
       <div class="statCard" style="border-right:3px solid #ef4444"><div class="statVal">${phases.early.toLocaleString()}</div><div class="statLbl">مبكر (0-7 يوم)</div></div>
       <div class="statCard" style="border-right:3px solid #f97316"><div class="statVal">${phases.mid.toLocaleString()}</div><div class="statLbl">متوسط (8-21 يوم)</div></div>
       <div class="statCard" style="border-right:3px solid #7c3aed"><div class="statVal">${phases.late.toLocaleString()}</div><div class="statLbl">متأخر (21+ يوم)</div></div>
-      ${reasonCards}
     </div>
+    ${hallCards&&!hallFilter?`<div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px">▸ الهلاك لكل قاعة</div><div class="statsGrid" style="margin-bottom:10px">${hallCards}</div>`:''}
+    ${reasonCards?`<div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px">▸ أسباب الهلاك</div><div class="statsGrid" style="margin-bottom:10px">${reasonCards}</div>`:''}
     <div class="tableWrap"><table class="tbl">
       <thead><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>السبب</th><th>ملاحظة</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات هلاك</td></tr>'}</tbody>
@@ -276,30 +305,44 @@ function _rptMortHtml(b,c,inRange){
   </div>`;
 }
 
-function _rptMarketHtml(b,inRange){
-  let recs=(data.markets||[]).filter(x=>+x.batchId===b.id&&inRange(x.date))
-    .sort((a,z)=>String(a.date).localeCompare(String(z.date)));
+function _rptMarketHtml(b,inRange,hallFilter=0){
+  // كل عمليات التسويق — بدون فلتر تاريخ إذا ما في نطاق محدد
+  let allRecs=(data.markets||[]).filter(x=>+x.batchId===b.id);
+  let recs=hallFilter?allRecs.filter(x=>+x.hallId===hallFilter):allRecs;
+  // فلتر التاريخ يطبق فقط إذا محدد
+  let from=$('rptFrom')?$('rptFrom').value:'';
+  let to=$('rptTo')?$('rptTo').value:'';
+  if(from||to)recs=recs.filter(x=>inRange(x.date));
+  recs=recs.sort((a,z)=>String(a.date).localeCompare(String(z.date)));
   let totalSold=recs.reduce((s,x)=>s+(+x.count||0),0);
-  let byType={};recs.forEach(x=>{byType[x.status||'—']=(byType[x.status||'—']||0)+(+x.count||0);});
+  let byType={};let byHall={};
+  recs.forEach(x=>{
+    byType[x.status||'غير محدد']=(byType[x.status||'غير محدد']||0)+(+x.count||0);
+    let hk=x.hall||'غير محدد';byHall[hk]=(byHall[hk]||0)+(+x.count||0);
+  });
   let rows=recs.map(x=>`<tr>
     <td>${fmt(x.date)}</td><td>${esc(x.hall||'—')}</td>
     <td style="font-weight:700;color:#d97706;text-align:center">${(+x.count||0).toLocaleString()}</td>
     <td>${esc(x.status||'—')}</td>
-    <td style="text-align:center">${x.price!=null?esc(''+x.price):'—'}</td>
     <td>${esc(x.note||'—')}</td>
+    ${x.diff?`<td style="color:#dc2626;font-size:11px">${x.diff.toLocaleString()}</td>`:'<td>—</td>'}
   </tr>`).join('');
   let typeCards=Object.entries(byType).map(([t,n])=>
     `<div class="statCard"><div class="statVal" style="color:#d97706">${n.toLocaleString()}</div><div class="statLbl">${t}</div></div>`
   ).join('');
+  let hallCards=!hallFilter?Object.entries(byHall).map(([h,n])=>
+    `<div class="statCard" style="border-right:3px solid #d97706"><div class="statVal" style="color:#d97706">${n.toLocaleString()}</div><div class="statLbl">${h}</div></div>`
+  ).join(''):'';
   return`<div class="card" style="margin-bottom:12px">
-    <div class="secHdr" style="color:#d97706"><span class="material-symbols-outlined">storefront</span> سجلات التسويق</div>
-    <div class="statsGrid" style="margin-bottom:12px">
-      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد السجلات</div></div>
+    <div class="secHdr" style="color:#d97706"><span class="material-symbols-outlined">storefront</span> سجلات التسويق${hallFilter?' — '+((data.halls||[]).find(h=>h.id===hallFilter)||{}).name:''}</div>
+    <div class="statsGrid" style="margin-bottom:10px">
+      <div class="statCard"><div class="statVal">${recs.length}</div><div class="statLbl">عدد العمليات</div></div>
       <div class="statCard"><div class="statVal" style="color:#d97706">${totalSold.toLocaleString()}</div><div class="statLbl">إجمالي المسوق</div></div>
       ${typeCards}
     </div>
+    ${hallCards?`<div style="font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:6px">▸ التسويق لكل قاعة</div><div class="statsGrid" style="margin-bottom:10px">${hallCards}</div>`:''}
     <div class="tableWrap"><table class="tbl">
-      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>النوع</th><th>السعر</th><th>ملاحظة</th></tr></thead>
+      <thead><tr><th>التاريخ</th><th>القاعة</th><th>العدد</th><th>النوع</th><th>ملاحظة</th><th>فرق</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="6" style="text-align:center;color:var(--ink3);padding:14px">لا توجد سجلات تسويق</td></tr>'}</tbody>
     </table></div>
   </div>`;

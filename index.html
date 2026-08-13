@@ -566,24 +566,30 @@
       <div class="card noPrint" style="margin-bottom:14px">
         <div class="cardTitle"><span class="material-symbols-outlined ct-icon">description</span> مركز التقارير</div>
 
-        <!-- اختيار الوجبة + فلتر التاريخ -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
-          <div class="formGroup" style="flex:2;min-width:220px">
-            <label style="font-weight:700">اختر الوجبة</label>
-            <select id="rptBatch" onchange="renderBatchReport()" style="font-size:14px;font-weight:600">
-              <option value="">-- اختر وجبة لعرض تقريرها --</option>
+        <!-- اختيار الوجبة + فلاتر -->
+        <div class="formGrid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:14px">
+          <div class="formGroup">
+            <label style="font-weight:700">الوجبة</label>
+            <select id="rptBatch" onchange="onRptBatchChange()">
+              <option value="">-- اختر وجبة --</option>
             </select>
           </div>
-          <div class="formGroup" style="min-width:140px">
+          <div class="formGroup">
+            <label>القاعة</label>
+            <select id="rptHall" onchange="renderBatchReport()">
+              <option value="">كل القاعات</option>
+            </select>
+          </div>
+          <div class="formGroup">
             <label>من تاريخ</label>
             <input id="rptFrom" type="date" onchange="renderBatchReport()">
           </div>
-          <div class="formGroup" style="min-width:140px">
+          <div class="formGroup">
             <label>إلى تاريخ</label>
             <input id="rptTo" type="date" onchange="renderBatchReport()">
           </div>
-          <div style="padding-bottom:2px">
-            <button class="btn btn-secondary btn-sm" onclick="$('rptBatch').value='';$('rptFrom').value='';$('rptTo').value='';renderBatchReport()">مسح</button>
+          <div class="formGroup" style="display:flex;align-items:flex-end">
+            <button class="btn btn-secondary btn-sm" onclick="$('rptBatch').value='';$('rptHall').value='';$('rptFrom').value='';$('rptTo').value='';renderBatchReport()">مسح الفلاتر</button>
           </div>
         </div>
 
@@ -615,7 +621,6 @@
       <div style="display:none">
         <select id="rptType"><option value="batches">batches</option></select>
         <select id="rptField"></select>
-        <select id="rptHall"></select>
         <select id="rptStatus"></select>
         <input  id="rptSearch">
         <div    id="rptSummaryCards"></div>
