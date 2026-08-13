@@ -9,15 +9,27 @@ function setRptSection(s){
 }
 
 function onRptBatchChange(){
-  // تحديث قائمة القاعات بعد اختيار الوجبة
   let batchId=$('rptBatch')&&$('rptBatch').value?+$('rptBatch').value:0;
+  let b=batchId?data.batches.find(x=>x.id===batchId):null;
+  // تحديث قائمة القاعات
   let hallSel=$('rptHall');
   if(hallSel){
-    let b=batchId?data.batches.find(x=>x.id===batchId):null;
     let hallIds=b?batchHallIds(b):[];
     let halls=hallIds.map(id=>(data.halls||[]).find(h=>h.id===id)).filter(Boolean);
     hallSel.innerHTML='<option value="">كل القاعات</option>'+
       halls.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');
+  }
+  // تعبئة التواريخ تلقائياً: من دخول الحقل → آخر تسويق
+  if(b){
+    let fromDate=b.fieldEntryDate||b.transferDate||'';
+    let mktDates=(data.markets||[]).filter(x=>x.batchId==b.id).map(x=>x.date).filter(Boolean);
+    let toDate=mktDates.length?mktDates.reduce((a,d)=>d>a?d:a,''):'';
+    if($('rptFrom')&&fromDate)$('rptFrom').value=fromDate;
+    if($('rptTo')&&toDate)$('rptTo').value=toDate;
+    else if($('rptTo')&&!toDate)$('rptTo').value='';
+  } else {
+    if($('rptFrom'))$('rptFrom').value='';
+    if($('rptTo'))$('rptTo').value='';
   }
   renderBatchReport();
 }
