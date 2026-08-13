@@ -1043,7 +1043,45 @@ function archiveBatchDetails(b){
     <div class="hb-right"><button class="btn btn-secondary btn-sm" onclick="printArchiveBatch(${b.id})">🖨️ طباعة</button></div>
   </div>`;
   let cards=stats.map(x=>`<div class="statCard"><div class="sc-val">${x.v}</div><div class="sc-label">${x.l}</div></div>`).join('');
-  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b);
+  return banner+`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">${cards}</div>`+selectedDetails(b)+batchHallsPanelHtml(b);
+}
+
+function batchHallsPanelHtml(b){
+  if(!b||!b.field)return'';
+  let allocs=Array.isArray(b.hallAllocations)&&b.hallAllocations.length
+    ?b.hallAllocations
+    :(b.hallId?[{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}]:[]);
+  if(!allocs.length)return'';
+  let rows=allocs.map(a=>{
+    let hallId=+a.hallId;
+    let cap=(data.halls||[]).find(h=>h.id===hallId);
+    let capVal=cap?+cap.capacity||0:0;
+    let birds=+a.birds||0;
+    let mort=batchHallMort(b,hallId);
+    let sold=batchHallSold(b,hallId);
+    let alive=batchHallAlive(b,hallId);
+    let lw=(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===hallId)
+      .sort((x,y)=>String(y.date).localeCompare(String(x.date)))[0];
+    let lastW=lw?(weightActualGrams(lw)+' غم'):'—';
+    let mortPct=birds?(mort/birds*100).toFixed(1)+'%':'—';
+    let soldPct=birds?(sold/birds*100).toFixed(1)+'%':'—';
+    return`<tr>
+      <td><b>${esc(a.hall||'—')}</b></td>
+      <td style="text-align:center">${capVal?capVal.toLocaleString():'—'}</td>
+      <td style="text-align:center;font-weight:700">${birds.toLocaleString()}</td>
+      <td style="text-align:center;color:#dc2626">${mort.toLocaleString()} <span style="font-size:10px;color:#dc2626">(${mortPct})</span></td>
+      <td style="text-align:center;color:#d97706">${sold.toLocaleString()} <span style="font-size:10px;color:#d97706">(${soldPct})</span></td>
+      <td style="text-align:center;font-weight:700;color:#16a34a">${alive.toLocaleString()}</td>
+      <td style="text-align:center;color:#2563eb">${lastW}</td>
+    </tr>`;
+  }).join('');
+  return`<div class="card" style="margin-top:12px">
+    <div class="secHdr"><span class="material-symbols-outlined">meeting_room</span> تفاصيل القاعات</div>
+    <div class="tableWrap"><table class="tbl">
+      <thead><tr><th>القاعة</th><th>السعة</th><th>المنقول</th><th>الهلاك</th><th>المسوق</th><th>الحي المتبقي</th><th>آخر وزن</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </div>`;
 }
 
 function printArchiveBatch(id){
