@@ -43,9 +43,11 @@ function renderSelectors(){
   renderArchiveFilters();
 
 
-  let allActive=visibleBatches().filter(b=>!calc(b).completed);
-  if($('mwBatch'))$('mwBatch').innerHTML=allActive.filter(b=>b.transferDate).map(b=>`<option value="${b.id}">${esc(b.name)} — ${esc(b.field||'')}</option>`).join('');
-  if($('mwBatch'))onMwBatchChange();
+  let mwBatches=visibleBatches().filter(b=>b.transferDate);
+  if($('mwBatch')){
+    $('mwBatch').innerHTML=mwBatches.map(b=>`<option value="${b.id}">${esc(b.name)}${calc(b).completed?' (منتهية)':' (نشطة)'} — ${esc(b.field||'')}</option>`).join('');
+    onMwBatchChange();
+  }
   let activeTransferred=visibleBatches().filter(b=>b.transferDate&&!calc(b).completed);
   if($('wBatch'))$('wBatch').innerHTML=activeTransferred.map(b=>{
     let label=b.hall?`${esc(b.name)} — ${esc(b.field)} / ${esc(b.hall)}`:`${esc(b.name)} — ${esc(b.field||'بلا حقل')}`;

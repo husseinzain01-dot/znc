@@ -430,16 +430,6 @@ function deleteWeight(id){
 
 // ── الأوزان المسوقة ──
 function onMwBatchChange(){
-  let id=$('mwBatch')?+$('mwBatch').value:0;
-  let b=data.batches.find(x=>x.id===id);
-  let hallSel=$('mwHall');if(!hallSel)return;
-  if(b&&Array.isArray(b.hallAllocations)&&b.hallAllocations.length){
-    hallSel.innerHTML=b.hallAllocations.map(a=>`<option value="${a.hallId}">${esc(a.hall||'قاعة')}</option>`).join('');
-  } else if(b&&b.hallId){
-    hallSel.innerHTML=`<option value="${b.hallId}">${esc(b.hall||'قاعة')}</option>`;
-  } else {
-    hallSel.innerHTML='<option value="">—</option>';
-  }
   calcMwAge();
 }
 function calcMwAge(){
@@ -463,18 +453,16 @@ function addMarketWeight(){
   let batchId=$('mwBatch')?+$('mwBatch').value:0;if(!batchId)return msg('⚠ اختر الوجبة أولاً');
   let b=data.batches.find(x=>x.id===batchId);
   if(!isAdmin()&&b&&!canSeeField(b.field))return msg('⛔ لا تملك صلاحية');
-  let hallId=$('mwHall')&&$('mwHall').value?+$('mwHall').value:null;
-  let hallObj=data.halls.find(h=>h.id===hallId);
   let count=+($('mwCount')?$('mwCount').value:0)||0;
   let totalKg=+($('mwTotalKg')?$('mwTotalKg').value:0)||0;
   if(!count)return msg('⚠ أدخل عدد الطيور');
-  if(!totalKg)return msg('⚠ أدخل الوزن الكلي');
+  if(!totalKg)return msg('⚠ أدخل مجموع الوزن الكلي');
   let date=$('mwDate')?$('mwDate').value:today();
   let age=$('mwAge')?+$('mwAge').value||null:null;
   let note=$('mwNote')?$('mwNote').value:'';
   let avgKg=+(totalKg/count).toFixed(3);
   data.marketWeights=data.marketWeights||[];
-  data.marketWeights.push({id:Date.now(),batchId,hallId,hall:hallObj?hallObj.name:(b?b.hall:''),date,age,count,totalKg,avgKg,note});
+  data.marketWeights.push({id:Date.now(),batchId,date,age,count,totalKg,avgKg,note});
   save();renderAll();clearMwForm();msg('تم حفظ وزن التسويق ✅');
 }
 function clearMwForm(){
@@ -499,7 +487,6 @@ function renderMarketWeights(){
     return `<tr>
       <td>${fmt(r.date)}</td>
       <td>${esc(b?b.name:'—')}</td>
-      <td>${esc(r.hall||'—')}</td>
       <td>${r.age!=null?r.age+' يوم':'—'}</td>
       <td>${(+r.count||0).toLocaleString()}</td>
       <td><b>${(+r.totalKg||0).toLocaleString()} كغ</b></td>
@@ -508,7 +495,7 @@ function renderMarketWeights(){
       <td>${isAdmin()?`<button class="btn btn-danger btn-sm" onclick="deleteMarketWeight(${r.id})">حذف</button>`:'—'}</td>
     </tr>`;
   }).join('');
-  el.innerHTML=`<thead><tr><th>التاريخ</th><th>الوجبة</th><th>القاعة</th><th>العمر</th><th>العدد</th><th>الوزن الكلي</th><th>معدل الوزن</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${rows||'<tr><td colspan="9" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان مسوقة</td></tr>'}</tbody>`;
+  el.innerHTML=`<thead><tr><th>التاريخ</th><th>الوجبة</th><th>العمر</th><th>العدد</th><th>الوزن الكلي</th><th>معدل الوزن</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${rows||'<tr><td colspan="8" style="text-align:center;color:var(--ink3);padding:18px">لا توجد سجلات أوزان مسوقة</td></tr>'}</tbody>`;
 }
 function deleteMarketWeight(id){
   if(!isAdmin())return;
