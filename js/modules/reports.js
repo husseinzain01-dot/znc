@@ -1066,7 +1066,7 @@ function batchHallsPanelHtml(b){
     ?b.hallAllocations
     :(b.hallId?[{hallId:b.hallId,hall:b.hall,birds:b.fieldBirds}]:[]);
   if(!allocs.length)return'';
-  let rows=allocs.map(a=>{
+  let rows=allocs.map((a,i)=>{
     let hallId=+a.hallId;
     let cap=(data.halls||[]).find(h=>h.id===hallId);
     let capVal=cap?+cap.capacity||0:0;
@@ -1079,18 +1079,52 @@ function batchHallsPanelHtml(b){
     let lastW=lw?(weightActualGrams(lw)+' غم'):'—';
     let mortPct=birds?(mort/birds*100).toFixed(1)+'%':'—';
     let soldPct=birds?(sold/birds*100).toFixed(1)+'%':'—';
-    return`<tr>
-      <td><b>${esc(a.hall||'—')}</b></td>
+    // تفاصيل القاعة
+    let hallWeights=(data.weights||[]).filter(w=>w.batchId===b.id&&+w.hallId===hallId)
+      .sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+    let hallMorts=(data.morts||[]).filter(m=>+m.batchId===b.id&&+m.hallId===hallId)
+      .sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+    let hallMarkets=(data.markets||[]).filter(m=>m.batchId==b.id&&+m.hallId===hallId)
+      .sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+    let wRows=hallWeights.map(w=>{
+      let ag=weightActualGrams(w),gg=weightGuideGrams(w);
+      let pct=gg?((ag/gg)*100).toFixed(1)+'%':'—';
+      let col=gg&&ag>=gg?'#16a34a':'#dc2626';
+      return`<tr><td>${fmt(w.date)}</td><td style="text-align:center">${w.ageDays!=null?w.ageDays+' يوم':'—'}</td><td style="font-weight:700;color:#2563eb;text-align:center">${ag?ag.toLocaleString()+' غم':'—'}</td><td style="color:var(--ink3);text-align:center">${gg?gg.toLocaleString()+' غم':'—'}</td><td style="color:${col};font-weight:700;text-align:center">${pct}</td></tr>`;
+    }).join('');
+    let mRows=hallMorts.map(m=>`<tr><td>${fmt(m.date)}</td><td style="color:#dc2626;font-weight:700;text-align:center">${(+m.count||0).toLocaleString()}</td><td>${esc(m.reason||'—')}</td></tr>`).join('');
+    let mkRows=hallMarkets.map(m=>`<tr><td>${fmt(m.date)}</td><td style="font-weight:700;color:#d97706;text-align:center">${(+m.count||0).toLocaleString()}</td><td>${esc(m.status||'—')}</td><td>${esc(m.note||'—')}</td></tr>`).join('');
+    let detailId=`archHall_${b.id}_${hallId}`;
+    let detail=`<tr id="${detailId}" class="hidden"><td colspan="7" style="padding:0">
+      <div style="padding:12px;background:var(--card2,#f8fafc);border-top:2px solid var(--border)">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <div class="statCard" style="min-width:110px"><div class="sc-val" style="color:#1d4ed8">${birds.toLocaleString()}</div><div class="sc-label">المنقول</div></div>
+          <div class="statCard" style="min-width:110px"><div class="sc-val" style="color:#dc2626">${mort.toLocaleString()}</div><div class="sc-label">الهلاك (${mortPct})</div></div>
+          <div class="statCard" style="min-width:110px"><div class="sc-val" style="color:#d97706">${sold.toLocaleString()}</div><div class="sc-label">المسوق (${soldPct})</div></div>
+          <div class="statCard" style="min-width:110px"><div class="sc-val" style="color:#16a34a">${alive.toLocaleString()}</div><div class="sc-label">الحي المتبقي</div></div>
+          <div class="statCard" style="min-width:110px"><div class="sc-val" style="color:#2563eb">${lastW}</div><div class="sc-label">آخر وزن</div></div>
+        </div>
+        ${hallWeights.length?`<div style="font-size:11px;font-weight:700;color:#2563eb;margin-bottom:4px">⚖️ الأوزان (${hallWeights.length} سجل)</div>
+        <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th>التاريخ</th><th>العمر</th><th>الفعلي</th><th>الكايد</th><th>نسبة التحقق</th></tr></thead><tbody>${wRows}</tbody></table></div>`:''}
+        ${hallMorts.length?`<div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:4px">💀 الهلاك (${hallMorts.length} سجل)</div>
+        <div class="tableWrap" style="margin-bottom:10px"><table class="tbl"><thead><tr><th>التاريخ</th><th>العدد</th><th>السبب</th></tr></thead><tbody>${mRows}</tbody></table></div>`:''}
+        ${hallMarkets.length?`<div style="font-size:11px;font-weight:700;color:#d97706;margin-bottom:4px">🏪 التسويق (${hallMarkets.length} سجل)</div>
+        <div class="tableWrap"><table class="tbl"><thead><tr><th>التاريخ</th><th>العدد</th><th>النوع</th><th>ملاحظة</th></tr></thead><tbody>${mkRows}</tbody></table></div>`:''}
+        ${!hallWeights.length&&!hallMorts.length&&!hallMarkets.length?`<p style="color:var(--ink3);text-align:center;padding:10px">لا توجد بيانات مسجلة لهذه القاعة</p>`:''}
+      </div>
+    </td></tr>`;
+    return`<tr class="selectable" onclick="toggleInlineDetails('${detailId}')">
+      <td><b>${esc(a.hall||'—')}</b> <span style="font-size:10px;color:var(--ink3)">▼</span></td>
       <td style="text-align:center">${capVal?capVal.toLocaleString():'—'}</td>
       <td style="text-align:center;font-weight:700">${birds.toLocaleString()}</td>
-      <td style="text-align:center;color:#dc2626">${mort.toLocaleString()} <span style="font-size:10px;color:#dc2626">(${mortPct})</span></td>
-      <td style="text-align:center;color:#d97706">${sold.toLocaleString()} <span style="font-size:10px;color:#d97706">(${soldPct})</span></td>
+      <td style="text-align:center;color:#dc2626">${mort.toLocaleString()} <span style="font-size:10px">(${mortPct})</span></td>
+      <td style="text-align:center;color:#d97706">${sold.toLocaleString()} <span style="font-size:10px">(${soldPct})</span></td>
       <td style="text-align:center;font-weight:700;color:#16a34a">${alive.toLocaleString()}</td>
       <td style="text-align:center;color:#2563eb">${lastW}</td>
-    </tr>`;
+    </tr>${detail}`;
   }).join('');
   return`<div class="card" style="margin-top:12px">
-    <div class="secHdr"><span class="material-symbols-outlined">meeting_room</span> تفاصيل القاعات</div>
+    <div class="secHdr"><span class="material-symbols-outlined">meeting_room</span> تفاصيل القاعات — اضغط على قاعة لعرض بياناتها</div>
     <div class="tableWrap"><table class="tbl">
       <thead><tr><th>القاعة</th><th>السعة</th><th>المنقول</th><th>الهلاك</th><th>المسوق</th><th>الحي المتبقي</th><th>آخر وزن</th></tr></thead>
       <tbody>${rows}</tbody>
