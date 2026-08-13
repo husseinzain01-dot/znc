@@ -66,7 +66,7 @@ function openEditRecord(type,id){
     let r=(data.markets||[]).find(x=>x.id===id);if(!r)return;
     let b=(data.batches||[]).find(x=>x.id===r.batchId);
     let bName=b?b.name:'';
-    let stOpts=['تسويق إلى المجزرة','بيع مباشر','تحويل','أخرى'].map(s=>`<option${r.status===s?' selected':''}>${s}</option>`).join('');
+    let stOpts=['تسويق إلى المجزرة','بيعت جزئياً','منقولة','منتهية'].map(s=>`<option${r.status===s?' selected':''}>${s}</option>`).join('');
     body=`
       <div class="formGrid">
         <div class="formGroup" style="grid-column:1/-1"><label>الوجبة / القاعة</label><input type="text" value="${esc(bName+' — '+(r.hall||''))}" readonly style="background:#f1f5f9;color:#64748b"></div>
