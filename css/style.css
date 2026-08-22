@@ -63,7 +63,7 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;background:var(--bg);color:
 .sideNav::-webkit-scrollbar-track{background:transparent}
 .sideNav::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}
 .appModeSwitch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:9px;border:1px solid #ffffff16;border-radius:11px;background:#02061766}
-.appModeBtn{min-width:0;border:0;border-radius:8px;padding:8px 5px;background:transparent;color:#94a3b8;font-family:inherit;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;transition:all .18s}
+.appModeBtn{min-width:0;border:0;border-radius:8px;padding:8px 5px;background:transparent;color:#94a3b8;font-family:inherit;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;transition:all .18s;text-decoration:none;text-align:center}
 .appModeBtn:hover{color:#fff;background:#ffffff0d}.appModeBtn.active{color:#fff;background:linear-gradient(135deg,var(--p),var(--p2));box-shadow:0 3px 10px #0d948844}
 .appModeIcon{display:none}
 

@@ -3,9 +3,10 @@ function buildNav(){
   let admin=isAdmin();
   const mi=ic=>`<span class="material-symbols-outlined">${ic}</span>`;
   let n=(icon,key,fn)=>`<button class="nav" onclick="show('${fn}',this)"><span class="navIcon">${mi(icon)}</span><span class="navText">${t(key)}</span></button>`;
+  const layerHref='layer/';
   let html=`<div class="appModeSwitch" aria-label="التبديل بين اللحم والبياض">
     <button class="appModeBtn active" onclick="switchPublishedApp('meat')" title="إدارة اللحم"><span class="appModeIcon">🐔</span><span>اللحم</span></button>
-    <button class="appModeBtn" onclick="switchPublishedApp('layer')" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span>البياض</span></button>
+    <a class="appModeBtn" href="${layerHref}" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span>البياض</span></a>
   </div>`;
   html+=`<div class="navLabel">${t('navHome')}</div>`;
   html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">${mi('dashboard')}</span><span class="navText">${t('navDash')}</span></button>`;
@@ -43,8 +44,7 @@ function buildNav(){
 }
 
 function switchPublishedApp(mode){
-  if(mode==='layer') window.location.href='frontend/';
-  else show('dash',document.querySelector(`.nav[onclick*="'dash'"]`));
+  if(mode==='meat') show('dash',document.querySelector(`.nav[onclick*="'dash'"]`));
 }
 
 function show(id,btn,skipHistory){
