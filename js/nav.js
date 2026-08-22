@@ -3,7 +3,10 @@ function buildNav(){
   let admin=isAdmin();
   const mi=ic=>`<span class="material-symbols-outlined">${ic}</span>`;
   let n=(icon,key,fn)=>`<button class="nav" onclick="show('${fn}',this)"><span class="navIcon">${mi(icon)}</span><span class="navText">${t(key)}</span></button>`;
-  let html='';
+  let html=`<div class="appModeSwitch" aria-label="التبديل بين اللحم والبياض">
+    <button class="appModeBtn active" onclick="switchPublishedApp('meat')" title="إدارة اللحم"><span class="appModeIcon">🐔</span><span>اللحم</span></button>
+    <button class="appModeBtn" onclick="switchPublishedApp('layer')" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span>البياض</span></button>
+  </div>`;
   html+=`<div class="navLabel">${t('navHome')}</div>`;
   html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">${mi('dashboard')}</span><span class="navText">${t('navDash')}</span></button>`;
   if(admin){
@@ -37,6 +40,11 @@ function buildNav(){
     html+=n('settings','navSettings','settings');
   }
   $('sideNav').innerHTML=html;
+}
+
+function switchPublishedApp(mode){
+  if(mode==='layer') window.location.href='frontend/';
+  else show('dash',document.querySelector(`.nav[onclick*="'dash'"]`));
 }
 
 function show(id,btn,skipHistory){

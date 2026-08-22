@@ -1222,6 +1222,7 @@ function buildNav(){
 }
 
 function switchPoultryApp(mode){
+  if(mode==='meat'&&location.pathname.includes('/frontend/')){window.location.href='../';return}
   localStorage.setItem('poultryAppMode',mode);
   buildNav();
   if(mode==='layer'){
