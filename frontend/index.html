@@ -296,6 +296,8 @@ tbody tr:hover td{background:#f8fafc}
   main{padding:0}
   .card{box-shadow:none;border:1px solid #ddd}
 }
+.batchModeSwitch{display:inline-flex;gap:5px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:12px;padding:5px;margin-bottom:14px}.batchModeSwitch button{border:0;border-radius:9px;background:transparent;color:var(--ink3);padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}.batchModeSwitch button.active{background:var(--surface);color:var(--p);box-shadow:var(--shadow)}.layerHero{display:flex;align-items:center;justify-content:space-between;gap:18px;background:linear-gradient(135deg,#ecfdf5,#fff)}.layerHero p{font-size:12px;color:var(--ink3);max-width:720px}.layerSummary{display:grid;grid-template-columns:repeat(3,minmax(105px,1fr));gap:7px;min-width:360px}.layerSummary span{background:#fff;border:1px solid #d1fae5;border-radius:9px;padding:8px 10px}.layerSummary small,.layerSummary b{display:block}.layerSummary small{font-size:9px;color:var(--ink3)}.layerSummary b{font-size:15px;color:var(--p);margin-top:2px}.productionTotal td{background:#ecfdf5!important;font-weight:700;color:#065f46}.productionActions{display:flex;gap:5px}@media(max-width:800px){.batchModeSwitch{display:flex}.batchModeSwitch button{flex:1}.layerHero{display:block}.layerSummary{min-width:0;margin-top:12px}.layerSummary{grid-template-columns:1fr 1fr}}
+.productionChart{height:285px;display:flex;align-items:flex-end;gap:16px;overflow-x:auto;padding:12px 8px;border-bottom:1px solid var(--border);background:repeating-linear-gradient(to top,#eef2f7 0,#eef2f7 1px,transparent 1px,transparent 52px)}.productionChartCol{width:74px;min-width:74px;display:grid;grid-template-rows:24px 205px 22px 20px;text-align:center;align-items:end}.productionChartValue{font-size:10px;font-weight:800}.productionBars{height:205px;display:flex;align-items:flex-end;justify-content:center;gap:5px}.productionBars i{display:block;width:24px;min-height:2px;background:#0d9488;border-radius:5px 5px 0 0;position:relative}.productionBars i.guide{background:#f59e0b}.productionBars em{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-size:8px;font-style:normal;font-weight:700}.productionChartCol>b{font-size:10px}.productionChartCol>small{font-size:8px;color:var(--ink3)}#layerTechnicalTable{font-size:10px}#layerTechnicalTable th,#layerTechnicalTable td{padding:7px 5px;text-align:center}#layerMonthlySummary{grid-template-columns:repeat(4,1fr)}@media(max-width:700px){#layerMonthlySummary{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -391,7 +393,11 @@ tbody tr:hover td{background:#f8fafc}
 
     <!-- ADD BATCH (admin only) -->
     <section id="batch" class="page hidden">
-      <div class="card">
+      <div class="batchModeSwitch" role="group" aria-label="نوع إدارة الوجبات">
+        <button id="batchModeMeat" class="active" onclick="setBatchWorkMode('meat')">🐔 إدارة اللحم</button>
+        <button id="batchModeLayer" onclick="setBatchWorkMode('layer')">🥚 إنتاج البيض</button>
+      </div>
+      <div class="card" id="batchMeatPanel">
         <div class="cardTitle">🥚 تسجيل وجبة تفقيس</div>
         <input type="hidden" id="editId">
         <div class="formGrid">
@@ -417,6 +423,59 @@ tbody tr:hover td{background:#f8fafc}
         <div class="formActions">
           <button class="btn btn-primary" onclick="saveBatch()">💾 حفظ الوجبة</button>
           <button class="btn btn-secondary" onclick="clearForm()">مسح</button>
+        </div>
+      </div>
+      <div id="batchLayerPanel" class="hidden">
+        <div class="card layerHero">
+          <div><div class="cardTitle">🥚 إدارة إنتاج البيض اليومية</div><p>سجّل إنتاج قاعات البياض والهلاكات وجودة البيض. تُحفظ السجلات داخل قاعدة بيانات النظام الحالية بدون التأثير على بيانات اللحم.</p></div>
+          <div id="layerProductionSummary" class="layerSummary"></div>
+        </div>
+        <div class="card">
+          <div class="cardTitle">📝 تسجيل بيانات قاعة بياض</div>
+          <input type="hidden" id="lpRecordId">
+          <div class="formGrid">
+            <div class="formGroup"><label>الحقل *</label><select id="prodField" onchange="onProductionFieldChange()"></select></div>
+            <div class="formGroup"><label>القاعة *</label><select id="prodHall" onchange="onProductionHallChange()"></select></div>
+            <div class="formGroup"><label>وجبة البياض *</label><select id="prodBatch" onchange="refreshProductionCalculated()"></select></div>
+            <div class="formGroup"><label>تاريخ التقرير *</label><input id="prodDate" type="date" onchange="refreshProductionCalculated()"></div>
+            <div class="formGroup"><label>العدد الأصلي</label><input id="prodOriginal" type="number" readonly></div>
+            <div class="formGroup"><label>هلاك الأمس</label><input id="prodYesterdayMort" type="number" readonly></div>
+            <div class="formGroup"><label>هلاكات اليوم</label><input id="prodMortality" type="number" min="0" value="0" oninput="refreshProductionCalculated()"></div>
+            <div class="formGroup"><label>التسويق اليوم</label><input id="prodMarketing" type="number" min="0" value="0" oninput="refreshProductionCalculated()"></div>
+            <div class="formGroup"><label>العدد المتبقي</label><input id="prodRemaining" type="number" readonly></div>
+            <div class="formGroup"><label>الإنتاج (بالبيضة)</label><input id="prodEggs" type="number" min="0" value="0" oninput="refreshProductionCalculated()"></div>
+            <div class="formGroup"><label>الإنتاج (بالصندوق)</label><input id="prodBoxes" type="number" readonly></div>
+            <div class="formGroup"><label>نسبة الإنتاج %</label><input id="prodRate" type="number" readonly></div>
+            <div class="formGroup"><label>البيض التالف (صندوق)</label><input id="prodDamaged" type="number" min="0" step="0.1" value="0"></div>
+            <div class="formGroup"><label>البيض الكسر والمعدم</label><input id="prodCracked" type="number" min="0" value="0"></div>
+            <div class="formGroup"><label>البيض الأشقر والمتسخ</label><input id="prodDirty" type="number" min="0" value="0"></div>
+            <div class="formGroup"><label>معدل وزن البيضة (غم)</label><input id="prodEggWeight" type="number" min="0" step="0.1" value="0"></div>
+            <div class="formGroup"><label>إنتاج الكايد %</label><input id="prodStandardRate" type="number" min="0" max="100" step="0.1" value="90" oninput="refreshProductionCalculated()"></div>
+            <div class="formGroup"><label>وزن البيضة القياسي (غم)</label><input id="prodStandardWeight" type="number" min="0" step="0.1" value="60"></div>
+            <div class="formGroup"><label>العلف (كغم)</label><input id="prodFeed" type="number" min="0" step="0.1" value="0"></div>
+            <div class="formGroup"><label>الملاحظات</label><input id="prodNotes"></div>
+          </div>
+          <div class="formActions"><button class="btn btn-primary" onclick="saveLayerProductionRecord()">💾 حفظ سجل الإنتاج</button><button class="btn btn-secondary" onclick="clearLayerProductionForm()">مسح</button></div>
+        </div>
+        <div class="card">
+          <div class="cardTitle">📋 سجل إنتاج البياض</div>
+          <div class="formGrid" style="margin-bottom:12px"><div class="formGroup"><label>من تاريخ</label><input id="prodFilterFrom" type="date" oninput="renderLayerProductionRecords()"></div><div class="formGroup"><label>إلى تاريخ</label><input id="prodFilterTo" type="date" oninput="renderLayerProductionRecords()"></div><div class="formGroup"><label>بحث</label><input id="prodFilterSearch" placeholder="الحقل أو القاعة أو الوجبة" oninput="renderLayerProductionRecords()"></div></div>
+          <div class="tableWrap"><table id="layerProductionTable"></table></div>
+        </div>
+        <div class="card">
+          <div class="cardTitle">📈 الإنتاج الفعلي مقابل الكايد</div>
+          <div id="layerProductionChart"></div>
+        </div>
+        <div class="card">
+          <div class="cardTitle">📄 التقرير الفني اليومي</div>
+          <div class="formGrid" style="margin-bottom:12px"><div class="formGroup"><label>التاريخ</label><input id="prodReportDate" type="date" oninput="renderLayerTechnicalReport()"></div></div>
+          <div class="tableWrap"><table id="layerTechnicalTable"></table></div>
+        </div>
+        <div class="card">
+          <div class="cardTitle">🗓️ كشف الإنتاج الشهري</div>
+          <div class="formGrid" style="margin-bottom:12px"><div class="formGroup"><label>الشهر</label><input id="prodReportMonth" type="month" oninput="renderLayerMonthlyReport()"></div></div>
+          <div id="layerMonthlySummary" class="statsGrid"></div>
+          <div class="tableWrap"><table id="layerMonthlyTable"></table></div>
         </div>
       </div>
     </section>
@@ -956,6 +1015,7 @@ const OLD_STORES=['chicken_field_system_v21_data','chicken_field_system_v11_data
 // ── STATE ──
 let data={
   batches:[],morts:[],markets:[],fields:[],
+  layerProduction:[], // سجلات إنتاج البياض اليومية — منفصلة عن بيانات اللحم
   halls:[],            // [{id,fieldId,name,capacity,chickWeight,avgWeight,totalWeight}]
   weights:[],          // [{id,batchId,field,hallId,hall,date,avgWeight,expectedWeight,totalWeight,note}]
   feeds:[],            // [{id,date,field,hallId,hall,feedType,qty,note}]
@@ -1007,6 +1067,7 @@ function load(){
       data.fields=data.fields||[];
       data.halls=data.halls||[];
       data.weights=data.weights||[];
+      data.layerProduction=data.layerProduction||[];
       migrateWeightsToGrams();
       data.subUsers=data.subUsers||[];
     }
@@ -4162,6 +4223,108 @@ function showFieldDetails(fieldName){
   </div>
   <div class="card"><div class="cardTitle">🚪 القاعات داخل ${fieldName}</div><div class="tableWrap"><table><thead><tr><th>القاعة</th><th>السعة</th><th>العدد</th><th>الحي</th><th>الهلاك</th><th>التسويق</th><th>العلف اليوم/الكلي</th><th>لقاحات اليوم</th><th>آخر مادة</th></tr></thead><tbody>${hallRows||'<tr><td colspan="9">لا توجد قاعات</td></tr>'}</tbody></table></div></div>
   <div class="card"><div class="cardTitle">انتقال سريع لتفاصيل الحقل <span style="font-size:11px;font-weight:500;color:var(--ink3)">يفتح الصفحة المعنية لهذا الحقل فقط</span></div><div class="statsGrid">${smartShortcutCards(fieldName)}</div></div>`;
+}
+
+// ── إنتاج البياض داخل إدارة الوجبات ──
+function setBatchWorkMode(mode){
+  let layer=mode==='layer';
+  $('batchMeatPanel').classList.toggle('hidden',layer);
+  $('batchLayerPanel').classList.toggle('hidden',!layer);
+  $('batchModeMeat').classList.toggle('active',!layer);
+  $('batchModeLayer').classList.toggle('active',layer);
+  if(layer)renderLayerProductionModule();
+}
+function productionRecords(){data.layerProduction=data.layerProduction||[];return data.layerProduction}
+function productionSelectedHallId(){return +($('prodHall')&&$('prodHall').value)||0}
+function productionSelectedBatch(){return data.batches.find(b=>b.id===+(($('prodBatch')&&$('prodBatch').value)||0))}
+function productionOriginalBirds(batch,hallId){
+  if(!batch)return 0;
+  let allocated=batchAllocatedToHall(batch,hallId);
+  return allocated||(+batch.fieldBirds||0);
+}
+function isoShift(date,days){let d=new Date(date+'T00:00:00');d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
+function renderLayerProductionModule(){
+  let old=$('prodField').value||'';
+  let layerFields=data.fields.filter(f=>canSeeField(f.name)&&(f.type==='بياض'||data.batches.some(b=>b.type==='بياض'&&b.field===f.name)));
+  if(!layerFields.length)layerFields=data.fields.filter(f=>canSeeField(f.name));
+  $('prodField').innerHTML='<option value="">اختر الحقل</option>'+layerFields.map(f=>`<option value="${esc(f.name)}">${esc(f.name)}</option>`).join('');
+  if(old&&layerFields.some(f=>f.name===old))$('prodField').value=old;
+  if(!$('prodDate').value)$('prodDate').value=today();
+  if(!$('prodReportDate').value)$('prodReportDate').value=today();
+  if(!$('prodReportMonth').value)$('prodReportMonth').value=today().slice(0,7);
+  onProductionFieldChange(true);
+  renderLayerProductionRecords();
+  renderLayerTechnicalReport();renderLayerMonthlyReport();
+}
+function onProductionFieldChange(keepHall=false){
+  let fieldName=$('prodField').value,field=data.fields.find(f=>f.name===fieldName),old=keepHall?$('prodHall').value:'';
+  let halls=data.halls.filter(h=>field&&h.fieldId===field.id);
+  $('prodHall').innerHTML='<option value="">اختر القاعة</option>'+halls.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');
+  if(old&&halls.some(h=>String(h.id)===String(old)))$('prodHall').value=old;
+  onProductionHallChange();
+}
+function onProductionHallChange(){
+  let field=$('prodField').value,hallId=productionSelectedHallId(),old=$('prodBatch').value;
+  let batches=data.batches.filter(b=>b.type==='بياض'&&b.field===field&&!calc(b).completed&&(!hallId||batchAllocatedToHall(b,hallId)>0||+b.hallId===hallId));
+  $('prodBatch').innerHTML='<option value="">اختر وجبة البياض</option>'+batches.map(b=>`<option value="${b.id}">${esc(b.name)} — ${esc(b.birdStrain||'بياض')}</option>`).join('');
+  if(old&&batches.some(b=>String(b.id)===String(old)))$('prodBatch').value=old;
+  refreshProductionCalculated();
+}
+function productionRollup(batchId,hallId,beforeOrOnDate,excludeId=0){
+  return productionRecords().filter(r=>+r.batchId===+batchId&&+r.hallId===+hallId&&r.date<beforeOrOnDate&&+r.id!==+excludeId).reduce((a,r)=>({mortality:a.mortality+(+r.mortality||0),marketing:a.marketing+(+r.marketing||0)}),{mortality:0,marketing:0});
+}
+function refreshProductionCalculated(){
+  let b=productionSelectedBatch(),hallId=productionSelectedHallId(),date=$('prodDate').value||today(),editing=+($('lpRecordId').value||0),original=productionOriginalBirds(b,hallId);
+  let prior=productionRollup(b?b.id:0,hallId,date,editing),mort=+($('prodMortality').value||0),marketing=+($('prodMarketing').value||0),remaining=Math.max(0,original-prior.mortality-mort-prior.marketing-marketing),eggs=+($('prodEggs').value||0);
+  let yesterday=productionRecords().find(r=>+r.batchId===+(b&&b.id)&&+r.hallId===hallId&&r.date===isoShift(date,-1));
+  $('prodOriginal').value=original||0;$('prodYesterdayMort').value=yesterday?+yesterday.mortality||0:0;$('prodRemaining').value=remaining;$('prodBoxes').value=(eggs/360).toFixed(1);$('prodRate').value=remaining?(eggs/remaining*100).toFixed(2):'0.00';
+}
+function clearLayerProductionForm(){
+  $('lpRecordId').value='';['prodMortality','prodMarketing','prodEggs','prodDamaged','prodCracked','prodDirty','prodEggWeight','prodFeed'].forEach(id=>$(id).value=0);$('prodStandardRate').value=90;$('prodStandardWeight').value=60;$('prodNotes').value='';$('prodDate').value=today();refreshProductionCalculated();
+}
+function saveLayerProductionRecord(){
+  if(!isAdmin())return msg('⚠ الحفظ متاح للمدير فقط');
+  let b=productionSelectedBatch(),hallId=productionSelectedHallId(),field=$('prodField').value,date=$('prodDate').value;
+  if(!field||!hallId||!b||!date)return msg('⚠ اختر الحقل والقاعة ووجبة البياض والتاريخ');
+  let hall=data.halls.find(h=>h.id===hallId),id=+($('lpRecordId').value||0)||Date.now();
+  let record={id,batchId:b.id,batchName:b.name,field,hallId,hall:hall?hall.name:'',breed:b.birdStrain||'',date,original:+$('prodOriginal').value||0,mortality:+$('prodMortality').value||0,mortalityYesterday:+$('prodYesterdayMort').value||0,marketing:+$('prodMarketing').value||0,remaining:+$('prodRemaining').value||0,eggs:+$('prodEggs').value||0,boxes:+$('prodBoxes').value||0,productionRate:+$('prodRate').value||0,standardRate:+$('prodStandardRate').value||0,deviation:(+$('prodRate').value||0)-(+$('prodStandardRate').value||0),damagedBoxes:+$('prodDamaged').value||0,crackedDestroyed:+$('prodCracked').value||0,dirtyBrown:+$('prodDirty').value||0,eggWeight:+$('prodEggWeight').value||0,standardEggWeight:+$('prodStandardWeight').value||0,feed:+$('prodFeed').value||0,notes:$('prodNotes').value.trim(),updatedAt:new Date().toISOString()};
+  data.layerProduction=[record,...productionRecords().filter(r=>+r.id!==id&&!(+r.batchId===+b.id&&+r.hallId===hallId&&r.date===date))];
+  save();clearLayerProductionForm();renderLayerProductionRecords();renderLayerTechnicalReport();renderLayerMonthlyReport();msg('تم حفظ سجل إنتاج البياض');
+}
+function editLayerProductionRecord(id){
+  let r=productionRecords().find(x=>+x.id===+id);if(!r)return;
+  $('prodField').value=r.field;onProductionFieldChange();$('prodHall').value=r.hallId;onProductionHallChange();$('prodBatch').value=r.batchId;$('prodDate').value=r.date;$('lpRecordId').value=r.id;
+  [['prodMortality',r.mortality],['prodMarketing',r.marketing],['prodEggs',r.eggs],['prodDamaged',r.damagedBoxes],['prodCracked',r.crackedDestroyed],['prodDirty',r.dirtyBrown],['prodEggWeight',r.eggWeight],['prodStandardRate',r.standardRate||90],['prodStandardWeight',r.standardEggWeight||60],['prodFeed',r.feed]].forEach(([id,v])=>$(id).value=v||0);$('prodNotes').value=r.notes||'';refreshProductionCalculated();window.scrollTo({top:$('batchLayerPanel').offsetTop,behavior:'smooth'});
+}
+function deleteLayerProductionRecord(id){if(!isAdmin())return;if(!confirm('حذف سجل إنتاج البياض المحدد؟'))return;data.layerProduction=productionRecords().filter(r=>+r.id!==+id);save();renderLayerProductionRecords();renderLayerTechnicalReport();renderLayerMonthlyReport()}
+function renderLayerProductionRecords(){
+  let from=$('prodFilterFrom')?$('prodFilterFrom').value:'',to=$('prodFilterTo')?$('prodFilterTo').value:'',q=(($('prodFilterSearch')&&$('prodFilterSearch').value)||'').trim().toLowerCase();
+  let rows=[...productionRecords()].filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&(!q||[r.field,r.hall,r.batchName,r.breed].join(' ').toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  let total=rows.reduce((a,r)=>({eggs:a.eggs+(+r.eggs||0),mort:a.mort+(+r.mortality||0),damaged:a.damaged+(+r.damagedBoxes||0)}),{eggs:0,mort:0,damaged:0});
+  $('layerProductionSummary').innerHTML=`<span><small>إجمالي البيض</small><b>${total.eggs.toLocaleString()}</b></span><span><small>الصناديق</small><b>${(total.eggs/360).toFixed(1)}</b></span><span><small>الهلاكات</small><b>${total.mort.toLocaleString()}</b></span>`;
+  $('layerProductionTable').innerHTML='<thead><tr><th>التاريخ</th><th>الحقل</th><th>القاعة</th><th>الوجبة</th><th>السلالة</th><th>الأصلي</th><th>هلاك أمس</th><th>هلاك اليوم</th><th>المتبقي</th><th>البيض</th><th>الصناديق</th><th>التالف</th><th>الكسر والمعدم</th><th>الأشقر والمتسخ</th><th>وزن البيضة</th><th>الإنتاج %</th><th>إجراء</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${r.date}</td><td>${esc(r.field)}</td><td>${esc(r.hall)}</td><td>${esc(r.batchName)}</td><td>${esc(r.breed||'—')}</td><td>${(+r.original||0).toLocaleString()}</td><td>${(+r.mortalityYesterday||0).toLocaleString()}</td><td>${(+r.mortality||0).toLocaleString()}</td><td><b>${(+r.remaining||0).toLocaleString()}</b></td><td>${(+r.eggs||0).toLocaleString()}</td><td>${(+r.boxes||0).toFixed(1)}</td><td>${(+r.damagedBoxes||0).toFixed(1)}</td><td>${(+r.crackedDestroyed||0).toLocaleString()}</td><td>${(+r.dirtyBrown||0).toLocaleString()}</td><td>${(+r.eggWeight||0)||'—'}</td><td>${(+r.productionRate||0).toFixed(2)}%</td><td><div class="productionActions"><button class="btn btn-secondary btn-sm" onclick="editLayerProductionRecord(${r.id})">تعديل</button><button class="btn btn-danger btn-sm" onclick="deleteLayerProductionRecord(${r.id})">حذف</button></div></td></tr>`).join('')+'<tr class="productionTotal"><td colspan="9">المجموع</td><td>'+total.eggs.toLocaleString()+'</td><td>'+(total.eggs/360).toFixed(1)+'</td><td>'+total.damaged.toFixed(1)+'</td><td colspan="5">هلاكات: '+total.mort.toLocaleString()+'</td></tr></tbody>';
+  renderLayerProductionChart();
+}
+function productionAgeDays(r){let b=data.batches.find(x=>+x.id===+r.batchId),start=(b&&(b.fieldEntryDate||b.transferDate||b.hatchDate))||'';if(!start||!r.date)return 0;return Math.max(0,Math.floor((new Date(r.date+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+(+b.layerInitWeeks||0)*7+(+b.layerInitDays||0))}
+function latestProductionByHall(records=productionRecords()){
+  let map=new Map();[...records].sort((a,b)=>b.date.localeCompare(a.date)).forEach(r=>{let key=r.batchId+'|'+r.hallId;if(!map.has(key))map.set(key,r)});return [...map.values()];
+}
+function renderLayerProductionChart(){
+  let el=$('layerProductionChart');if(!el)return;let latest=latestProductionByHall();
+  if(!latest.length){el.innerHTML='<div class="warnBox free" style="display:block">لا توجد سجلات إنتاج لعرض الرسم.</div>';return}
+  el.innerHTML='<div class="productionChart">'+latest.map(r=>{let actual=+r.productionRate||0,standard=+r.standardRate||0,dev=actual-standard;return `<div class="productionChartCol"><div class="productionChartValue" style="color:${dev>=0?'#059669':'#dc2626'}">${dev>=0?'+':''}${dev.toFixed(1)}</div><div class="productionBars"><i style="height:${Math.min(100,actual)}%"><em>${actual.toFixed(1)}</em></i><i class="guide" style="height:${Math.min(100,standard)}%"><em>${standard.toFixed(1)}</em></i></div><b>${esc(r.hall)}</b><small>${esc(r.field)}</small></div>`}).join('')+'</div><div class="chartLegend"><span><i class="legendDot" style="background:#0d9488"></i>الفعلي</span><span><i class="legendDot" style="background:#f59e0b"></i>الكايد</span></div>';
+}
+function renderLayerTechnicalReport(){
+  let el=$('layerTechnicalTable');if(!el)return;
+  let date=$('prodReportDate').value||today(),rows=productionRecords().filter(r=>r.date===date).sort((a,b)=>a.field.localeCompare(b.field)||a.hall.localeCompare(b.hall));
+  let total=rows.reduce((a,r)=>({original:a.original+(+r.original||0),mort:a.mort+(+r.mortality||0),remaining:a.remaining+(+r.remaining||0),eggs:a.eggs+(+r.eggs||0),damaged:a.damaged+(+r.damagedBoxes||0)}),{original:0,mort:0,remaining:0,eggs:0,damaged:0});
+  el.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>الوجبة</th><th>السلالة</th><th>العمر يوم</th><th>الأصلي</th><th>هلاك أمس</th><th>هلاك اليوم</th><th>المتبقي</th><th>البيض</th><th>الصناديق</th><th>التالف</th><th>الكسر والمعدم</th><th>الأشقر والمتسخ</th><th>وزن البيضة</th><th>الوزن القياسي</th><th>الإنتاج %</th><th>الكايد %</th><th>الانحراف</th></tr></thead><tbody>'+rows.map(r=>`<tr><td>${esc(r.field)}</td><td>${esc(r.hall)}</td><td>${esc(r.batchName)}</td><td>${esc(r.breed)}</td><td>${productionAgeDays(r)}</td><td>${(+r.original||0).toLocaleString()}</td><td>${(+r.mortalityYesterday||0).toLocaleString()}</td><td>${(+r.mortality||0).toLocaleString()}</td><td>${(+r.remaining||0).toLocaleString()}</td><td>${(+r.eggs||0).toLocaleString()}</td><td>${(+r.boxes||0).toFixed(1)}</td><td>${(+r.damagedBoxes||0).toFixed(1)}</td><td>${(+r.crackedDestroyed||0).toLocaleString()}</td><td>${(+r.dirtyBrown||0).toLocaleString()}</td><td>${(+r.eggWeight||0)||'—'}</td><td>${(+r.standardEggWeight||0)||'—'}</td><td>${(+r.productionRate||0).toFixed(2)}%</td><td>${(+r.standardRate||0).toFixed(2)}%</td><td style="color:${(+r.deviation||0)>=0?'#059669':'#dc2626'}">${(+r.deviation||0)>=0?'+':''}${(+r.deviation||0).toFixed(2)}</td></tr>`).join('')+`<tr class="productionTotal"><td colspan="5">المجموع</td><td>${total.original.toLocaleString()}</td><td>—</td><td>${total.mort.toLocaleString()}</td><td>${total.remaining.toLocaleString()}</td><td>${total.eggs.toLocaleString()}</td><td>${(total.eggs/360).toFixed(1)}</td><td>${total.damaged.toFixed(1)}</td><td colspan="7">نسبة الإنتاج الكلية: ${total.remaining?(total.eggs/total.remaining*100).toFixed(2):'0.00'}%</td></tr></tbody>`;
+}
+function renderLayerMonthlyReport(){
+  let table=$('layerMonthlyTable'),summary=$('layerMonthlySummary');if(!table||!summary)return;let month=$('prodReportMonth').value||today().slice(0,7),rows=productionRecords().filter(r=>r.date.startsWith(month)),groups=new Map();
+  rows.forEach(r=>{let key=r.field+'|'+r.hall,old=groups.get(key)||{field:r.field,hall:r.hall,eggs:0,damaged:0,mort:0};old.eggs+=+r.eggs||0;old.damaged+=+r.damagedBoxes||0;old.mort+=+r.mortality||0;groups.set(key,old)});let list=[...groups.values()],grand=list.reduce((a,r)=>({eggs:a.eggs+r.eggs,damaged:a.damaged+r.damaged,mort:a.mort+r.mort}),{eggs:0,damaged:0,mort:0}),boxes=grand.eggs/360,marketed=boxes-grand.damaged;
+  summary.innerHTML=`<div class="statCard"><div class="sc-label">الإنتاج بالبيضة</div><div class="sc-val">${grand.eggs.toLocaleString()}</div></div><div class="statCard"><div class="sc-label">الإنتاج بالصندوق</div><div class="sc-val">${boxes.toFixed(1)}</div></div><div class="statCard"><div class="sc-label">التالف بالصندوق</div><div class="sc-val">${grand.damaged.toFixed(1)}</div></div><div class="statCard"><div class="sc-label">صافي المسوّق</div><div class="sc-val">${marketed.toFixed(1)}</div></div>`;
+  table.innerHTML='<thead><tr><th>الحقل</th><th>القاعة</th><th>الإنتاج بالبيضة</th><th>الإنتاج بالصندوق</th><th>التالف بالصندوق</th><th>صافي المسوّق</th><th>الهلاكات</th></tr></thead><tbody>'+list.map(r=>`<tr><td>${esc(r.field)}</td><td>${esc(r.hall)}</td><td>${r.eggs.toLocaleString()}</td><td>${(r.eggs/360).toFixed(1)}</td><td>${r.damaged.toFixed(1)}</td><td>${(r.eggs/360-r.damaged).toFixed(1)}</td><td>${r.mort.toLocaleString()}</td></tr>`).join('')+`<tr class="productionTotal"><td colspan="2">المجموع الكلي</td><td>${grand.eggs.toLocaleString()}</td><td>${boxes.toFixed(1)}</td><td>${grand.damaged.toFixed(1)}</td><td>${marketed.toFixed(1)}</td><td>${grand.mort.toLocaleString()}</td></tr></tbody>`;
 }
 
 </script>
