@@ -70,6 +70,12 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;background:var(--bg);color:
 .sideNav::-webkit-scrollbar-track{background:transparent}
 .sideNav::-webkit-scrollbar-thumb{background:#1e293b;border-radius:3px}
 
+.appModeSwitch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin-bottom:9px;border:1px solid #ffffff16;border-radius:11px;background:#02061766}
+.appModeBtn{min-width:0;border:0;border-radius:8px;padding:8px 5px;background:transparent;color:#94a3b8;font-family:inherit;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;transition:all .18s}
+.appModeBtn:hover{color:#fff;background:#ffffff0d}
+.appModeBtn.active{color:#fff;background:linear-gradient(135deg,var(--p),var(--p2));box-shadow:0 3px 10px #0d948844}
+.appModeIcon{display:none}
+
 .navLabel{font-size:9px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:1px;padding:8px 10px 3px;white-space:nowrap;overflow:hidden;transition:opacity .2s ease,max-height .2s ease,padding .2s ease;max-height:30px}
 .nav{width:100%;padding:8px 10px;border-radius:9px;border:0;background:transparent;color:#94a3b8;text-align:right;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s,color .15s;margin-bottom:1px;white-space:nowrap;overflow:hidden}
 .nav:hover{background:#1e293b;color:#e2e8f0}
@@ -97,6 +103,9 @@ body{font-family:'IBM Plex Sans Arabic',Tahoma,Arial;background:var(--bg);color:
 .layout.collapsed .nav{justify-content:center;padding:10px 0}
 .layout.collapsed .navIcon{font-size:17px}
 .layout.collapsed .sideNav{padding:8px 4px}
+.layout.collapsed .appModeSwitch{grid-template-columns:1fr;padding:3px;gap:3px}
+.layout.collapsed .appModeBtn{padding:7px 2px;font-size:0}
+.layout.collapsed .appModeIcon{display:inline;font-size:16px}
 .layout.collapsed .userInfo{opacity:0;max-width:0}
 .layout.collapsed .userChip{justify-content:center;padding:8px 4px}
 .layout.collapsed .navOutText{opacity:0;max-width:0}
@@ -1176,7 +1185,11 @@ function updateUserChip(){
 function buildNav(){
   let admin=isAdmin();
   let n=(icon,txt,fn)=>`<button class="nav" onclick="show('${fn}',this)"><span class="navIcon">${icon}</span><span class="navText">${txt}</span></button>`;
-  let html='';
+  let appMode=localStorage.getItem('poultryAppMode')||'meat',html='';
+  html+=`<div class="appModeSwitch" aria-label="التبديل بين تطبيق اللحم والبياض">
+    <button class="appModeBtn ${appMode==='meat'?'active':''}" onclick="switchPoultryApp('meat')" title="إدارة اللحم"><span class="appModeIcon">🐔</span><span class="modeText">اللحم</span></button>
+    <button class="appModeBtn ${appMode==='layer'?'active':''}" onclick="switchPoultryApp('layer')" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span class="modeText">البياض</span></button>
+  </div>`;
   html+=`<div class="navLabel">الرئيسية</div>`;
   html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">📊</span><span class="navText">لوحة المعلومات</span></button>`;
   if(admin){
@@ -1206,6 +1219,21 @@ function buildNav(){
     html+=n('⚙️','الإعدادات','settings');
   }
   $('sideNav').innerHTML=html;
+}
+
+function switchPoultryApp(mode){
+  localStorage.setItem('poultryAppMode',mode);
+  buildNav();
+  if(mode==='layer'){
+    let batchBtn=[...document.querySelectorAll('.nav')].find(x=>x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'batch'"));
+    show('batch',batchBtn);
+    setBatchWorkMode('layer');
+    $('title').textContent='إنتاج البيض';
+  }else{
+    let dashBtn=[...document.querySelectorAll('.nav')].find(x=>x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'dash'"));
+    show('dash',dashBtn);
+    $('title').textContent='إدارة اللحم';
+  }
 }
 
 function show(id,btn){
