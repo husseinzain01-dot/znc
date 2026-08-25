@@ -2,7 +2,8 @@
 const SUPABASE_URL='https://tvuymajwnrzlibxzfdhy.supabase.co';
 const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2dXltYWp3bnJ6bGlieHpmZGh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcxMDMsImV4cCI6MjA5NjE2MzEwM30.pr9dxBM9Ob75T0lg063_y-O3Q6BgL7o6FAM-9eLODj4';
 const SUPABASE_STATE_ID='main';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_CURRENT_KEY='sb_publishable_oP-PoXwEgIs_WHcc9BoxSg_eMfCGHtv';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CURRENT_KEY);
 let cloudReady=true;
 let cloudBusy=false;
 
