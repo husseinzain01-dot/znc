@@ -1,13 +1,25 @@
 ﻿// ── BOOT ──
-let _sess=sessionStorage.getItem('cf_logged');
-let _user=sessionStorage.getItem('cf_user');
-if(_sess==='1'&&_user){
-  try{currentUser=JSON.parse(_user)}catch(e){currentUser=null}
-  if(currentUser){
-    $('loginBox').classList.add('hidden');
-    $('app').classList.remove('hidden');
-    load();buildNav();updateUserChip();applyLang();
-    pullCloud().then(()=>startRealtimeSync());
+async function bootAuthenticatedApp(){
+  const {data,error}=await sb.auth.getSession();
+  const session=!error&&data?data.session:null;
+  if(!session){
+    sessionStorage.removeItem('cf_logged');
+    sessionStorage.removeItem('cf_user');
+    sessionStorage.removeItem('currentUser');
+    $('loginBox').classList.remove('hidden');
+    $('app').classList.add('hidden');
+    return;
+  }
+  let storedUser=sessionStorage.getItem('cf_user');
+  try{currentUser=storedUser?JSON.parse(storedUser):null}catch(e){currentUser=null}
+  if(!currentUser){
+    const meta=session.user&&session.user.user_metadata?session.user.user_metadata:{};
+    currentUser={name:meta.name||session.user.email,role:meta.role||'admin',fields:meta.fields||null,email:session.user.email};
+  }
+  startSession();
+  await pullCloud();
+  startRealtimeSync();
+  renderAll();
   // استرجاع حالة الشريط الجانبي
   if(sessionStorage.getItem('sideCollapsed')==='1')$('app').classList.add('collapsed');
   // زر الرجوع بالمتصفح
@@ -16,8 +28,8 @@ if(_sess==='1'&&_user){
     let pg=(e.state&&e.state.page)||'dash';
     show(pg,null,true);
   });
-  }
 }
+bootAuthenticatedApp().catch(error=>{console.error('تعذر التحقق من جلسة Supabase',error);$('loginBox').classList.remove('hidden');$('app').classList.add('hidden')});
 
 // Override: فحص إشغال القاعة في نقل الفقسة
 function checkFieldOccupancy(){
