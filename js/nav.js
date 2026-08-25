@@ -1,4 +1,16 @@
 ﻿// ── NAV ──
+async function openLayerApp(event){
+  if(event)event.preventDefault();
+  try{
+    const {data,error}=await sb.auth.getSession();
+    const session=data&&data.session;
+    if(!error&&session&&session.access_token&&session.refresh_token){
+      sessionStorage.setItem('znc_layer_session_handoff',JSON.stringify({access_token:session.access_token,refresh_token:session.refresh_token}));
+    }
+  }catch(error){console.warn('تعذر تجهيز جلسة التحويل إلى البياض',error)}
+  window.location.href='layer/';
+  return false;
+}
 function buildNav(){
   let admin=isAdmin();
   const mi=ic=>`<span class="material-symbols-outlined">${ic}</span>`;
@@ -6,7 +18,7 @@ function buildNav(){
   const layerHref='layer/';
   let html=`<div class="appModeSwitch" aria-label="التبديل بين اللحم والبياض">
     <button class="appModeBtn active" onclick="switchPublishedApp('meat')" title="إدارة اللحم"><span class="appModeIcon">🐔</span><span>اللحم</span></button>
-    <a class="appModeBtn" href="${layerHref}" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span>البياض</span></a>
+    <a class="appModeBtn" href="${layerHref}" onclick="return openLayerApp(event)" title="إنتاج البياض"><span class="appModeIcon">🥚</span><span>البياض</span></a>
   </div>`;
   html+=`<div class="navLabel">${t('navHome')}</div>`;
   html+=`<button class="nav active" onclick="show('dash',this)"><span class="navIcon">${mi('dashboard')}</span><span class="navText">${t('navDash')}</span></button>`;
