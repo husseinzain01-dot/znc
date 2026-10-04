@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.8'
+$Version = '1.1.9'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -1509,6 +1509,8 @@ function Set-Database([string]$file) {
     Save-Config
     Close-Engine
     $script:BackupDay = ''
+    # every other sign-in on this computer was for the old file
+    $script:Sessions.Clear()
     Write-LawhaLog "database set to $($script:Config.dbPath)"
 }
 
@@ -1556,10 +1558,11 @@ function Handle($ctx) {
                 Write-LawhaLog "login $user ($(if (Test-Admin $user) { 'manager' } else { $permText }))"
                 return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = $permText }
             }
-            # Choosing the data file: open to anyone before it is set, then managers only.
+            # Choosing the data file is this computer's connection setting:
+            # anyone at it may set it, signed in or not (the shop asked for
+            # this, e.g. a new laptop before any manager has signed in).
             { $_ -in '/api/choose-file', '/api/candidates', '/api/browse' } {
                 $s = Get-Session $req
-                Need ((Get-DbPath) -eq '' -or ($s -and $s.admin)) 'تغيير ملف البيانات يحتاج صلاحية مدير'
                 $b = Read-Body $req
                 if ($path -eq '/api/candidates') {
                     $files = Find-Candidates

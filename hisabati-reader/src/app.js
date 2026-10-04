@@ -342,15 +342,8 @@ async function loginScreen(error = '', chosen = '') {
     </div>` : ''}
     <p class="muted" style="font-size:12px;margin-top:18px">لوحة المحل ${esc(state.version)}${state.test ? ' — وضع تجربة' : ''}</p>`);
   $('#lPass').focus();
-  // changing the file needs a manager: sign in first, then the picker opens
-  if ($('#lChange')) {
-    $('#lChange').onclick = () => {
-      state.chooseAfterLogin = true;
-      $('#lGo').textContent = 'دخول وتغيير ملف البيانات';
-      $('#lChange').outerHTML = '<p class="muted" style="margin:6px 0 0">سجّل دخول بحساب <b>المدير</b>، وبعدها تنفتح نافذة اختيار الملف.</p>';
-      $('#lPass').focus();
-    };
-  }
+  // the data file is this computer's connection: anyone may set it here
+  if ($('#lChange')) $('#lChange').onclick = () => chooseFileScreen();
   $('#loginForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button');
@@ -392,14 +385,14 @@ async function refreshMe() {
   }
 }
 
-// Choosing another data file, right after a manager signed in from the
-// login screen. The users may differ in the new file, so sign in again.
-function chooseFileScreen(me) {
+// Choosing another data file from the login screen (no sign-in needed).
+// The users may differ in the new file, so everyone signs in again.
+function chooseFileScreen() {
   screen(`<h1>تغيير ملف البيانات</h1>
     <p class="muted">اختار ملف حساباتي (<code>Units2026.accdb</code>). إذا على حاسبة ثانية: تصفح المجلدات ← الشبكة.</p>
     <div id="setupPicker"></div>
     <button class="btn block" id="pkBack" style="margin-top:12px">رجوع بدون تغيير</button>`, true);
-  $('#pkBack').onclick = () => signedIn(me);
+  $('#pkBack').onclick = () => loginScreen();
   databasePicker({ esc, api, icon }, $('#setupPicker'), async (j) => {
     toast('صار الملف: ' + j.file);
     try {
@@ -414,11 +407,6 @@ function chooseFileScreen(me) {
 async function signedIn(me) {
   state.user = me.user;
   setMe(me);
-  if (state.chooseAfterLogin) {
-    state.chooseAfterLogin = false;
-    if (me.admin) return chooseFileScreen(me);
-    toast('تغيير ملف البيانات يحتاج حساب مدير', true);
-  }
   $('#who').hidden = false;
   $('#whoName').textContent = me.user;
   $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);
@@ -432,7 +420,7 @@ async function signedIn(me) {
     if (!state.token) return;
     screen(`<h1>ما كدرت أقرا البيانات</h1><p class="notice error">${esc(e.message)}</p>
       <button class="btn primary block" id="btnRetry">${icon('refresh')} حاول مرة ثانية</button>
-      ${state.admin ? `<button class="btn block" id="btnRechoose" style="margin-top:8px">${icon('file')} اختار ملف ثاني</button>` : ''}`);
+      <button class="btn block" id="btnRechoose" style="margin-top:8px">${icon('file')} اختار ملف ثاني</button>`);
     $('#btnRetry').onclick = () => signedIn(me);
     if ($('#btnRechoose')) $('#btnRechoose').onclick = () => setupScreen();
   }

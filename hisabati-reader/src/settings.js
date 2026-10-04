@@ -403,8 +403,9 @@ export function setupSettings(ctx) {
     openModal('<h2>تغيير ملف البيانات</h2><div id="pickHost"></div>');
     databasePicker({ esc, api, icon }, $('#pickHost'), async (j) => {
       closeModal();
-      toast('صار الملف: ' + j.file);
-      await guarded(() => readServer());
+      // the users may differ in the new file: everyone signs in again
+      toast('صار الملف: ' + j.file + ' — سجّل دخول مرة ثانية');
+      await api('/api/me').catch(() => {});
     }, { auto: true });
   }
 
