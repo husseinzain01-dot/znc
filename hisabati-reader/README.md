@@ -42,6 +42,7 @@ server.ps1 (http://localhost:8765، هذا الجهاز بس)
 npm install
 npm run build                                     # release/hisabati-reader.html
 node test/calc.test.mjs Units2026.accdb           # التقارير على ملف حقيقي
+node test/numeric.test.mjs Units2026.accdb        # قارئ الأسعار السريع يطلع نفس القيم بالضبط
 node server/test/export-tables.mjs Units2026.accdb tables.json
 pwsh server/test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb   # كل عمليات الحفظ (173 فحص)
 KEEP_TMP=1 pwsh server/test/run-ops.ps1 ... && node test/fulltest.test.mjs <مجلد الفحص المؤقت>   # نص الفحص الشامل مال البرنامج
@@ -63,4 +64,5 @@ installer/build.sh                                # dist/LawhatAlMahal-Setup-<ve
 | `installer/` | الأيقونة، المشغّل، وسكربتات NSIS |
 
 - `LAWHA_FAKEDAO=tables.json` يشغّل `server.ps1` على نسخة بالذاكرة (بدون Access) للفحص.
-- قراءة Access بمكتبة [mdb-reader](https://github.com/andipaetzold/mdb-reader)، وأجزاء التشفير مستبدلة بـ `src/stubs` لأن ملفات حساباتي مو محمية بكلمة سر.
+- قراءة Access بمكتبة [mdb-reader](https://github.com/andipaetzold/mdb-reader)، وأجزاء التشفير مستبدلة بـ `src/stubs` لأن ملفات حساباتي مو محمية بكلمة سر. قارئ أعمدة Numeric (الأسعار) مالها بطيء جداً (1.8 ثانية للملف)، فمستبدل بـ `src/stubs/numeric-fast.js` (نفس القيم، 0.01 ثانية).
+- المساعد يبقي ملف البيانات مفتوح بين الحفظات (يسده بعد 20 ثانية بدون شغل)، والمشغّل يختار PowerShell 64 أو 32-bit حسب Office حتى يشتغل محرك DAO السريع.

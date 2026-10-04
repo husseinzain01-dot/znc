@@ -22,7 +22,21 @@ const out = await esbuild.build({
     'create-hash': './src/stubs/no-crypto.js',
     'browserify-aes/browser.js': './src/stubs/no-crypto.js',
   },
+  plugins: [
+    {
+      // mdb-reader's Numeric (price) reader is very slow; same results, fast
+      // (see src/stubs/numeric-fast.js and test/numeric.test.mjs)
+      name: 'fast-numeric',
+      setup(b) {
+        b.onLoad({ filter: /mdb-reader[\\/]lib[\\/]browser[\\/]data[\\/]numeric\.js$/ }, () => ({
+          contents: fs.readFileSync('src/stubs/numeric-fast.js', 'utf8'),
+          loader: 'js',
+        }));
+      },
+    },
+  ],
 });
+if (!out.outputFiles[0].text.includes('B256') && !/BigInt\(256\)/.test(out.outputFiles[0].text)) throw new Error('fast Numeric reader was not bundled');
 
 // Arabic + Latin subsets of IBM Plex Sans Arabic, embedded so the app looks
 // the same on every machine without internet.

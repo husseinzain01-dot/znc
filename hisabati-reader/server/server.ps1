@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.9'
+$Version = '1.2.0'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -192,6 +192,7 @@ function Get-Engine {
 }
 
 function Close-Engine {
+    Close-Db
     if ($script:AccessApp) {
         try { $script:AccessApp.Quit() } catch { }
         try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($script:AccessApp) } catch { }
@@ -203,15 +204,50 @@ function Close-Engine {
 
 # Opens the database and runs $body($db). Writes run inside a transaction
 # that commits, or rolls back on any error (always, with -Rollback).
+# Opening the file is the slow part of a save, above all when it is on
+# another computer, so it stays open between requests and closes after 20
+# idle seconds (main loop). Before each use the engine refreshes its cache,
+# so what حساباتي saved meanwhile is seen.
+$script:Db = $null
+$script:DbOpenPath = ''
+$script:DbLastUse = Get-Date
+
+function Close-Db {
+    if ($script:Db) { try { $script:Db.Close() } catch { } }
+    $script:Db = $null
+    $script:DbOpenPath = ''
+}
+
+function Open-Db([string]$path) {
+    if ($script:Db -and $script:DbOpenPath -eq $path) {
+        # dbRefreshCache: see changes other programs wrote since
+        try { $script:Engine.Idle(8) } catch { }
+        return $script:Db
+    }
+    Close-Db
+    $ws = $script:Engine.Workspaces.Item(0)
+    try {
+        $script:Db = $ws.OpenDatabase($path, $false, $false)
+    } catch {
+        throw "ما كدرت أفتح ملف البيانات. إذا حساباتي فاتحه بشكل حصري سدّه وجرّب مرة ثانية. ($($_.Exception.Message))"
+    }
+    $script:DbOpenPath = $path
+    return $script:Db
+}
+
 function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) {
     $path = Get-DbPath
     Need ($path -ne '') 'ما محدد ملف البيانات. اختاره من الإعدادات.'
     $engine = Get-Engine
     $ws = $engine.Workspaces.Item(0)
+    $script:DbLastUse = Get-Date
     try {
-        $db = $ws.OpenDatabase($path, $false, [bool]$ReadOnly)
+        $db = Open-Db $path
     } catch {
-        throw "ما كدرت أفتح ملف البيانات. إذا حساباتي فاتحه بشكل حصري سدّه وجرّب مرة ثانية. ($($_.Exception.Message))"
+        # a file that can only be read (read-only share) still opens for reading
+        if (-not $ReadOnly) { throw }
+        try { $db = $ws.OpenDatabase($path, $false, $true) } catch { throw "ما كدرت أفتح ملف البيانات. ($($_.Exception.Message))" }
+        try { return (& $body $db) } finally { try { $db.Close() } catch { } }
     }
     try {
         if ($ReadOnly) { return (& $body $db) }
@@ -224,8 +260,13 @@ function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) 
             try { $ws.Rollback() } catch { }
             throw
         }
+    } catch {
+        # whatever went wrong (a refused save, or the file gone from the
+        # network), the next request opens the file fresh
+        Close-Db
+        throw
     } finally {
-        try { $db.Close() } catch { }
+        $script:DbLastUse = Get-Date
     }
 }
 
@@ -1505,6 +1546,7 @@ function Find-Candidates {
 function Set-Database([string]$file) {
     Need (Test-DbFile $file) "هذا مو ملف Access (accdb): $file"
     # ProviderPath: a plain path also for \\PC\share (Path would add "FileSystem::")
+    Close-Db
     $script:Config.dbPath = (Resolve-Path -LiteralPath $file).ProviderPath
     Save-Config
     Close-Engine
@@ -1621,10 +1663,11 @@ function Handle($ctx) {
                 $data = $msg.data
                 if ($null -eq $data) { $data = [pscustomobject]@{} }
                 try {
+                    $clock = [Diagnostics.Stopwatch]::StartNew()
                     Test-Allowed $op $data $s
                     $data | Add-Member -NotePropertyName user -NotePropertyValue $s.user -Force
                     $r = Invoke-Write $op $data $s
-                    Write-LawhaLog "$($s.user)  $op OK $($r.id)"
+                    Write-LawhaLog "$($s.user)  $op OK $($r.id) ($($clock.ElapsedMilliseconds) ms, $($script:EngineName))"
                     return Send-Json $ctx 200 @{ ok = $true; result = $r }
                 } catch {
                     Write-LawhaLog "$($s.user)  $op FAILED: $($_.Exception.Message)"
@@ -1749,6 +1792,8 @@ try {
         while (-not $async.AsyncWaitHandle.WaitOne(1000)) {
             # Let an idle Access instance go after two minutes.
             if ($script:AccessApp -and ((Get-Date) - $script:LastUse).TotalSeconds -gt 120) { Close-Engine }
+            # don't hold the data file open while nobody is saving
+            if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt 20) { Close-Db }
         }
         $ctx = $listener.EndGetContext($async)
         try {

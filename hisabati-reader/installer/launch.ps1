@@ -29,6 +29,35 @@ function Get-Helper {
 }
 function Test-Helper { return $null -ne (Get-Helper) }
 
+# Access's fast engine (DAO) only loads into a PowerShell of the same
+# bitness as Office. LawhatAlMahal.exe is 32-bit, so this script runs in the
+# 32-bit PowerShell; with 64-bit Office (the usual today) the helper must run
+# in the 64-bit one, or every save goes through Access itself and is slow.
+# Try 64-bit first, then 32-bit; keep the one where DAO loads.
+function Test-Dao([string]$exe) {
+    if (-not (Test-Path -LiteralPath $exe)) { return $false }
+    try {
+        $out = & $exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "try { [void](New-Object -ComObject DAO.DBEngine.120); 'yes' } catch { 'no' }" 2>$null
+        return ([string]($out | Select-Object -Last 1)).Trim() -eq 'yes'
+    } catch { return $false }
+}
+
+function Get-HelperHost {
+    $win = $env:windir
+    $sys = Join-Path $win 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if ([Environment]::Is64BitOperatingSystem) {
+        # from a 32-bit process, System32 leads to the 32-bit copy; Sysnative to the real one
+        $x64 = if ([Environment]::Is64BitProcess) { $sys } else { Join-Path $win 'Sysnative\WindowsPowerShell\v1.0\powershell.exe' }
+        $x86 = Join-Path $win 'SysWOW64\WindowsPowerShell\v1.0\powershell.exe'
+        foreach ($c in @(@($x64, '64-bit'), @($x86, '32-bit'))) {
+            if (Test-Dao $c[0]) { Log "helper: $($c[1]) PowerShell (DAO loads there)"; return $c[0] }
+        }
+        Log 'helper: DAO loads in neither PowerShell; 64-bit, saving through Access itself'
+        if (Test-Path -LiteralPath $x64) { return $x64 }
+    }
+    return (Join-Path $PSHOME 'powershell.exe')
+}
+
 try {
     Log "launch from $Here (PowerShell $($PSVersionTable.PSVersion), $([IntPtr]::Size * 8)-bit)"
     $server = Join-Path $Here 'server.ps1'
@@ -49,7 +78,7 @@ try {
 
     if (-not (Test-Helper)) {
         $env:LAWHA_HIDDEN = '1'
-        $ps = Join-Path $PSHOME 'powershell.exe'
+        $ps = Get-HelperHost
         $proc = Start-Process -FilePath $ps -WindowStyle Hidden -PassThru -ArgumentList @(
             '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $server + '"'), '-NoBrowser'
         )

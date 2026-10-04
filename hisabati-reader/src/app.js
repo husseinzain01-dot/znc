@@ -207,7 +207,8 @@ function setAuto(on) {
   if (on)
     state.timer = setInterval(async () => {
       if (state.server) {
-        readServer({ quiet: true }).catch((e) => console.warn('auto refresh failed', e));
+        // skip a tick while a read is still going
+        if (!reading) refreshData({ quiet: true }).catch((e) => console.warn('auto refresh failed', e));
         return;
       }
       if (!state.handle || (await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') return;
@@ -270,11 +271,30 @@ async function readServer({ quiet = false } = {}) {
   }
 }
 
+// Re-reading the file after saves: one read at a time. Asked while one is
+// running (sales saved back to back), a single further read follows and
+// covers them all, instead of one full read per sale.
+let reading = null;
+let queued = null;
+function refreshData(opts = {}) {
+  if (!reading) {
+    reading = readServer(opts).finally(() => {
+      reading = null;
+    });
+    return reading;
+  }
+  queued ??= reading.catch(() => {}).then(() => {
+    queued = null;
+    return refreshData({ quiet: true });
+  });
+  return queued;
+}
+
 // Saves through server.ps1, then re-reads the file. With background, the
 // caller gets the result straight away and the data refreshes behind it.
 async function write(op, data, { background = false } = {}) {
   const j = await api('/api/write', { method: 'POST', body: { op, data } });
-  const refreshed = readServer({ quiet: background }).catch((e) => toast('انحفظ، بس ما تحدّثت الشاشة: ' + e.message, true));
+  const refreshed = refreshData({ quiet: background }).catch((e) => toast('انحفظ، بس ما تحدّثت الشاشة: ' + e.message, true));
   if (!background) await refreshed;
   return j.result || {};
 }

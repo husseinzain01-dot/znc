@@ -267,6 +267,21 @@ $admin = @{ user = 'نور'; admin = $true; perms = (Get-Perms 'نور') }
 Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL1; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
 $script:Config.perms = @{}
 
+Write-Host "`n== the file stays open between saves"
+Close-Db
+$o0 = [int]$script:Engine.State.opens
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 'x' }) | Out-Null
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-2'; user = 'x' }) | Out-Null
+Use-Database -ReadOnly { param($db) Count $db 'SELECT Count(*) FROM bayeeCode' } | Out-Null
+Assert (([int]$script:Engine.State.opens - $o0) -eq 1) "two saves and a read opened the file once ($([int]$script:Engine.State.opens - $o0))"
+try { Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 'x' }) | Out-Null } catch { }
+Assert ($null -eq $script:Db) 'a refused save closes it (next one opens fresh)'
+Assert (@((Rows 'bayeeCode') | Where-Object { $_['bayeeCode'] -like 'فتح-*' }).Count -eq 2) 'nothing half-saved by the refused one'
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-3'; user = 'x' }) | Out-Null
+$script:DbLastUse = (Get-Date).AddSeconds(-30)
+if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt 20) { Close-Db }
+Assert ($null -eq $script:Db) 'closed after 20 idle seconds'
+
 Write-Host "`n== empty rows"
 $b0 = @(Get-BrokenRows)
 Assert (-not ($b0 | Where-Object { $_.count -gt 0 })) 'real data: no empty rows found'

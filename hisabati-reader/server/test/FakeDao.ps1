@@ -53,6 +53,7 @@ function New-FakeEngine([string]$jsonPath) {
         # one set of tables per file: the first file opened is the data file,
         # any other (the full test's copy) starts as a copy of it
         $st = $this.State
+        $st.opens = [int]$st.opens + 1
         $full = [IO.Path]::GetFullPath($path)
         if (-not $st.current) { $st.current = $full; $st.main = $full; $st.files = @{} }
         if ($st.current -ne $full) {
