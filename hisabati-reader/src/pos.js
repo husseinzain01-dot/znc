@@ -3,7 +3,7 @@
 // a closed window doesn't lose a half-entered sale.
 
 export function setupPos(ctx) {
-  const { $, $$, esc, fmt, localDay, state, write, toast, forms, icon, onAfter, C, store } = ctx;
+  const { $, $$, esc, fmt, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal } = ctx;
   const P = () => state.P;
   const key = () => 'lawha-cart-' + (state.user || '');
   const emptyCart = () => ({ type: C.CASH, customer: '', paid: '', note: '', lines: [] });
@@ -92,6 +92,23 @@ export function setupPos(ctx) {
     return b ? `الرصيد الحالي: <b class="num">${fmt(b.balance)}</b>` : '<span class="neg">هذا الزبون مو موجود</span>';
   }
 
+  // Today's latest invoices (a cashier sees their own), one click away
+  // from printing again, editing or deleting.
+  function recentHtml() {
+    const today = localDay();
+    const list = P().sales
+      .filter((s) => s.date === today && s.lines.length && (state.admin || s.user === state.user))
+      .sort((a, b) => b.id - a.id)
+      .slice(0, 8);
+    if (!list.length) return '<p class="muted" style="margin:0;font-size:13px">ماكو قوائم اليوم بعد</p>';
+    return list
+      .map((s) => `<button class="recent" data-sale="${s.id}">
+          <span><b>رقم ${s.id}</b> <small>${esc(s.time.slice(11, 16))} — ${s.type === C.CREDIT ? esc(s.customer) : 'نقدي'}</small></span>
+          <b class="num">${fmt(s.total)}</b>
+        </button>`)
+      .join('');
+  }
+
   function view() {
     onAfter(bind);
     const credit = cart.type === C.CREDIT;
@@ -120,6 +137,10 @@ export function setupPos(ctx) {
             <button class="btn big" id="posSavePrint" style="flex:1">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>
           </div>
           <button class="btn small" id="posClear">${icon('trash')} قائمة جديدة (مسح)</button>
+        </div>
+        <div class="card stack" style="gap:6px">
+          <h3 style="margin:0">آخر القوائم <small class="muted" style="font-weight:400">— دوس على قائمة حتى تطبعها${state.admin ? ' أو تعدّلها أو تمسحها' : ''}</small></h3>
+          <div id="posRecent" class="stack" style="gap:6px">${recentHtml()}</div>
         </div>
       </aside>
     </div>`;
@@ -285,6 +306,11 @@ export function setupPos(ctx) {
         drawLines();
       }
     };
+    $('#posRecent').onclick = (e) => {
+      const b = e.target.closest('[data-sale]');
+      const inv = b && P().saleById.get(Number(b.dataset.sale));
+      if (inv) invoiceModal(inv);
+    };
     $('#posSave').onclick = () => save(false);
     $('#posSavePrint').onclick = () => save(true);
     $('#posClear').onclick = () => {
@@ -316,6 +342,7 @@ export function setupPos(ctx) {
     $('#posGrid').innerHTML = gridHtml();
     $('#posChips').innerHTML = chipsHtml();
     if (cart.type === C.CREDIT) $('#posCustInfo').innerHTML = customerInfo();
+    if ($('#posRecent')) $('#posRecent').innerHTML = recentHtml();
   }
 
   // The cart belongs to whoever signed in.

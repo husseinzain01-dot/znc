@@ -317,6 +317,13 @@ table.lines th { cursor: default; }
 .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
 .user-list label { display: flex; gap: 8px; align-items: center; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
 
+/* ---------------- invoice row actions, recent invoices ---------------- */
+.row-acts { display: inline-flex; gap: 4px; white-space: nowrap; }
+.row-acts .btn { padding: 4px 8px; }
+.recent { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); cursor: pointer; }
+.recent:hover { border-color: var(--accent); }
+.recent small { color: var(--muted); }
+
 /* ---------------- data file picker ---------------- */
 .picker h3 { margin: 18px 0 8px; font-size: 15px; }
 .pk-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 320px; overflow-y: auto; }

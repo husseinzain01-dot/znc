@@ -486,6 +486,11 @@ document.addEventListener('click', (e) => {
     $('#' + id).innerHTML = tableInner(id);
     return;
   }
+  const ra = e.target.closest('[data-row-act]');
+  if (ra) {
+    rowAction(ra);
+    return;
+  }
   const tr = e.target.closest('tbody tr.click');
   if (tr) {
     const t = tables.get(tr.closest('.table-wrap').id);
@@ -499,8 +504,9 @@ function exportCsv(id) {
     const s = String(v ?? '');
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const lines = [t.columns.map((c) => q(c.label)).join(',')];
-  for (const r of t.rows) lines.push(t.columns.map((c) => q(c.csv ? c.csv(r) : cellValue(c, r))).join(','));
+  const cols = t.columns.filter((c) => c.key !== 'act');
+  const lines = [cols.map((c) => q(c.label)).join(',')];
+  for (const r of t.rows) lines.push(cols.map((c) => q(c.csv ? c.csv(r) : cellValue(c, r))).join(','));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -638,6 +644,30 @@ document.addEventListener('click', (e) => {
 
 // ---------- views ----------
 
+// Print / edit / delete right on each invoice row, so they don't hide
+// behind opening the invoice. Edit and delete are for managers.
+const invoiceActions = (kind) =>
+  canWrite()
+    ? [{
+        key: 'act', label: '', get: () => '', csv: () => '',
+        html: (r) => `<span class="row-acts">${kind === 'sale' ? `<button class="btn small" data-row-act="print" data-kind="sale" data-id="${r.id}" title="طباعة وصل">${icon('print')}</button>` : ''}${canAdmin()
+          ? `<button class="btn small" data-row-act="edit" data-kind="${kind}" data-id="${r.id}">${icon('edit')} تعديل</button><button class="btn small danger" data-row-act="del" data-kind="${kind}" data-id="${r.id}">${icon('trash')} مسح</button>`
+          : ''}</span>`,
+      }]
+    : [];
+
+function rowAction(btn) {
+  const id = Number(btn.dataset.id);
+  const kind = btn.dataset.kind;
+  const inv = kind === 'sale' ? state.P.saleById.get(id) : state.P.purchases.find((p) => p.id === id);
+  if (!inv) return toast('القائمة مو موجودة، سوّي تحديث', true);
+  const f = forms();
+  const act = btn.dataset.rowAct;
+  if (act === 'print') f.printSale(inv);
+  if (act === 'edit' && canAdmin()) f.invoiceEditor(kind, inv);
+  if (act === 'del' && canAdmin()) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `القائمة رقم ${id} (${fmt(inv.total)} دينار)`);
+}
+
 const kpi = (label, value, hint = '', accent = false) =>
   `<div class="card kpi${accent ? ' accent' : ''}"><div class="label">${esc(label)}</div><div class="value">${money(value)}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
 
@@ -753,6 +783,7 @@ function viewSales() {
       { key: 'user', label: 'الكاشير' },
       { key: 'n', label: 'عدد المواد', num: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
+      ...invoiceActions('sale'),
     ], { onClick: (r) => invoiceModal(r), sort: { key: 'id', dir: -1 }, name: 'المبيعات' }))}
     ${section('المبيعات حسب المادة', table(s.byItem, [
       { key: 'item', label: 'المادة' },
@@ -938,6 +969,7 @@ function viewPurchases() {
       { key: 'user', label: 'المستخدم' },
       { key: 'n', label: 'عدد المواد', num: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
+      ...invoiceActions('purchase'),
     ], { onClick: (r) => invoiceModal(r, 'purchase'), sort: { key: 'id', dir: -1 }, name: 'المشتريات' }))}
     ${section('المشتريات حسب المورد', table([...bySupplier].map(([s, t]) => ({ s, t })), [
       { key: 's', label: 'المورد' },
@@ -1014,7 +1046,7 @@ const onAfter = (fn) => afterRender.push(fn);
 
 let POS = null;
 const pos = () =>
-  (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store }));
+  (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal }));
 let SET = null;
 const settings = () =>
   (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal }));
