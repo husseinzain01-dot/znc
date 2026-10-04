@@ -29,4 +29,12 @@ cp release/hisabati-reader.html "$OUT/lawha.html"
 VERSION=$(grep -oP "^\\\$Version = '\\K[^']+" server/server.ps1)
 makensis -V2 -DOUTDIR="$OUT" -DVERSION="$VERSION" "$OUT/launcher.nsi"
 makensis -V2 -DOUTDIR="$OUT" -DVERSION="$VERSION" "$OUT/setup.nsi"
-ls -la "$OUT"/*.exe
+
+# Same program without installing: unzip anywhere, put Units2026.accdb next
+# to it and run LawhatAlMahal.exe.
+PORT="$OUT/portable/LawhatAlMahal"
+mkdir -p "$PORT"
+cp "$OUT/LawhatAlMahal.exe" "$OUT/launch.ps1" "$OUT/server.ps1" "$OUT/lawha.html" "$OUT/app.ico" "$OUT/README-AR.txt" "$PORT/"
+(cd "$OUT/portable" && zip -qr -9 "$OUT/LawhatAlMahal-Portable-$VERSION.zip" LawhatAlMahal)
+rm -rf "$OUT/portable"
+ls -la "$OUT"/*.exe "$OUT"/*.zip

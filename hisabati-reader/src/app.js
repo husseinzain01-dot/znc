@@ -9,6 +9,7 @@ import { setupForms } from './forms.js';
 import { setupPos } from './pos.js';
 import { setupSettings } from './settings.js';
 import { icon, LOGO } from './icons.js';
+import { databasePicker } from './picker.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -295,18 +296,8 @@ function setupScreen(error = '') {
   screen(`<h1>أهلاً بيك بلوحة المحل</h1>
     <p class="muted">أول خطوة: اختار ملف بيانات حساباتي (<code>Units2026.accdb</code>). البرنامج يحفظ مكانه وما يسألك عنه مرة ثانية.</p>
     ${error ? `<p class="notice error">${esc(error)}</p>` : ''}
-    <button class="btn primary big block" id="btnChoose">${icon('file')} اختار ملف البيانات</button>
-    <p class="muted" style="font-size:13px">إذا الملف على حاسبة ثانية بالشبكة، افتحه من "Network" بنافذة الاختيار.</p>`);
-  $('#btnChoose').onclick = async (e) => {
-    e.target.disabled = true;
-    e.target.textContent = 'اختار الملف من النافذة اللي انفتحت…';
-    try {
-      await api('/api/choose-file', { method: 'POST', body: {} });
-      loginScreen();
-    } catch (err) {
-      setupScreen(err.message);
-    }
-  };
+    <div id="setupPicker"></div>`, true);
+  databasePicker({ esc, api, icon }, $('#setupPicker'), () => loginScreen());
 }
 
 async function loginScreen(error = '', chosen = '') {
@@ -1026,7 +1017,7 @@ const pos = () =>
   (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store }));
 let SET = null;
 const settings = () =>
-  (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen }));
+  (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal }));
 
 // ---------- navigation ----------
 

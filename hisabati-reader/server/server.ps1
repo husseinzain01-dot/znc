@@ -20,13 +20,18 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
 
 # Startup failures in a hidden window would go unseen; show them.
 trap {
+    try {
+        $logDir = if ($env:APPDATA) { Join-Path $env:APPDATA 'LawhatAlMahal\logs' } else { Join-Path $PSScriptRoot '.data' }
+        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+        Add-Content -LiteralPath (Join-Path $logDir 'startup-errors.log') -Encoding UTF8 -Value ((Get-Date -Format 's') + '  ' + $_.Exception.Message + '  ' + $_.InvocationInfo.PositionMessage)
+    } catch { }
     try {
         Add-Type -AssemblyName System.Windows.Forms
         [void][System.Windows.Forms.MessageBox]::Show("ما اشتغل لوحة المحل:`n`n$($_.Exception.Message)", 'لوحة المحل')
@@ -73,6 +78,22 @@ function Save-Config {
 }
 
 $script:Config = Read-Config
+
+function Test-DbFile([string]$p) {
+    return ($p -and (Test-Path -LiteralPath $p -PathType Leaf) -and ([IO.Path]::GetExtension($p) -in '.accdb', '.mdb'))
+}
+
+# Run from its own folder: a data file sitting next to the program is used
+# without asking (Units2026.accdb first, else the only .accdb there).
+if (-not ($script:Config.dbPath -and (Test-Path -LiteralPath $script:Config.dbPath))) {
+    $local = @(Get-ChildItem -LiteralPath $Here -Filter '*.accdb' -File -ErrorAction SilentlyContinue)
+    $pick = $local | Where-Object { $_.Name -ieq 'Units2026.accdb' } | Select-Object -First 1
+    if (-not $pick -and $local.Count -eq 1) { $pick = $local[0] }
+    if ($pick) {
+        $script:Config.dbPath = $pick.FullName
+        $script:Config | ConvertTo-Json -Depth 4 | Set-Content $ConfigFile -Encoding UTF8
+    }
+}
 
 function Get-DbPath {
     $p = $script:Config.dbPath
@@ -781,9 +802,15 @@ function Read-Body($req) {
     return $body | ConvertFrom-Json
 }
 
+# Windows' own file dialog. A hidden background process cannot bring it to the
+# front, so the app offers its own browser first and this only as a fallback.
 function Choose-File {
     Add-Type -AssemblyName System.Windows.Forms
-    $owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+    $owner = New-Object System.Windows.Forms.Form -Property @{
+        TopMost = $true; ShowInTaskbar = $false; Opacity = 0; StartPosition = 'CenterScreen'; Size = (New-Object System.Drawing.Size 1, 1)
+    }
+    $owner.Show()
+    $owner.Activate()
     $dlg = New-Object System.Windows.Forms.OpenFileDialog -Property @{
         Title  = 'اختار ملف حساباتي (Units2026.accdb)'
         Filter = 'Access (*.accdb;*.mdb)|*.accdb;*.mdb'
@@ -793,7 +820,85 @@ function Choose-File {
     try {
         if ($dlg.ShowDialog($owner) -ne 'OK') { return '' }
         return $dlg.FileName
-    } finally { $owner.Dispose() }
+    } finally { $owner.Close(); $owner.Dispose() }
+}
+
+# Places to start browsing from: drives and the usual user folders.
+function Get-Places {
+    $out = New-Object System.Collections.Generic.List[object]
+    $userHome = $env:USERPROFILE
+    foreach ($f in @(
+            @{ name = 'سطح المكتب'; path = [Environment]::GetFolderPath('Desktop') },
+            @{ name = 'المستندات'; path = [Environment]::GetFolderPath('MyDocuments') },
+            @{ name = 'التنزيلات'; path = $(if ($userHome) { Join-Path $userHome 'Downloads' } else { '' }) })) {
+        if ($f.path -and (Test-Path -LiteralPath $f.path)) { $out.Add(@{ name = $f.name; path = $f.path; kind = 'folder' }) }
+    }
+    foreach ($d in [IO.DriveInfo]::GetDrives()) {
+        try {
+            if (-not $d.IsReady -or [string]$d.DriveType -notin 'Fixed', 'Removable', 'Network') { continue }
+            $label = if ($d.VolumeLabel) { "$($d.Name) ($($d.VolumeLabel))" } else { $d.Name }
+            $out.Add(@{ name = $label; path = $d.RootDirectory.FullName; kind = [string]$d.DriveType })
+        } catch { }
+    }
+    return , $out.ToArray()
+}
+
+# One folder: its sub-folders and Access files.
+function Get-FolderListing([string]$dir) {
+    Need (Test-Path -LiteralPath $dir -PathType Container) "الفولدر مو موجود: $dir"
+    $folders = New-Object System.Collections.Generic.List[string]
+    $files = New-Object System.Collections.Generic.List[object]
+    foreach ($i in (Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue)) {
+        $hidden = ($i.Attributes -band [IO.FileAttributes]::Hidden) -or ($i.Attributes -band [IO.FileAttributes]::System)
+        if ($hidden) { continue }
+        if ($i.PSIsContainer) { $folders.Add($i.Name) }
+        elseif ($i.Extension -in '.accdb', '.mdb') {
+            $files.Add(@{ name = $i.Name; path = $i.FullName; size = $i.Length; modified = $i.LastWriteTime.ToString('yyyy-MM-dd HH:mm') })
+        }
+    }
+    $parent = Split-Path $dir -Parent
+    return @{
+        dir = (Resolve-Path -LiteralPath $dir).Path; parent = $(if ($parent) { $parent } else { '' })
+        folders = @($folders | Sort-Object); files = @($files | Sort-Object { $_.name })
+    }
+}
+
+# Likely حساباتي files: next to the program, in the user's folders and near
+# the top of each local drive. Bounded in depth and time.
+function Find-Candidates {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $roots = New-Object System.Collections.Generic.List[object]
+    $roots.Add(@{ p = $Here; d = 0 })
+    $roots.Add(@{ p = (Split-Path $Here -Parent); d = 1 })
+    foreach ($sf in 'Desktop', 'MyDocuments') { $roots.Add(@{ p = [Environment]::GetFolderPath($sf); d = 3 }) }
+    if ($env:USERPROFILE) { $roots.Add(@{ p = (Join-Path $env:USERPROFILE 'Downloads'); d = 3 }) }
+    foreach ($d in [IO.DriveInfo]::GetDrives()) {
+        try { if ($d.IsReady -and [string]$d.DriveType -eq 'Fixed') { $roots.Add(@{ p = $d.RootDirectory.FullName; d = 2 }) } } catch { }
+    }
+    $seen = @{}
+    $found = New-Object System.Collections.Generic.List[object]
+    foreach ($r in $roots) {
+        if ($clock.Elapsed.TotalSeconds -gt 8) { break }
+        if (-not $r.p -or -not (Test-Path -LiteralPath $r.p)) { continue }
+        $items = Get-ChildItem -LiteralPath $r.p -Filter '*.accdb' -File -Recurse -Depth $r.d -ErrorAction SilentlyContinue
+        foreach ($f in $items) {
+            if ($f.FullName -match '\\(backups-lawha|Windows|Program Files[^\\]*|ProgramData|AppData|\$Recycle\.Bin)\\') { continue }
+            if ($seen.ContainsKey($f.FullName)) { continue }
+            $seen[$f.FullName] = $true
+            $found.Add(@{ name = $f.Name; path = $f.FullName; size = $f.Length; modified = $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm'); t = $f.LastWriteTime })
+        }
+    }
+    $sorted = $found | Sort-Object @{ Expression = { $_.name -notlike 'Units*' } }, @{ Expression = { $_.t }; Descending = $true } | Select-Object -First 25
+    return , @($sorted | ForEach-Object { @{ name = $_.name; path = $_.path; size = $_.size; modified = $_.modified } })
+}
+
+function Set-Database([string]$file) {
+    Need (Test-DbFile $file) "هذا مو ملف Access (accdb): $file"
+    $script:Config.dbPath = (Resolve-Path -LiteralPath $file).Path
+    Save-Config
+    Close-Engine
+    $script:BackupDay = ''
+    Write-LawhaLog "database set to $($script:Config.dbPath)"
 }
 
 $script:Stop = $false
@@ -839,19 +944,23 @@ function Handle($ctx) {
                 Write-LawhaLog "login $user"
                 return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user) }
             }
-            '/api/choose-file' {
+            # Choosing the data file: open to anyone before it is set, then managers only.
+            { $_ -in '/api/choose-file', '/api/candidates', '/api/browse' } {
                 $s = Get-Session $req
                 Need ((Get-DbPath) -eq '' -or ($s -and $s.admin)) 'تغيير ملف البيانات يحتاج صلاحية مدير'
                 $b = Read-Body $req
-                $file = if ($env:LAWHA_FAKEDAO -and $b.path) { [string]$b.path } else { Choose-File }
+                if ($path -eq '/api/candidates') {
+                    $files = Find-Candidates
+                    return Send-Json $ctx 200 @{ ok = $true; files = $files; current = (Get-DbPath) }
+                }
+                if ($path -eq '/api/browse') {
+                    if (-not $b.dir) { $places = Get-Places; return Send-Json $ctx 200 @{ ok = $true; places = $places } }
+                    return Send-Json $ctx 200 (@{ ok = $true } + (Get-FolderListing ([string]$b.dir)))
+                }
+                $file = if ($b.path) { [string]$b.path } elseif ($env:LAWHA_FAKEDAO) { '' } else { Choose-File }
                 if (-not $file) { return Send-Json $ctx 200 @{ ok = $false; error = 'ما اخترت ملف' } }
-                Need (Test-Path -LiteralPath $file) 'الملف مو موجود'
-                $script:Config.dbPath = $file
-                Save-Config
-                Close-Engine
-                $script:BackupDay = ''
-                Write-LawhaLog "database set to $file"
-                return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($file) }
+                Set-Database $file
+                return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($file); path = $script:Config.dbPath }
             }
             '/api/shutdown' {
                 $script:Stop = $true

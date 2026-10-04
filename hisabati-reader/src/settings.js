@@ -3,8 +3,10 @@
 // %APPDATA%\LawhatAlMahal\config.json, so every user of this computer shares
 // them and they survive updates.
 
+import { databasePicker } from './picker.js';
+
 export function setupSettings(ctx) {
-  const { $, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen } = ctx;
+  const { $, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal } = ctx;
 
   function view() {
     onAfter(load);
@@ -115,20 +117,13 @@ export function setupSettings(ctx) {
     }
   }
 
-  async function choose(e) {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.textContent = 'اختار الملف من النافذة اللي انفتحت…';
-    try {
-      const j = await api('/api/choose-file', { method: 'POST', body: {} });
+  function choose() {
+    openModal('<h2>تغيير ملف البيانات</h2><div id="pickHost"></div>');
+    databasePicker({ esc, api, icon }, $('#pickHost'), async (j) => {
+      closeModal();
       toast('صار الملف: ' + j.file);
       await guarded(() => readServer());
-    } catch (err) {
-      toast(err.message, true);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = `${icon('file')} تغيير الملف`;
-    }
+    });
   }
 
   return { view, setupScreen };

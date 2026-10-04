@@ -317,6 +317,22 @@ table.lines th { cursor: default; }
 .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
 .user-list label { display: flex; gap: 8px; align-items: center; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
 
+/* ---------------- data file picker ---------------- */
+.picker h3 { margin: 18px 0 8px; font-size: 15px; }
+.pk-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 320px; overflow-y: auto; }
+.pk-file, .pk-dir {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer;
+}
+.pk-file:hover, .pk-dir:hover { border-color: var(--accent); background: var(--accent-soft); }
+.pk-file span { flex: 1; min-width: 0; }
+.pk-file b { display: block; }
+.pk-file small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-file .pk-meta { flex: none; text-align: end; white-space: normal; }
+.pk-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pk-crumb { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; flex-wrap: wrap; }
+#pkBrowse { margin-top: 10px; }
+
 /* ---------------- responsive ---------------- */
 @media (max-width: 1100px) {
   .pos { grid-template-columns: 1fr; }
