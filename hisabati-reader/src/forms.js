@@ -177,6 +177,11 @@ export function setupForms(ctx) {
       }
     };
     $('#fItem').onchange = () => findItem($('#fItem').value) && addItem();
+    // a barcode scan anywhere in this window (see scanner.js)
+    $('#fItem').scanAdd = (code) => {
+      $('#fItem').value = code;
+      addItem();
+    };
     $('#fLines').oninput = (e) => {
       const i = e.target.dataset.i;
       if (i == null) return;
@@ -330,7 +335,7 @@ export function setupForms(ctx) {
       ${datalist('dlUnits', unitsList.map((u) => ({ value: u })))}
       <div class="form-grid">
         ${field('الاسم', `<input id="iName" maxlength="150" value="${esc(it?.name || '')}">`, true)}
-        ${field('الرمز / الباركود', `<input id="iCode" value="${esc(it?.code || nextCode)}">`)}
+        ${field('الرمز / الباركود', `<input id="iCode" maxlength="15" dir="ltr" value="${esc(it?.code || nextCode)}" title="دوس هنا وامسح باركود المادة">`)}
         ${field('الصنف', `<input id="iCls" list="dlCls" value="${esc(it?.cls || '')}">`)}
         ${field('الوحدة الكبيرة', `<input id="iU1" list="dlUnits" maxlength="10" value="${esc(it?.unitL1 || 'كارتون')}">`)}
         ${field('الوحدة الصغيرة', `<input id="iU2" list="dlUnits" maxlength="10" value="${esc(it?.unitL2 || 'قطعة')}">`)}
@@ -358,6 +363,8 @@ export function setupForms(ctx) {
     $('#iP1').onchange = autoSmall('iP1', 'iP2');
     $('#iB1').onchange = autoSmall('iB1', 'iB2');
     $('#iCancel').onclick = closeModal;
+    // a scan into the code box replaces the old code instead of adding to it
+    $('#iCode').onfocus = (e) => e.target.select();
     $('#iSave').onclick = (e) => {
       const data = {
         id: it?.id, name: val('iName'), code: val('iCode'), cls: val('iCls'), unitL1: val('iU1'), unitL2: val('iU2'),

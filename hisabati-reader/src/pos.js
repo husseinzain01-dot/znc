@@ -191,6 +191,17 @@ export function setupPos(ctx) {
     }
   }
 
+  // A barcode scan: only an exact code (or name), never a near match.
+  function scan(code) {
+    const q = code.trim();
+    const it = P().items.find((x) => x.code === q) || P().items.find((x) => x.name === q);
+    search = '';
+    if ($('#posSearch')) $('#posSearch').value = '';
+    if ($('#posGrid')) $('#posGrid').innerHTML = gridHtml();
+    if (!it) return toast(`ما لكيت مادة بالباركود ${q}. حطّه برمز المادة من المخزن والأسعار.`, true);
+    add(it);
+  }
+
   async function save(print) {
     if (saving) return;
     if (print && !can('print')) print = false;
@@ -271,7 +282,10 @@ export function setupPos(ctx) {
     };
     $('#posGrid').onclick = (e) => {
       const b = e.target.closest('[data-item]');
-      if (b) add(itemBy(b.dataset.item));
+      if (!b) return;
+      add(itemBy(b.dataset.item));
+      // back to the search box, so the next scan or Enter doesn't click this button again
+      $('#posSearch').focus();
     };
     $('#posType').onclick = (e) => e.target.dataset.t && setType(e.target.dataset.t);
     $('#posCustomer').oninput = (e) => {
@@ -365,5 +379,5 @@ export function setupPos(ctx) {
     cart = load();
   }
 
-  return { view, onData, reset };
+  return { view, onData, reset, scan };
 }

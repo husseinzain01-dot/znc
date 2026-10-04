@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.4'
+$Version = '1.1.5'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -1415,6 +1415,11 @@ function Handle($ctx) {
             '/api/file' {
                 $p = Get-DbPath
                 Need ($p -ne '') 'ما محدد ملف البيانات'
+                if ($env:LAWHA_FAKEDAO) {
+                    # test engine: the data lives in memory, send its tables
+                    $null = Use-Database -ReadOnly { param($db) 0 }
+                    return Send-Json $ctx 200 @{ ok = $true; fake = $true; tables = (Get-FakeFileTables $script:Engine $p) }
+                }
                 $fs = [IO.File]::Open($p, 'Open', 'Read', 'ReadWrite')
                 try {
                     $res = $ctx.Response

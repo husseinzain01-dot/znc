@@ -10,6 +10,8 @@ import { setupPos } from './pos.js';
 import { setupSettings } from './settings.js';
 import { icon, LOGO } from './icons.js';
 import { databasePicker } from './picker.js';
+import { installScanner } from './scanner.js';
+import { readerFromTables } from './fulltest.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -101,9 +103,11 @@ const idb = {
 // A data file's bytes → the app's data (the full test reads its copy too).
 const parseData = (buf) => C.prepare(loadDatabase(new MDBReader(Buffer.from(buf))));
 
-async function readBuffer(buf, name, { quiet = false } = {}) {
-  const reader = new MDBReader(Buffer.from(buf));
-  const P = C.prepare(loadDatabase(reader));
+async function readBuffer(buf, name, opts = {}) {
+  return showData(parseData(buf), name, opts);
+}
+
+async function showData(P, name, { quiet = false } = {}) {
   state.P = P;
   state.stockByName = new Map(C.stock(P).map((x) => [x.name, x]));
   state.fileName = name;
@@ -253,7 +257,10 @@ async function readServer({ quiet = false } = {}) {
     try {
       const r = await api('/api/file');
       const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
-      const out = await readBuffer(await r.arrayBuffer(), name, { quiet });
+      // the helper's test engine sends its in-memory tables instead of a file
+      const out = (r.headers.get('Content-Type') || '').includes('json')
+        ? await showData(C.prepare(loadDatabase(readerFromTables((await r.json()).tables))), name, { quiet })
+        : await readBuffer(await r.arrayBuffer(), name, { quiet });
       refreshMe();
       return out;
     } catch (e) {
@@ -1291,5 +1298,15 @@ function init() {
     loginScreen();
   });
 }
+
+// Barcode scans: into the open invoice window, else the quick sale screen.
+installScanner(() => {
+  if (!$('#modal').hidden) {
+    const f = $('#fItem');
+    return f?.scanAdd ? { input: f, onScan: f.scanAdd } : null;
+  }
+  if (state.view === 'pos' && $('#posSearch') && POS) return { input: $('#posSearch'), onScan: (code) => POS.scan(code) };
+  return null;
+});
 
 init();
