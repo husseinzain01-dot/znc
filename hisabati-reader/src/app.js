@@ -310,7 +310,7 @@ function setupScreen(error = '') {
     <p class="muted">أول خطوة: اختار ملف بيانات حساباتي (<code>Units2026.accdb</code>). البرنامج يحفظ مكانه وما يسألك عنه مرة ثانية.</p>
     ${error ? `<p class="notice error">${esc(error)}</p>` : ''}
     <div id="setupPicker"></div>`, true);
-  databasePicker({ esc, api, icon }, $('#setupPicker'), () => loginScreen());
+  databasePicker({ esc, api, icon }, $('#setupPicker'), () => loginScreen(), { auto: true });
 }
 
 async function loginScreen(error = '', chosen = '') {
@@ -408,7 +408,7 @@ function chooseFileScreen(me) {
       /* signed out locally either way */
     }
     signedOut();
-  });
+  }, { auto: true });
 }
 
 async function signedIn(me) {

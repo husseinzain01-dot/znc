@@ -51,7 +51,7 @@ try {
         $env:LAWHA_HIDDEN = '1'
         $ps = Join-Path $PSHOME 'powershell.exe'
         $proc = Start-Process -FilePath $ps -WindowStyle Hidden -PassThru -ArgumentList @(
-            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $server + '"'), '-NoBrowser'
+            '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $server + '"'), '-NoBrowser'
         )
         Log "helper started, pid $($proc.Id)"
         $deadline = (Get-Date).AddSeconds(30)

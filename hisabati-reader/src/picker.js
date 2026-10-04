@@ -1,9 +1,9 @@
-// Choosing the حساباتي data file inside the app: files found automatically,
-// a folder browser, or a pasted path. (Windows' own file dialog, opened by
-// the hidden helper, can end up behind other windows, so it is only offered
-// as a last resort.)
+// Choosing the حساباتي data file: Windows' own Open window first (opened
+// right away when auto is set; it has Network in its side panel), and in
+// the app below it the files found automatically, a folder and network
+// browser, or a pasted path.
 
-export function databasePicker(ctx, host, onDone) {
+export function databasePicker(ctx, host, onDone, { auto = false } = {}) {
   const { esc, api, icon } = ctx;
   const q = (s) => host.querySelector(s);
   const size = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
@@ -11,12 +11,13 @@ export function databasePicker(ctx, host, onDone) {
 
   host.innerHTML = `
     <div class="picker">
-      <h3>الملفات اللي لكيتها</h3>
+      <button class="btn primary big block" id="pkNative">${icon('file')} اختار الملف من نافذة ويندوز</button>
+      <p class="muted pk-hint" id="pkNativeHint">تنفتح نافذة ويندوز العادية. إذا الملف على حاسبة ثانية، دوس <b>Network</b> (الشبكة) بالجانب مالها.</p>
+      <h3>أو من الملفات اللي لكيتها</h3>
       <div id="pkFound" class="pk-list"><p class="muted">جاري البحث عن ملفات حساباتي على الجهاز…</p></div>
       <div class="pk-tabs">
         <button class="btn" id="pkBrowseBtn">${icon('file')} تصفح المجلدات</button>
         <button class="btn" id="pkPathBtn">${icon('edit')} أكتب مكان الملف</button>
-        <button class="btn ghost small" id="pkNative">نافذة ويندوز</button>
       </div>
       <div id="pkPath" hidden class="row" style="display:flex;gap:8px;margin-top:10px">
         <input id="pkPathInput" dir="ltr" placeholder="D:\\Units2026\\Units2026.accdb  أو  \\\\PC\\share\\Units2026.accdb" style="flex:1">
@@ -130,19 +131,27 @@ export function databasePicker(ctx, host, onDone) {
     if (p) choose(p, e.currentTarget);
   };
   q('#pkPathInput').onkeydown = (e) => e.key === 'Enter' && q('#pkPathUse').click();
-  q('#pkNative').onclick = async (e) => {
+  async function nativeWindow() {
     showErr('');
-    const btn = e.currentTarget;
+    const btn = q('#pkNative');
+    const label = btn.innerHTML;
     btn.disabled = true;
-    btn.textContent = 'انفتحت نافذة ويندوز — إذا ما بانت، شوف شريط المهام';
+    btn.textContent = 'نافذة ويندوز مفتوحة… اختار الملف منها';
+    q('#pkNativeHint').innerHTML = 'إذا ما شفت النافذة، دوس على <b>"اختيار ملف البيانات — لوحة المحل"</b> بشريط المهام (جوّه الشاشة).';
     try {
       const j = await api('/api/choose-file', { method: 'POST', body: {} });
       onDone(j);
     } catch (err) {
-      showErr(err.message);
+      // closing the window without a file is not an error
+      if (!/ما اخترت ملف/.test(err.message)) showErr(err.message);
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'نافذة ويندوز';
+      if (btn.isConnected) {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        q('#pkNativeHint').innerHTML = 'تنفتح نافذة ويندوز العادية. إذا الملف على حاسبة ثانية، دوس <b>Network</b> (الشبكة) بالجانب مالها.';
+      }
     }
-  };
+  }
+  q('#pkNative').onclick = nativeWindow;
+  if (auto) nativeWindow();
 }

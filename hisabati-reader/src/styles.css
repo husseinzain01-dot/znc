@@ -337,6 +337,7 @@ table.lines th { cursor: default; }
 
 /* ---------------- data file picker ---------------- */
 .picker h3 { margin: 18px 0 8px; font-size: 15px; }
+.picker .pk-hint { font-size: 13px; margin: 6px 2px 0; }
 .pk-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 320px; overflow-y: auto; }
 .pk-file, .pk-dir {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: start; padding: 10px 12px;

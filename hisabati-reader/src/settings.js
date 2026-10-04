@@ -405,7 +405,7 @@ export function setupSettings(ctx) {
       closeModal();
       toast('صار الملف: ' + j.file);
       await guarded(() => readServer());
-    });
+    }, { auto: true });
   }
 
   return { view, setupScreen };

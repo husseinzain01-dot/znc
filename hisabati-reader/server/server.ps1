@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.7'
+$Version = '1.1.8'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -1243,12 +1243,49 @@ function Read-Body($req) {
 
 # Windows' own file dialog. A hidden background process cannot bring it to the
 # front, so the app offers its own browser first and this only as a fallback.
+# Windows keeps a hidden background program from putting a window in front
+# of the one being used; attaching to the front window's input (or, failing
+# that, an Alt tap) lifts that, so the file dialog really comes up on top.
+$ForegroundCode = @'
+using System;
+using System.Runtime.InteropServices;
+public static class LawhaForeground {
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, IntPtr pid);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    public static void Bring(IntPtr h) {
+        uint fg = GetWindowThreadProcessId(GetForegroundWindow(), IntPtr.Zero);
+        uint me = GetCurrentThreadId();
+        if (fg != 0 && fg != me) AttachThreadInput(fg, me, true);
+        BringWindowToTop(h);
+        SetForegroundWindow(h);
+        if (fg != 0 && fg != me) AttachThreadInput(fg, me, false);
+        if (GetForegroundWindow() != h) {
+            keybd_event(0x12, 0, 0, UIntPtr.Zero);
+            keybd_event(0x12, 0, 2, UIntPtr.Zero);
+            SetForegroundWindow(h);
+        }
+    }
+}
+'@
+
 function Choose-File {
     Add-Type -AssemblyName System.Windows.Forms
+    # an invisible owner that sits on top of everything and has a taskbar
+    # button, so the dialog can't end up hidden behind the program
     $owner = New-Object System.Windows.Forms.Form -Property @{
-        TopMost = $true; ShowInTaskbar = $false; Opacity = 0; StartPosition = 'CenterScreen'; Size = (New-Object System.Drawing.Size 1, 1)
+        TopMost = $true; ShowInTaskbar = $true; Opacity = 0; StartPosition = 'CenterScreen'; Size = (New-Object System.Drawing.Size 1, 1)
+        Text = 'اختيار ملف البيانات — لوحة المحل'; FormBorderStyle = 'None'
     }
     $owner.Show()
+    try {
+        if (-not ('LawhaForeground' -as [type])) { Add-Type -TypeDefinition $ForegroundCode }
+        [LawhaForeground]::Bring($owner.Handle)
+    } catch { }
     $owner.Activate()
     $dlg = New-Object System.Windows.Forms.OpenFileDialog -Property @{
         Title  = 'اختار ملف حساباتي (Units2026.accdb)'
