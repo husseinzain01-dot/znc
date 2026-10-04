@@ -321,6 +321,7 @@ async function loginScreen(error = '', chosen = '') {
     return setupScreen(e.message);
   }
   const last = chosen || store.get('lawha-last-user');
+  const info = (await detectServer()) || {};
   screen(`<h1>${esc(state.shopName || 'لوحة المحل')}</h1>
     <p class="muted">سجّل دخول بنفس اسمك وكلمة السر مال حساباتي</p>
     <form id="loginForm" autocomplete="off">
@@ -331,10 +332,25 @@ async function loginScreen(error = '', chosen = '') {
       </label>
       <label class="field">كلمة السر <input id="lPass" type="password" autocomplete="current-password"></label>
       ${error ? `<p class="notice error" style="margin:0">${esc(error)}</p>` : ''}
-      <button class="btn primary big block" type="submit">دخول</button>
+      <button class="btn primary big block" type="submit" id="lGo">دخول</button>
     </form>
+    ${info.path ? `<div class="login-file">
+      <small class="muted">ملف البيانات</small>
+      <code dir="ltr">${esc(info.path)}</code>
+      ${info.local ? `<p class="notice warn">هذا الملف موجود جوّه فولدر البرنامج على هذا الجهاز، يعني الأغلب <b>نسخة</b> انتقلت ويه البرنامج. إذا الملف الأصلي على حاسبة ثانية، غيّره واختاره من <b>الشبكة</b>، وإلا هذا الجهاز يشتغل على نسخة لحاله وبيعه ما يطلع بالحاسبة الثانية.</p>` : ''}
+      <button type="button" class="btn small" id="lChange">${icon('file')} تغيير ملف البيانات</button>
+    </div>` : ''}
     <p class="muted" style="font-size:12px;margin-top:18px">لوحة المحل ${esc(state.version)}${state.test ? ' — وضع تجربة' : ''}</p>`);
   $('#lPass').focus();
+  // changing the file needs a manager: sign in first, then the picker opens
+  if ($('#lChange')) {
+    $('#lChange').onclick = () => {
+      state.chooseAfterLogin = true;
+      $('#lGo').textContent = 'دخول وتغيير ملف البيانات';
+      $('#lChange').outerHTML = '<p class="muted" style="margin:6px 0 0">سجّل دخول بحساب <b>المدير</b>، وبعدها تنفتح نافذة اختيار الملف.</p>';
+      $('#lPass').focus();
+    };
+  }
   $('#loginForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button');
@@ -376,9 +392,33 @@ async function refreshMe() {
   }
 }
 
+// Choosing another data file, right after a manager signed in from the
+// login screen. The users may differ in the new file, so sign in again.
+function chooseFileScreen(me) {
+  screen(`<h1>تغيير ملف البيانات</h1>
+    <p class="muted">اختار ملف حساباتي (<code>Units2026.accdb</code>). إذا على حاسبة ثانية: تصفح المجلدات ← الشبكة.</p>
+    <div id="setupPicker"></div>
+    <button class="btn block" id="pkBack" style="margin-top:12px">رجوع بدون تغيير</button>`, true);
+  $('#pkBack').onclick = () => signedIn(me);
+  databasePicker({ esc, api, icon }, $('#setupPicker'), async (j) => {
+    toast('صار الملف: ' + j.file);
+    try {
+      await api('/api/logout', { method: 'POST', body: {} });
+    } catch {
+      /* signed out locally either way */
+    }
+    signedOut();
+  });
+}
+
 async function signedIn(me) {
   state.user = me.user;
   setMe(me);
+  if (state.chooseAfterLogin) {
+    state.chooseAfterLogin = false;
+    if (me.admin) return chooseFileScreen(me);
+    toast('تغيير ملف البيانات يحتاج حساب مدير', true);
+  }
   $('#who').hidden = false;
   $('#whoName').textContent = me.user;
   $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);

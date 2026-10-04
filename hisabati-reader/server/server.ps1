@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.6'
+$Version = '1.1.7'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -137,6 +137,12 @@ if (-not ($script:Config.dbPath -and (Test-Path -LiteralPath $script:Config.dbPa
         $script:Config.dbPath = $pick.FullName
         $script:Config | ConvertTo-Json -Depth 4 | Set-Content $ConfigFile -Encoding UTF8
     }
+}
+
+# The data file sits inside the program's own folder: on a computer the
+# program was copied to, that is a copy, not the shared file.
+function Test-DbLocal([string]$p) {
+    return [bool]($p -and ((Split-Path $p -Parent).TrimEnd('\', '/') -eq ([string]$Here).TrimEnd('\', '/')))
 }
 
 function Get-DbPath {
@@ -1486,7 +1492,7 @@ function Handle($ctx) {
         $p = Get-DbPath
         return Send-Json $ctx 200 @{
             ok = $true; version = $Version; configured = ($p -ne '')
-            file = $(if ($p) { [IO.Path]::GetFileName($p) } else { '' })
+            file = $(if ($p) { [IO.Path]::GetFileName($p) } else { '' }); path = $p; local = (Test-DbLocal $p)
             shopName = $script:Config.shopName; test = [bool]$env:LAWHA_FAKEDAO
         }
     }
@@ -1610,7 +1616,7 @@ function Handle($ctx) {
                 return Send-Json $ctx 200 @{
                     ok = $true; shopName = $script:Config.shopName; admins = @($script:Config.admins)
                     perms = $script:Config.perms; allPerms = ($AllPerms -join ','); defaultPerms = ($DefaultPerms -join ',')
-                    dbPath = (Get-DbPath); dataDir = $DataDir; version = $Version; engine = $script:EngineName
+                    dbPath = (Get-DbPath); dbLocal = (Test-DbLocal (Get-DbPath)); dataDir = $DataDir; version = $Version; engine = $script:EngineName
                 }
             }
             '/api/selftest' {

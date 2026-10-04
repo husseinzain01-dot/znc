@@ -384,3 +384,9 @@ table.lines th { cursor: default; }
   .modal-box { max-height: none; width: 100%; padding: 0; box-shadow: none; }
   body.printing-modal .app { display: none; }
 }
+
+/* ---------------- login: which data file ---------------- */
+.login-file { margin-top: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; display: grid; gap: 6px; text-align: start; }
+.login-file code { word-break: break-all; font-size: 12px; }
+.login-file .notice { margin: 0; font-size: 13px; }
+.login-file .btn { justify-self: start; }

@@ -103,7 +103,8 @@ export function setupSettings(ctx) {
       <div class="card">
         <h3>ملف البيانات</h3>
         <p class="muted">الملف اللي يقرا ويكتب عليه البرنامج. محفوظ، وما ينطلب منك مرة ثانية.</p>
-        <p><code id="setPath">…</code></p>
+        <p><code id="setPath" dir="ltr">…</code></p>
+        <p class="notice warn" id="setLocal" hidden>هذا الملف موجود جوّه فولدر البرنامج على هذا الجهاز، يعني الأغلب <b>نسخة</b> انتقلت ويه البرنامج. إذا الملف الأصلي على حاسبة ثانية، غيّره واختاره من <b>الشبكة</b>، وإلا هذا الجهاز يشتغل على نسخة لحاله وبيعه ما يطلع بالحاسبة الثانية.</p>
         <div class="row">
           <button class="btn" id="setChoose">${icon('file')} تغيير الملف</button>
           <button class="btn" id="setBackups">${icon('file')} فتح فولدر النسخ الاحتياطية</button>
@@ -144,6 +145,7 @@ export function setupSettings(ctx) {
       const [s, u] = await Promise.all([api('/api/settings'), api('/api/users')]);
       $('#setShop').value = s.shopName || '';
       $('#setPath').textContent = s.dbPath || '—';
+      $('#setLocal').hidden = !s.dbLocal;
       $('#setAbout').innerHTML = `الإصدار ${esc(s.version)} — محرك الحفظ: ${esc(s.engine || 'يشتغل عند أول حفظ')}<br>الإعدادات والسجل: <code>${esc(s.dataDir)}</code>`;
       drawUsers(u.users || [], s);
     } catch (e) {
