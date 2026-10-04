@@ -98,6 +98,9 @@ const idb = {
 
 // ---------- loading ----------
 
+// A data file's bytes → the app's data (the full test reads its copy too).
+const parseData = (buf) => C.prepare(loadDatabase(new MDBReader(Buffer.from(buf))));
+
 async function readBuffer(buf, name, { quiet = false } = {}) {
   const reader = new MDBReader(Buffer.from(buf));
   const P = C.prepare(loadDatabase(reader));
@@ -236,7 +239,7 @@ async function api(path, { method = 'GET', body } = {}) {
     signedOut();
     throw new Error('انتهت الجلسة، سجّل دخول مرة ثانية');
   }
-  if (path === '/api/file') {
+  if (path === '/api/file' || path === '/api/fulltest-file') {
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'ما كدرت أقرا الملف');
     return r;
   }
@@ -1089,7 +1092,7 @@ const pos = () =>
   (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal, can }));
 let SET = null;
 const settings = () =>
-  (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal }));
+  (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal, parseData, localDay }));
 
 // ---------- navigation ----------
 

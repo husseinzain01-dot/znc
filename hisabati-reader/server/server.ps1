@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.3'
+$Version = '1.1.4'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -139,6 +139,8 @@ if (-not ($script:Config.dbPath -and (Test-Path -LiteralPath $script:Config.dbPa
 }
 
 function Get-DbPath {
+    # the full test works on a copy while it runs
+    if ($script:DbOverride) { return $script:DbOverride }
     $p = $script:Config.dbPath
     if ($p -and (Test-Path -LiteralPath $p)) { return $p }
     return ''
@@ -224,6 +226,7 @@ function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) 
 
 $script:BackupDay = ''
 function Backup-Database {
+    if ($script:DbOverride) { return }
     $today = Get-Date -Format 'yyyy-MM-dd'
     if ($script:BackupDay -eq $today) { return }
     $path = Get-DbPath
@@ -826,6 +829,235 @@ function Get-Session($req) {
     return $null
 }
 
+# ---------------------------------------------------------------- full test
+# Before handing the program over: on a COPY of the data file, with the real
+# Access engine, save / edit / delete one of everything through the same
+# path the app uses (permission checks included) and commit each one. The
+# app then reads the copy back and checks the reports (balances, stock, cash,
+# profit) came out as expected. The real file is never touched.
+$script:FT = $null
+
+function Use-TestCopy([scriptblock]$body) {
+    Need ($script:FT -and (Test-Path -LiteralPath $script:FT.path)) 'ابدأ الفحص الشامل من جديد'
+    $script:DbOverride = $script:FT.path
+    try { return (& $body) } finally { $script:DbOverride = $null }
+}
+
+function Start-FullTest {
+    Stop-FullTest
+    $src = Get-DbPath
+    Need ($src -ne '') 'ما محدد ملف البيانات'
+    $dir = Join-Path ([IO.Path]::GetTempPath()) 'lawha-fulltest'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    # copies left by a test that was cut off (closed window, power cut)
+    Get-ChildItem -LiteralPath $dir -Filter 'test-*' -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -LiteralPath $_.FullName -Force } catch { } }
+    $target = Join-Path $dir ('test-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + [IO.Path]::GetExtension($src))
+    $in = [IO.File]::Open($src, 'Open', 'Read', 'ReadWrite')
+    try {
+        $out = [IO.File]::Create($target)
+        try { $in.CopyTo($out) } finally { $out.Close() }
+    } finally { $in.Close() }
+    $tag = 'فحص-شامل ' + (Get-Random -Minimum 1000 -Maximum 9999)
+    $script:FT = @{ path = $target; tag = $tag; ids = @{} }
+    return @{ file = [IO.Path]::GetFileName($target); size = (Get-Item -LiteralPath $target).Length }
+}
+
+function Stop-FullTest {
+    if ($script:FT -and $script:FT.path) {
+        foreach ($f in @($script:FT.path, [IO.Path]::ChangeExtension($script:FT.path, '.laccdb'))) {
+            try { if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force } } catch { }
+        }
+    }
+    $script:FT = $null
+}
+
+function New-StepList {
+    $steps = New-Object System.Collections.Generic.List[object]
+    $step = {
+        param([string]$name, [scriptblock]$body)
+        try {
+            $msg = & $body
+            $steps.Add(@{ name = $name; ok = $true; msg = [string]$msg })
+        } catch {
+            $steps.Add(@{ name = $name; ok = $false; msg = $_.Exception.Message })
+        }
+    }.GetNewClosure()
+    return @{ list = $steps; step = $step }
+}
+
+# Writes the way /api/write does: permission check, then the save.
+function Write-As($session, [string]$op, [hashtable]$data) {
+    $data.user = $script:FT.user
+    $x = [pscustomobject]$data
+    Test-Allowed $op $x $session
+    return Invoke-Write $op $x $session
+}
+
+function Read-One([string]$sql) { return Use-Database -ReadOnly { param($db) Get-Value $db $sql } }
+function Read-Count([string]$sql) { return [int](Use-Database -ReadOnly { param($db) Count $db $sql }) }
+
+function Invoke-FullTestRun {
+    $S = New-StepList
+    $step = $S.step
+    Use-TestCopy {
+        $t = $script:FT.tag
+        $ids = $script:FT.ids
+        $script:FT.user = 'فحص شامل'
+        $today = Get-Date -Format 'yyyy-MM-dd'
+        $mgr = @{ user = $script:FT.user; admin = $true; perms = [string[]]$AllPerms }
+        $cust = "$t زبون"; $cust2 = "$t زبون2"; $sup = "$t مورد"; $item = "$t مادة"
+        $script:FT.names = @{ customer = $cust2; supplier = $sup; item = $item }
+
+        & $step 'إضافة مورد' {
+            $ids.sup = (Write-As $mgr 'saveSupplier' @{ name = $sup; mobile = '07800000000'; opening = 0 }).id
+            Need ((Read-One "SELECT shiraCode FROM shiraCode WHERE ID=$($ids.sup)") -eq $sup) 'المورد ما انحفظ'
+            "رقم $($ids.sup)"
+        }
+        & $step 'إضافة زبون' {
+            $ids.cust = (Write-As $mgr 'saveCustomer' @{ name = $cust; mobile = '07700000000'; opening = 1000; type = 'جملة' }).id
+            Need ((Read-One "SELECT bayeeCode FROM bayeeCode WHERE id=$($ids.cust)") -eq $cust) 'الزبون ما انحفظ'
+            "رقم $($ids.cust)"
+        }
+        & $step 'تعديل الزبون (موبايل ورصيد افتتاحي)' {
+            Write-As $mgr 'saveCustomer' @{ id = $ids.cust; name = $cust; mobile = '07711111111'; opening = 2000; type = 'جملة' } | Out-Null
+            Need ([string](Read-One "SELECT CMobile FROM bayeeCode WHERE id=$($ids.cust)") -eq '07711111111') 'الموبايل ما تغيّر'
+            Need ([double](Read-One "SELECT MB FROM bayeeCode WHERE id=$($ids.cust)") -eq 2000) 'الرصيد الافتتاحي ما تغيّر'
+            'تمام'
+        }
+        & $step 'إضافة مادة (كارتون = 10 قطع)' {
+            $ids.item = (Write-As $mgr 'saveItem' @{ name = $item; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10
+                    priceL1 = 10000; priceL2 = 1100; buyL1 = 8000; buyL2 = 800 }).id
+            Need ([double](Read-One "SELECT priceSeeat FROM madaCode WHERE ID=$($ids.item)") -eq 1100) 'سعر القطعة ما انحفظ'
+            "رقم $($ids.item)"
+        }
+        & $step 'تعديل سعر المادة' {
+            Write-As $mgr 'saveItem' @{ id = $ids.item; name = $item; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10
+                priceL1 = 12000; priceL2 = 1100; buyL1 = 8000; buyL2 = 800 } | Out-Null
+            Need ([double](Read-One "SELECT price FROM madaCode WHERE ID=$($ids.item)") -eq 12000) 'السعر ما تغيّر'
+            '12,000 للكارتون'
+        }
+        & $step 'قائمة شراء آجل (5 كارتون × 8,000)' {
+            $ids.pur = (Write-As $mgr 'savePurchase' @{ type = 'اجل'; supplier = $sup; date = $today; updatePrices = $true
+                    lines = @(@{ item = $item; unit = 'كارتون'; qty = 5; price = 8000 }) }).id
+            Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 1) 'سطر الشراء ما انحفظ'
+            Need ([string](Read-One "SELECT fromname FROM MasterIn WHERE IdIn=$($ids.pur)") -eq $sup) 'اسم المورد ما انحفظ'
+            "رقم $($ids.pur)"
+        }
+        & $step 'تعديل قائمة الشراء (6 كارتون × 8,500) وتحديث سعر الشراء' {
+            Write-As $mgr 'savePurchase' @{ id = $ids.pur; type = 'اجل'; supplier = $sup; date = $today; updatePrices = $true
+                lines = @(@{ item = $item; unit = 'كارتون'; qty = 6; price = 8500 }) } | Out-Null
+            Need ([double](Read-One "SELECT QuntIn FROM subIN WHERE IdIn=$($ids.pur)") -eq 6) 'الكمية ما تغيّرت'
+            Need ([double](Read-One "SELECT BpriceL1 FROM madaCode WHERE ID=$($ids.item)") -eq 8500) 'سعر الشراء بالمادة ما تحدّث'
+            Need ([double](Read-One "SELECT BpriceL2 FROM madaCode WHERE ID=$($ids.item)") -eq 850) 'سعر شراء القطعة ما تحدّث'
+            'تمام'
+        }
+        & $step 'بيع نقدي (3 قطع × 1,100)' {
+            $ids.cash = (Write-As $mgr 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 3; price = 1100 }) }).id
+            Need ([string](Read-One "SELECT OutType FROM MasterOut WHERE idOut=$($ids.cash)") -eq 'نقدي') 'نوع القائمة ما انحفظ'
+            "رقم $($ids.cash)"
+        }
+        & $step 'بيع آجل (2 كارتون × 12,000، دفع 4,000)' {
+            $ids.credit = (Write-As $mgr 'saveSale' @{ type = 'اجل'; customer = $cust; paid = 4000; date = $today
+                    lines = @(@{ item = $item; unit = 'كارتون'; qty = 2; price = 12000 }) }).id
+            Need ([string](Read-One "SELECT TOname FROM MasterOut WHERE idOut=$($ids.credit)") -eq $cust) 'اسم الزبون ما انحفظ'
+            Need ([double](Read-One "SELECT Paid FROM MasterOut WHERE idOut=$($ids.credit)") -eq 4000) 'المدفوع ما انحفظ'
+            "رقم $($ids.credit)"
+        }
+        & $step 'تعديل البيع الآجل (كارتون + 5 قطع)' {
+            Write-As $mgr 'saveSale' @{ id = $ids.credit; type = 'اجل'; customer = $cust; paid = 4000; date = $today
+                lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 12000 }, @{ item = $item; unit = 'قطعة'; qty = 5; price = 1100 }) } | Out-Null
+            Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids.credit)") -eq 2) 'أسطر التعديل ما انحفظت'
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE idOut=$($ids.credit)") -eq 1) 'القائمة تكررت'
+            'المبلغ 17,500'
+        }
+        & $step 'وصل قبض من الزبون (3,000)' {
+            $ids.rec = (Write-As $mgr 'saveReceipt' @{ cls = 'تسديد'; name = $cust; amount = 3000; date = $today }).id
+            "رقم $($ids.rec)"
+        }
+        & $step 'تعديل وصل القبض (3,500)' {
+            Write-As $mgr 'saveReceipt' @{ id = $ids.rec; cls = 'تسديد'; name = $cust; amount = 3500; date = $today } | Out-Null
+            Need ([double](Read-One "SELECT mablak FROM mablakIn WHERE idS=$($ids.rec)") -eq 3500) 'المبلغ ما تغيّر'
+            'تمام'
+        }
+        & $step 'وصل دفع للمورد (20,000)' {
+            $ids.pay = (Write-As $mgr 'savePayment' @{ cls = 'تسديد'; name = $sup; amount = 20000; date = $today }).id
+            "رقم $($ids.pay)"
+        }
+        & $step 'مصروف (1,500)' {
+            $ids.exp = (Write-As $mgr 'savePayment' @{ cls = 'مصاريف متفرقة'; name = ''; amount = 1500; note = $t; date = $today }).id
+            "رقم $($ids.exp)"
+        }
+        & $step 'تغيير اسم الزبون ينتقل لقوائمه ووصولاته' {
+            Write-As $mgr 'saveCustomer' @{ id = $ids.cust; name = $cust2; mobile = '07711111111'; opening = 2000; type = 'جملة' } | Out-Null
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust2)") -eq 1) 'القائمة بقت بالاسم القديم'
+            Need ((Read-Count "SELECT Count(*) FROM mablakIn WHERE nameFrom=$(Q $cust2)") -eq 1) 'الوصل بقى بالاسم القديم'
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust)") -eq 0) 'بقى شي بالاسم القديم'
+            'تمام'
+        }
+
+        # a cashier with the default permissions (cash sale and print)
+        $cashier = @{ user = $script:FT.user; admin = $false; perms = [string[]]$DefaultPerms }
+        $refused = {
+            param([string]$op, [hashtable]$d, [string]$expect)
+            try { Write-As $cashier $op $d | Out-Null } catch {
+                Need ($_.Exception.Message -match $expect) "انرفض بس بسبب ثاني: $($_.Exception.Message)"
+                return 'انرفض ✔'
+            }
+            throw 'انحفظ وهو ما لازم ينحفظ!'
+        }
+        & $step 'صلاحيات: الكاشير يبيع نقدي بالسعر' {
+            $ids.cashier = (Write-As $cashier 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 1100 }) }).id
+            "رقم $($ids.cashier)"
+        }
+        & $step 'صلاحيات: الكاشير ما يبيع آجل' { & $refused 'saveSale' @{ type = 'اجل'; customer = $cust2; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 1100 }) } 'صلاحية' }
+        & $step 'صلاحيات: الكاشير ما يبيع جملة (كارتون)' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 12000 }) } 'الجملة' }
+        & $step 'صلاحيات: الكاشير ما يغيّر السعر' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 500 }) } 'السعر' }
+        & $step 'صلاحيات: الكاشير ما يمسح قائمة' { & $refused 'deleteSale' @{ id = $ids.cash } 'صلاحية' }
+        & $step 'صلاحيات: الكاشير ما يشتري' { & $refused 'savePurchase' @{ type = 'اجل'; supplier = $sup; date = $today; lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 8500 }) } 'صلاحية' }
+        & $step 'صلاحيات: الكاشير ما يغيّر المواد' { & $refused 'saveItem' @{ id = $ids.item; name = $item; unitL1 = 'كارتون' } 'صلاحية' }
+        & $step 'ما يصير تمسح مادة عليها حركة' {
+            try { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null } catch { return 'انرفض ✔' }
+            throw 'انمسحت المادة وعليها قوائم!'
+        }
+    }
+    # what the app should see when it reads the copy back
+    $expect = @{
+        user = $script:FT.user; tag = $script:FT.tag; customer = $script:FT.names.customer; supplier = $script:FT.names.supplier; item = $script:FT.names.item
+        customerBalance = 12000; supplierBalance = 31000; stockPcs = 41; stockK = 4; stockS = 1
+        salesCount = 3; salesTotal = 21900; salesCash = 4400; salesCredit = 17500
+        cashIn = 11900; cashOut = 21500; cashNet = -9600; gross = 5750
+    }
+    return @{ steps = $S.list.ToArray(); expect = $expect }
+}
+
+function Invoke-FullTestClean {
+    $S = New-StepList
+    $step = $S.step
+    Use-TestCopy {
+        $ids = $script:FT.ids
+        $mgr = @{ user = $script:FT.user; admin = $true; perms = [string[]]$AllPerms }
+        foreach ($k in 'cash', 'credit', 'cashier') {
+            if ($ids[$k]) { & $step "مسح قائمة البيع رقم $($ids[$k])" { Write-As $mgr 'deleteSale' @{ id = $ids[$k] } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids[$k])") -eq 0) 'بقت أسطر'; 'تمام' } }
+        }
+        if ($ids.pur) { & $step 'مسح قائمة الشراء' { Write-As $mgr 'deletePurchase' @{ id = $ids.pur } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 0) 'بقت أسطر'; 'تمام' } }
+        if ($ids.rec) { & $step 'مسح وصل القبض' { Write-As $mgr 'deleteReceipt' @{ id = $ids.rec } | Out-Null; 'تمام' } }
+        foreach ($k in 'pay', 'exp') { if ($ids[$k]) { & $step "مسح وصل الدفع رقم $($ids[$k])" { Write-As $mgr 'deletePayment' @{ id = $ids[$k] } | Out-Null; 'تمام' } } }
+        if ($ids.item) { & $step 'مسح المادة' { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null; 'تمام' } }
+        if ($ids.cust) { & $step 'مسح الزبون' { Write-As $mgr 'deleteCustomer' @{ id = $ids.cust } | Out-Null; 'تمام' } }
+        if ($ids.sup) { & $step 'مسح المورد' { Write-As $mgr 'deleteSupplier' @{ id = $ids.sup } | Out-Null; 'تمام' } }
+        & $step 'ما بقى أي شي من الفحص' {
+            $n = $script:FT.names
+            $left = (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $n.customer)") + (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q ($script:FT.tag + ' زبون'))") +
+                (Read-Count "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $n.supplier)") +
+                (Read-Count "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $n.item)") + (Read-Count "SELECT Count(*) FROM MasterOut WHERE strUserName=$(Q $script:FT.user)") +
+                (Read-Count "SELECT Count(*) FROM mablakIn WHERE strUserName=$(Q $script:FT.user)") + (Read-Count "SELECT Count(*) FROM mablakOut WHERE strUserName=$(Q $script:FT.user)")
+            Need ($left -eq 0) "بقى $left سجل"
+            'تمام'
+        }
+    }
+    return @{ steps = $S.list.ToArray() }
+}
+
 # ---------------------------------------------------------------- empty rows
 # Versions before 1.1.1 wrote rows whose values all ended up empty on some
 # Access installs. These rules match only rows with every key value empty,
@@ -1246,6 +1478,40 @@ function Handle($ctx) {
                 $ok = -not ($steps | Where-Object { -not $_.ok })
                 Write-LawhaLog "$($s.user)  selftest $(if ($ok) { 'PASSED' } else { 'FAILED' })"
                 return Send-Json $ctx 200 @{ ok = $true; passed = $ok; steps = $steps; engine = $script:EngineName }
+            }
+            '/api/fulltest' {
+                Need $s.admin 'الفحص الشامل يحتاج صلاحية مدير'
+                $b = Read-Body $req
+                $phase = [string]$b.phase
+                $r = switch ($phase) {
+                    'start' { Start-FullTest }
+                    'run' { Invoke-FullTestRun }
+                    'clean' { Invoke-FullTestClean }
+                    'stop' { Stop-FullTest; @{} }
+                    default { throw "مرحلة مو معروفة: $phase" }
+                }
+                Write-LawhaLog "$($s.user)  fulltest $phase$(if ($r.steps) { ' ' + (@($r.steps | Where-Object { -not $_.ok }).Count) + ' failed' })"
+                return Send-Json $ctx 200 (@{ ok = $true } + $r)
+            }
+            '/api/fulltest-file' {
+                Need $s.admin 'الفحص الشامل يحتاج صلاحية مدير'
+                Need ($script:FT -and (Test-Path -LiteralPath $script:FT.path)) 'ابدأ الفحص الشامل من جديد'
+                if ($env:LAWHA_FAKEDAO) {
+                    # test engine: the copy lives in memory, send its tables
+                    $tables = Get-FakeFileTables $script:Engine $script:FT.path
+                    return Send-Json $ctx 200 @{ ok = $true; fake = $true; tables = $tables }
+                }
+                $fs = [IO.File]::Open($script:FT.path, 'Open', 'Read', 'ReadWrite')
+                try {
+                    $res = $ctx.Response
+                    $res.StatusCode = 200
+                    $res.ContentType = 'application/octet-stream'
+                    $res.Headers['Cache-Control'] = 'no-store'
+                    $res.ContentLength64 = $fs.Length
+                    $fs.CopyTo($res.OutputStream)
+                    $res.OutputStream.Close()
+                } finally { $fs.Close() }
+                return
             }
             '/api/broken' {
                 Need $s.admin 'تحتاج صلاحية مدير'

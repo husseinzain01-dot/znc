@@ -277,6 +277,30 @@ $before = (Rows 'MasterOut').Count
 Get-BrokenRows -Clean | Out-Null
 Assert ((Rows 'MasterOut').Count -eq $before - 1 -and -not (@(Get-BrokenRows) | Where-Object { $_.count -gt 0 })) 'clean removes only those'
 
+Write-Host "`n== full test (on a copy)"
+$counts0 = @{}; foreach ($tb in 'MasterOut', 'subOut', 'MasterIn', 'subIN', 'mablakIn', 'mablakOut', 'bayeeCode', 'shiraCode', 'madaCode') { $counts0[$tb] = (Rows $tb).Count }
+$st0 = Start-FullTest
+Assert (Test-Path -LiteralPath $script:FT.path) "copy made: $($st0.file)"
+Get-FakeFileTables $script:Engine $script:FT.path | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'fulltest-start.json') -Encoding UTF8
+$run = Invoke-FullTestRun
+foreach ($x in $run.steps) { Assert $x.ok "run: $($x.name): $($x.msg)" }
+Assert (@($run.steps).Count -ge 20) "run has $(@($run.steps).Count) steps"
+$copyTables = Get-FakeFileTables $script:Engine $script:FT.path
+Assert (@($copyTables['bayeeCode'].rows | Where-Object { $_.bayeeCode -eq $run.expect.customer }).Count -eq 1) 'the copy has the test customer'
+foreach ($tb in $counts0.Keys) { Assert ((Rows $tb).Count -eq $counts0[$tb]) "real data untouched by the test: $tb" }
+$copyTables | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'fulltest-run.json') -Encoding UTF8
+$run.expect | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $tmp 'fulltest-expect.json') -Encoding UTF8
+$cl = Invoke-FullTestClean
+foreach ($x in $cl.steps) { Assert $x.ok "clean: $($x.name): $($x.msg)" }
+$copyTables2 = Get-FakeFileTables $script:Engine $script:FT.path
+foreach ($tb in $counts0.Keys) { Assert (@($copyTables2[$tb].rows).Count -eq $counts0[$tb]) "copy back to the start after clean: $tb" }
+$copyTables2 | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'fulltest-clean.json') -Encoding UTF8
+$copyPath = $script:FT.path
+Stop-FullTest
+Assert (-not (Test-Path -LiteralPath $copyPath)) 'copy removed'
+Assert ($null -eq $script:DbOverride) 'real file in use again'
+Write-Host "   (JSON for the app check: $tmp)"
+
 Write-Host "`n== backup"
 $backups = @(Get-ChildItem (Join-Path $tmp 'backups-lawha') -Filter '*.accdb')
 Assert ($backups.Count -eq 1 -and $backups[0].Length -eq (Get-Item $dbCopy).Length) "one daily backup: $($backups[0].Name)"
@@ -290,5 +314,5 @@ Assert (-not ($steps | Where-Object { -not $_.ok })) "self-test: all $($steps.Co
 foreach ($t in $counts.Keys) { Assert ((Rows $t).Count -eq $snap[$t]) "self-test left $t unchanged" }
 Assert ($script:Engine.State.inTrans -eq $false) 'no transaction left open'
 
-Remove-Item $tmp -Recurse -Force
+if (-not $env:KEEP_TMP) { Remove-Item $tmp -Recurse -Force }
 Write-Host "`nALL PASSED ($script:pass checks)" -ForegroundColor Green

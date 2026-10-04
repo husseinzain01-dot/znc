@@ -50,7 +50,18 @@ function New-FakeEngine([string]$jsonPath) {
     $ws | Add-Member ScriptMethod OpenDatabase {
         param($path, $exclusive, $readOnly)
         if (-not (Test-Path -LiteralPath $path)) { throw "FakeDao: file not found $path" }
-        return New-FakeDb $this.State ([bool]$readOnly)
+        # one set of tables per file: the first file opened is the data file,
+        # any other (the full test's copy) starts as a copy of it
+        $st = $this.State
+        $full = [IO.Path]::GetFullPath($path)
+        if (-not $st.current) { $st.current = $full; $st.main = $full; $st.files = @{} }
+        if ($st.current -ne $full) {
+            $st.files[$st.current] = $st.tables
+            if (-not $st.files.ContainsKey($full)) { $st.files[$full] = Copy-FakeTables $st.files[$st.main] }
+            $st.tables = $st.files[$full]
+            $st.current = $full
+        }
+        return New-FakeDb $st ([bool]$readOnly)
     }
     $wsList = [pscustomobject]@{ Ws = $ws }
     $wsList | Add-Member ScriptMethod Item { param($i) if ($i -ne 0) { throw 'FakeDao: only workspace 0' }; return $this.Ws }
@@ -421,4 +432,25 @@ function New-FakeRecordset($db, $table, $rows, $cols, [bool]$snapshot, [bool]$ta
 }
 
 # Test helper: current rows of a table.
-function Get-FakeRows($engine, [string]$table) { return , @((Get-FakeTable $engine.State $table).rows) }
+function Get-FakeRows($engine, [string]$table) {
+    # always the data file's rows, whichever file was opened last
+    $st = $engine.State
+    if ($st.main -and $st.current -ne $st.main) { return , @((Get-FakeTable @{ tables = $st.files[$st.main] } $table).rows) }
+    return , @((Get-FakeTable $st $table).rows) }
+
+# The tables of one file, in the export-tables.mjs shape (dates as text).
+function Get-FakeFileTables($engine, [string]$path) {
+    $st = $engine.State
+    $full = [IO.Path]::GetFullPath($path)
+    $tables = if ($st.current -eq $full) { $st.tables } elseif ($st.files -and $st.files.ContainsKey($full)) { $st.files[$full] } else { $st.tables }
+    $out = @{}
+    foreach ($k in $tables.Keys) {
+        $rows = foreach ($r in $tables[$k].rows) {
+            $o = @{}
+            foreach ($c in $r.Keys) { $v = $r[$c]; $o[$c] = if ($v -is [datetime]) { $v.ToString('yyyy-MM-ddTHH:mm:ss') } else { $v } }
+            $o
+        }
+        $out[$k] = @{ columns = @($tables[$k].columns | ForEach-Object { $_.name }); rows = @($rows) }
+    }
+    return $out
+}

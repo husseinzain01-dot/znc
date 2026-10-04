@@ -15,7 +15,7 @@ export const SETTLE = 'تسديد';
 
 export const inRange = (d, from, to) => !!d && (!from || d >= from) && (!to || d <= to);
 const userMatch = (u, user) => !user || u === user;
-const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+export const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
 
 function groupSum(arr, keyFn, valFn) {
   const m = new Map();
