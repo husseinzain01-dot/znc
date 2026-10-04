@@ -3,7 +3,7 @@
 // a closed window doesn't lose a half-entered sale.
 
 export function setupPos(ctx) {
-  const { $, $$, esc, fmt, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal } = ctx;
+  const { $, $$, esc, fmt, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal, can } = ctx;
   const P = () => state.P;
   const key = () => 'lawha-cart-' + (state.user || '');
   const emptyCart = () => ({ type: C.CASH, customer: '', paid: '', note: '', lines: [] });
@@ -24,7 +24,13 @@ export function setupPos(ctx) {
   }
   const persist = () => store.set(key(), cart.lines.length || cart.customer ? JSON.stringify(cart) : '');
 
-  const unitsOf = (it) => [...new Set([it.unitL2, it.unitL1].filter(Boolean))];
+  // Selling by the big unit (wholesale) needs its own permission; a line
+  // already in the big unit keeps it so the select still shows it.
+  const isBig = (it, unit) => !!it.unitL2 && it.unitL1 !== it.unitL2 && unit === it.unitL1;
+  const unitsOf = (it, cur) =>
+    [...new Set([it.unitL2, it.unitL1].filter(Boolean))].filter((u) => u === cur || !isBig(it, u) || can('sale_wholesale'));
+  // Sale types this user may save; the first one is the default.
+  const types = () => [C.CASH, C.CREDIT].filter((t) => can(t === C.CREDIT ? 'sale_credit' : 'sale_cash'));
   const priceFor = (it, unit) => (unit === it.unitL1 ? it.priceL1 : it.priceL2);
   const itemBy = (name) => P().itemByName.get(name);
   const total = () => cart.lines.reduce((a, l) => a + l.qty * l.price, 0);
@@ -71,14 +77,14 @@ export function setupPos(ctx) {
     return cart.lines
       .map((l, i) => {
         const it = itemBy(l.item);
-        const units = it ? unitsOf(it) : [l.unit];
+        const units = it ? unitsOf(it, l.unit) : [l.unit];
         return `<div class="cart-line" data-i="${i}">
           <span class="name">${esc(l.item)}</span>
           <span class="line-total num">${fmt(l.qty * l.price)}</span>
           <div class="row">
             ${units.length > 1 ? `<select data-f="unit">${units.map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>` : `<small class="muted">${esc(l.unit)}</small>`}
             <span class="stepper"><button type="button" data-step="-1" aria-label="أقل">−</button><input data-f="qty" inputmode="decimal" value="${l.qty}"><button type="button" data-step="1" aria-label="أكثر">+</button></span>
-            <input class="price" data-f="price" inputmode="numeric" value="${l.price}" title="السعر">
+            <input class="price" data-f="price" inputmode="numeric" value="${l.price}" title="${can('edit_price') ? 'السعر' : 'السعر (تغييره يحتاج صلاحية)'}"${can('edit_price') ? '' : ' readonly tabindex="-1"'}>
             <button class="icon-btn rm" type="button" data-rm aria-label="شيل">${icon('trash')}</button>
           </div>
         </div>`;
@@ -97,7 +103,7 @@ export function setupPos(ctx) {
   function recentHtml() {
     const today = localDay();
     const list = P().sales
-      .filter((s) => s.date === today && s.lines.length && (state.admin || s.user === state.user))
+      .filter((s) => s.date === today && s.lines.length && (can('sales') || s.user === state.user))
       .sort((a, b) => b.id - a.id)
       .slice(0, 8);
     if (!list.length) return '<p class="muted" style="margin:0;font-size:13px">ماكو قوائم اليوم بعد</p>';
@@ -111,7 +117,10 @@ export function setupPos(ctx) {
 
   function view() {
     onAfter(bind);
+    const allowed = types();
+    if (!allowed.includes(cart.type)) cart.type = allowed[0] || C.CASH;
     const credit = cart.type === C.CREDIT;
+    const recentHint = [can('print') && 'تطبعها', can('sale_edit') && 'تعدّلها', can('sale_delete') && 'تمسحها'].filter(Boolean);
     return `<div class="pos">
       <section class="pos-items">
         <div class="pos-search">${icon('search')}<input id="posSearch" autocomplete="off" placeholder="ابحث باسم المادة أو رمزها، أو امسح الباركود ودوس Enter" value="${esc(search)}"></div>
@@ -120,7 +129,10 @@ export function setupPos(ctx) {
       </section>
       <aside class="pos-cart">
         <div class="card stack" style="gap:10px">
-          <div class="seg" id="posType" style="width:100%"><button data-t="${C.CASH}" class="${credit ? '' : 'on'}" style="flex:1">نقدي</button><button data-t="${C.CREDIT}" class="${credit ? 'on' : ''}" style="flex:1">آجل</button></div>
+          <div class="seg" id="posType" style="width:100%"${allowed.length > 1 ? '' : ' hidden'}>${allowed
+            .map((t) => `<button data-t="${t}" class="${t === cart.type ? 'on' : ''}" style="flex:1">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`)
+            .join('')}</div>
+          ${allowed.length > 1 ? '' : `<p class="muted" style="margin:0">بيع ${credit ? 'آجل' : 'نقدي'}</p>`}
           <div id="posWho" ${credit ? '' : 'hidden'}>
             <datalist id="dlCust">${P().customers.map((c) => `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
             <input id="posCustomer" list="dlCust" autocomplete="off" placeholder="اسم الزبون" value="${esc(cart.customer)}" style="width:100%">
@@ -134,12 +146,12 @@ export function setupPos(ctx) {
           <input id="posNote" placeholder="ملاحظة (اختياري)" value="${esc(cart.note)}">
           <div class="row" style="display:flex;gap:8px">
             <button class="btn primary big" id="posSave" style="flex:1">${icon('save')} حفظ <span class="kbd">F9</span></button>
-            <button class="btn big" id="posSavePrint" style="flex:1">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>
+            ${can('print') ? `<button class="btn big" id="posSavePrint" style="flex:1">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>` : ''}
           </div>
           <button class="btn small" id="posClear">${icon('trash')} قائمة جديدة (مسح)</button>
         </div>
         <div class="card stack" style="gap:6px">
-          <h3 style="margin:0">آخر القوائم <small class="muted" style="font-weight:400">— دوس على قائمة حتى تطبعها${state.admin ? ' أو تعدّلها أو تمسحها' : ''}</small></h3>
+          <h3 style="margin:0">آخر القوائم <small class="muted" style="font-weight:400">${recentHint.length ? '— دوس على قائمة حتى ' + recentHint.join(' أو ') : ''}</small></h3>
           <div id="posRecent" class="stack" style="gap:6px">${recentHtml()}</div>
         </div>
       </aside>
@@ -181,6 +193,8 @@ export function setupPos(ctx) {
 
   async function save(print) {
     if (saving) return;
+    if (print && !can('print')) print = false;
+    if (!types().includes(cart.type)) return toast('ما عندك صلاحية على هذا النوع من البيع', true);
     const lines = cart.lines.filter((l) => l.qty > 0);
     const credit = cart.type === C.CREDIT;
     let err = '';
@@ -222,6 +236,7 @@ export function setupPos(ctx) {
   }
 
   function setType(t) {
+    if (!types().includes(t)) return;
     cart.type = t;
     $$('#posType button').forEach((b) => b.classList.toggle('on', b.dataset.t === t));
     $('#posWho').hidden = t !== C.CREDIT;
@@ -278,7 +293,7 @@ export function setupPos(ctx) {
       if (!row) return;
       const l = cart.lines[+row.dataset.i];
       if (e.target.dataset.f === 'qty') l.qty = Number(e.target.value) || 0;
-      if (e.target.dataset.f === 'price') l.price = Number(e.target.value.replace(/,/g, '')) || 0;
+      if (e.target.dataset.f === 'price' && can('edit_price')) l.price = Number(e.target.value.replace(/,/g, '')) || 0;
       row.querySelector('.line-total').textContent = fmt(l.qty * l.price);
       $('#posTotal').textContent = fmt(total());
       persist();
@@ -312,7 +327,7 @@ export function setupPos(ctx) {
       if (inv) invoiceModal(inv);
     };
     $('#posSave').onclick = () => save(false);
-    $('#posSavePrint').onclick = () => save(true);
+    if ($('#posSavePrint')) $('#posSavePrint').onclick = () => save(true);
     $('#posClear').onclick = () => {
       if (cart.lines.length && !confirm('تمسح القائمة الحالية؟')) return;
       cart = emptyCart();

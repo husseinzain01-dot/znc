@@ -314,8 +314,19 @@ table.lines th { cursor: default; }
 .steps li.bad { background: var(--bad-bg); }
 .steps li.bad .mark { color: var(--bad); }
 .steps li small { color: var(--muted); margin-inline-start: auto; text-align: end; }
-.user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 10px 0; }
-.user-list label { display: flex; gap: 8px; align-items: center; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; }
+.perm-users { display: grid; gap: 8px; margin: 10px 0 14px; }
+.perm-user { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.perm-user summary { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; cursor: pointer; list-style: none; }
+.perm-user summary::-webkit-details-marker { display: none; }
+.perm-user summary::before { content: '◂'; color: var(--muted); transition: transform .15s; }
+.perm-user[open] summary::before { transform: rotate(-90deg); }
+.perm-sum { color: var(--muted); font-size: 13px; margin-inline-start: auto; }
+.perm-body { padding: 0 14px 14px; display: grid; gap: 12px; }
+.perm-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.perm-groups.off { opacity: .45; }
+.perm-groups fieldset { border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px 10px; margin: 0; display: grid; gap: 6px; background: var(--surface); }
+.perm-groups legend { font-weight: 600; font-size: 13px; padding: 0 4px; color: var(--text-2); }
+.perm-groups .check { font-size: 14px; }
 
 /* ---------------- invoice row actions, recent invoices ---------------- */
 .row-acts { display: inline-flex; gap: 4px; white-space: nowrap; }

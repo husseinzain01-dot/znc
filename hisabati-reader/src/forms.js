@@ -5,7 +5,7 @@
 import * as C from './calc.js';
 
 export function setupForms(ctx) {
-  const { $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast } = ctx;
+  const { $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, can } = ctx;
   const P = () => state.P;
 
   const datalist = (id, options) =>
@@ -65,7 +65,16 @@ export function setupForms(ctx) {
   function invoiceEditor(kind, inv) {
     const sale = kind === 'sale';
     const items = P().items;
-    const units = (it) => [...new Set([it.unitL1, it.unitL2].filter(Boolean))];
+    // Sales: the big (wholesale) unit and other prices need permissions; a
+    // line the invoice already had keeps what it was.
+    const had = new Set((inv?.lines || []).map((l) => l.item + '|' + l.unit));
+    const unitOk = (it, u) =>
+      !sale || can('sale_wholesale') || !(it.unitL2 && it.unitL1 !== it.unitL2 && u === it.unitL1) || had.has(it.name + '|' + u);
+    const units = (it) => [...new Set([it.unitL1, it.unitL2].filter(Boolean))].filter((u) => unitOk(it, u));
+    const priceLocked = sale && !can('edit_price');
+    const typeList = sale
+      ? [C.CASH, C.CREDIT].filter((t) => t === inv?.type || can(t === C.CREDIT ? 'sale_credit' : 'sale_cash'))
+      : [C.CASH, C.CREDIT];
     const priceFor = (it, unit) =>
       sale ? (unit === it.unitL1 ? it.priceL1 : it.priceL2) : unit === it.unitL1 ? it.buyL1 : it.buyL2;
     const lines = (inv?.lines || []).map((l) => ({ item: l.item, unit: l.unit, qty: l.qty, price: l.price }));
@@ -79,7 +88,7 @@ export function setupForms(ctx) {
       ${datalist('dlPeople', people.map((p) => ({ value: p.name, label: p.mobile })))}
       ${datalist('dlItems', items.map((it) => ({ value: it.name, label: stockLabel(it) })))}
       <div class="form-grid">
-        ${field('النوع', `<div class="seg" id="fType"><button type="button" data-t="${C.CASH}">نقدي</button><button type="button" data-t="${C.CREDIT}">آجل</button></div>`)}
+        ${field('النوع', `<div class="seg" id="fType">${typeList.map((t) => `<button type="button" data-t="${t}">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`).join('')}</div>`)}
         ${field(sale ? 'الزبون' : 'المورد', `<input id="fWho" list="dlPeople" value="${esc(who)}" autocomplete="off" placeholder="${sale ? 'للآجل لازم تختار زبون' : 'اختار المورد'}">`)}
         ${field('التاريخ', `<input id="fDate" type="date" value="${inv?.date || localDay()}">`)}
         ${sale ? field('المدفوع', `<input id="fPaid" inputmode="numeric" value="${inv?.paid || ''}" placeholder="للآجل إذا دفع شي">`) : field('رقم قائمة المورد', `<input id="fNo" inputmode="numeric" value="${esc(inv?.no || '')}">`)}
@@ -98,7 +107,7 @@ export function setupForms(ctx) {
       ${errorBox}
       <div class="form-actions">
         <button class="btn primary" id="fSave">حفظ</button>
-        ${sale ? '<button class="btn" id="fSavePrint">حفظ وطباعة</button>' : ''}
+        ${sale && can('print') ? '<button class="btn" id="fSavePrint">حفظ وطباعة</button>' : ''}
         <button class="btn" id="fCancel">إلغاء</button>
       </div>`);
 
@@ -114,9 +123,9 @@ export function setupForms(ctx) {
               const it = findItem(l.item);
               return `<tr>
                 <td>${esc(l.item)}</td>
-                <td><select data-i="${i}" data-f="unit">${units(it).map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select></td>
+                <td><select data-i="${i}" data-f="unit">${(it ? units(it) : [l.unit]).map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select></td>
                 <td><input class="qty" data-i="${i}" data-f="qty" inputmode="decimal" value="${l.qty}"></td>
-                <td><input class="price" data-i="${i}" data-f="price" inputmode="numeric" value="${l.price}"></td>
+                <td><input class="price" data-i="${i}" data-f="price" inputmode="numeric" value="${l.price}"${priceLocked ? ' readonly tabindex="-1" title="تغيير السعر يحتاج صلاحية"' : ''}></td>
                 <td class="num" data-total="${i}">${fmt(l.qty * l.price)}</td>
                 <td><button class="btn small" type="button" data-del="${i}" aria-label="شيل">×</button></td>
               </tr>`;
@@ -217,7 +226,7 @@ export function setupForms(ctx) {
       submit(e.target, sale ? 'saveSale' : 'savePurchase', data, (r) => print && printSale(P().saleById.get(r.id)));
     };
     $('#fSave').onclick = save(false);
-    if (sale) $('#fSavePrint').onclick = save(true);
+    if ($('#fSavePrint')) $('#fSavePrint').onclick = save(true);
 
     setType(type);
     whoInfo();

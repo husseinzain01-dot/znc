@@ -188,19 +188,56 @@ Assert ($null -eq (Row 'mablakIn' 'idS' $recId) -and $null -eq (Row 'mablakOut' 
 Assert-Throws { W 'deleteSale' @{ id = $creditSaleId } } 'مو موجودة' 'deleting twice'
 
 Write-Host "`n== permissions"
-$cashier = @{ user = 'كاشير1'; admin = $false }
-Test-Allowed 'saveSale' ([pscustomobject]@{ type = 'نقدي' }) $cashier
-Test-Allowed 'saveReceipt' ([pscustomobject]@{}) $cashier
-Test-Allowed 'saveCustomer' ([pscustomobject]@{}) $cashier
-Assert $true 'cashier: new sale, receipt, customer allowed'
-Assert-Throws { Test-Allowed 'saveSale' ([pscustomobject]@{ id = 5 }) $cashier } 'مدير' 'cashier cannot edit a sale'
-Assert-Throws { Test-Allowed 'deleteSale' ([pscustomobject]@{ id = 5 }) $cashier } 'مدير' 'cashier cannot delete'
-Assert-Throws { Test-Allowed 'savePurchase' ([pscustomobject]@{}) $cashier } 'مدير' 'cashier cannot buy'
-Assert-Throws { Test-Allowed 'saveItem' ([pscustomobject]@{}) $cashier } 'مدير' 'cashier cannot change items'
 $script:Config.admins = @()
 Assert (Test-Admin 'كاشير1') 'no managers set: everyone is manager'
 $script:Config.admins = @('نور')
 Assert ((Test-Admin 'نور') -and -not (Test-Admin 'كاشير1')) 'managers list respected'
+Assert (((Get-Perms 'كاشير1') -join ',') -eq 'pos,sale_cash,print') 'default for a non-manager: cash sale + print'
+$cashier = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
+$liver = Row 'madaCode' 'madaName' 'كبد'
+$small = @{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = $liver.priceSeeat }
+function Wc([string]$op, [hashtable]$d, $session) { $d.user = $session.user; $x = [pscustomobject]$d; Test-Allowed $op $x $session; return Invoke-Write $op $x $session }
+$r = Wc 'saveSale' @{ type = 'نقدي'; lines = @($small) } $cashier
+Assert ($r.id -gt 0) 'cashier: cash sale at list price saved'
+Assert-Throws { Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @($small) } $cashier } 'صلاحية' 'cashier: no credit sale'
+Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = 1 }) } $cashier } 'تغيير السعر' 'cashier: no price change'
+$egg = Row 'madaCode' 'madaName' 'بيض احمر كبير'
+Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 1; price = $egg.price }) } $cashier } 'الجملة' 'cashier: no wholesale (big unit)'
+$one = @((Rows 'madaCode') | Where-Object { -not $_['UnitL2'] })[0]
+Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = $one['madaName']; unit = $one['UnitL1']; qty = 1; price = $(if ($null -eq $one['price']) { 0 } else { $one['price'] }) }) } $cashier).id -gt 0) "cashier: single-unit item ($($one['madaName'])) is not wholesale"
+Assert-Throws { Wc 'saveSale' @{ id = $r.id; type = 'نقدي'; lines = @($small) } $cashier } 'صلاحية' 'cashier: cannot edit a sale'
+Assert-Throws { Wc 'deleteSale' @{ id = $r.id } $cashier } 'صلاحية' 'cashier: cannot delete'
+Assert-Throws { Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي الجزيرة'; amount = 5 } $cashier } 'صلاحية' 'cashier: no receipts by default'
+Assert-Throws { Wc 'savePurchase' @{ type = 'اجل'; supplier = 'مشروع دواجن الديوانية'; lines = @($small) } $cashier } 'صلاحية' 'cashier: cannot buy'
+Assert-Throws { Wc 'saveItem' @{ name = 'x'; unitL1 = 'كيس' } $cashier } 'صلاحية' 'cashier: cannot change items'
+$script:Config.perms = @{ 'كاشير1' = @('pos', 'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'receipt', 'sale_delete') }
+$seller = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
+$r2 = Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @(@{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 2; price = 70000 }) } $seller
+Assert ($r2.id -gt 0) 'with permissions: credit + wholesale + own price saved'
+Assert ((Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي الجزيرة'; amount = 5 } $seller).id -gt 0) 'with permission: receipt saved'
+Wc 'deleteSale' @{ id = $r2.id } $seller | Out-Null
+Assert ($null -eq (Row 'MasterOut' 'idOut' $r2.id)) 'with permission: delete'
+Assert-Throws { Wc 'saveSale' @{ id = $r.id; type = 'نقدي'; lines = @($small) } $seller } 'صلاحية' 'delete permission does not include edit'
+$script:Config.perms = @{ 'كاشير1' = @('pos', 'sale_cash', 'sale_edit') }
+$editor = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
+$admin0 = @{ user = 'نور'; admin = $true; perms = @() }
+$r3 = Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = 777 }, @{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 1; price = $egg.price }) } $admin0
+Assert ((Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }, @{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 2; price = $egg.price }) } $editor).id -eq $r3.id) 'edit permission: change quantities, keeping the invoice prices and units'
+Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 1 }) } $editor } 'تغيير السعر' 'edit permission does not include a new price'
+Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }) } $editor } 'الآجل' 'edit permission cannot turn it into credit'
+$admin = @{ user = 'نور'; admin = $true; perms = (Get-Perms 'نور') }
+Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL1; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
+$script:Config.perms = @{}
+
+Write-Host "`n== empty rows"
+$b0 = @(Get-BrokenRows)
+Assert (-not ($b0 | Where-Object { $_.count -gt 0 })) 'real data: no empty rows found'
+Use-Database { param($db) $db.Execute('INSERT INTO [MasterOut] ([Paid]) VALUES (0)', $dbFailOnError); $db.Execute('INSERT INTO [subOut] ([QuntOut]) VALUES (1)', $dbFailOnError) } | Out-Null
+$b1 = @(Get-BrokenRows)
+Assert ((($b1 | Where-Object { $_.table -eq 'MasterOut' }).count -eq 1) -and (($b1 | Where-Object { $_.table -eq 'subOut' }).count -eq 1)) 'finds an empty invoice and an empty line'
+$before = (Rows 'MasterOut').Count
+Get-BrokenRows -Clean | Out-Null
+Assert ((Rows 'MasterOut').Count -eq $before - 1 -and -not (@(Get-BrokenRows) | Where-Object { $_.count -gt 0 })) 'clean removes only those'
 
 Write-Host "`n== backup"
 $backups = @(Get-ChildItem (Join-Path $tmp 'backups-lawha') -Filter '*.accdb')

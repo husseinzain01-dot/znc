@@ -1,9 +1,53 @@
-// Settings (managers only): shop name, who counts as a manager, the data
-// file, the system check and the backups folder. Stored by server.ps1 in
+// Settings (managers only): shop name, users and what each may see and do,
+// the data file, the system check and the backups folder. Stored by server.ps1 in
 // %APPDATA%\LawhatAlMahal\config.json, so every user of this computer shares
 // them and they survive updates.
 
 import { databasePicker } from './picker.js';
+
+// Same ids as $AllPerms in server.ps1, which checks them on every save.
+const PERM_GROUPS = [
+  ['الشاشات اللي يشوفها', [
+    ['pos', 'بيع سريع'],
+    ['home', 'الرئيسية (ملخص اليوم)'],
+    ['sales', 'المبيعات (كل القوائم)'],
+    ['purchases', 'المشتريات'],
+    ['customers', 'الزبائن وأرصدتهم'],
+    ['suppliers', 'الموردين وأرصدتهم'],
+    ['stock', 'المخزن والأسعار'],
+    ['cash', 'الصندوق'],
+    ['profit', 'الأرباح'],
+    ['checks', 'ملاحظات البيانات'],
+  ]],
+  ['البيع', [
+    ['sale_cash', 'بيع نقدي'],
+    ['sale_credit', 'بيع آجل (على زبون)'],
+    ['sale_wholesale', 'بيع جملة (بالوحدة الكبيرة)'],
+    ['edit_price', 'تغيير السعر بالقائمة'],
+    ['print', 'طباعة الوصل'],
+    ['sale_edit', 'تعديل قوائم البيع'],
+    ['sale_delete', 'مسح قوائم البيع'],
+  ]],
+  ['الإدخال', [
+    ['purchase', 'قوائم شراء جديدة'],
+    ['purchase_edit', 'تعديل ومسح قوائم الشراء'],
+    ['receipt', 'وصل قبض'],
+    ['payment', 'وصل دفع ومصاريف'],
+    ['voucher_edit', 'تعديل ومسح الوصولات'],
+    ['customer_add', 'إضافة زبون'],
+    ['customer_edit', 'تعديل ومسح الزبائن'],
+    ['supplier_manage', 'إضافة وتعديل الموردين'],
+    ['item_manage', 'المواد والأسعار (إضافة وتعديل)'],
+  ]],
+];
+
+export const PRESETS = [
+  ['cashier', 'كاشير نقدي — فاتورة البيع بس', ['pos', 'sale_cash', 'print']],
+  ['cashier2', 'كاشير نقدي وآجل', ['pos', 'sale_cash', 'sale_credit', 'print', 'customers', 'receipt', 'customer_add']],
+  ['wholesale', 'بائع جملة', ['pos', 'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'customers', 'stock', 'receipt', 'customer_add']],
+  ['accountant', 'محاسب', ['home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks', 'print',
+    'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit', 'customer_add', 'customer_edit', 'supplier_manage']],
+];
 
 export function setupSettings(ctx) {
   const { $, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal } = ctx;
@@ -24,11 +68,12 @@ export function setupSettings(ctx) {
         <div class="row"><input id="setShop" maxlength="60" style="flex:1;min-width:220px" class="search"><button class="btn primary" id="setShopSave">حفظ</button></div>
       </div>
       <div class="card">
-        <h3>المدراء</h3>
-        <p class="muted">المدير يكدر يعدّل ويمسح القوائم، ويسجّل مشتريات ومصاريف، ويغيّر المواد والأسعار، ويشوف الأرباح والصندوق.
-          الباقين (كاشير) يسوّون قوائم بيع ووصولات قبض ويضيفون زبائن بس. إذا ما أشّرت على أحد، الكل مدراء.</p>
-        <div class="user-list" id="setAdmins"><span class="muted">جاري التحميل…</span></div>
-        <button class="btn primary" id="setAdminsSave">حفظ المدراء</button>
+        <h3>المستخدمين والصلاحيات</h3>
+        <p class="muted">نفس مستخدمين حساباتي وكلمات السر مالتهم. <b>المدير</b> يسوّي كلشي ويدخل للإعدادات.
+          الباقين يشوفون ويسوّون بس اللي تأشّره إلهم. اختار قالب جاهز، وبعدين تكدر تزيد أو تنقص.
+          أي مستخدم ما أشّرتله شي: بيع نقدي وطباعة بس. إذا ما أشّرت أي أحد مدير، الكل مدراء.</p>
+        <div id="setUsers" class="perm-users"><span class="muted">جاري التحميل…</span></div>
+        <button class="btn primary" id="setUsersSave">${icon('save')} حفظ الصلاحيات</button>
       </div>
       <div class="card">
         <h3>ملف البيانات</h3>
@@ -41,6 +86,13 @@ export function setupSettings(ctx) {
         <p class="muted" style="font-size:13px">قبل أول حفظ بكل يوم تنسوى نسخة من الملف بفولدر <code>backups-lawha</code> يمّه (آخر 30 نسخة).</p>
       </div>
       <div class="card">
+        <h3>تنظيف البيانات</h3>
+        <p class="muted">يدوّر على سجلات فارغة تماماً (بلا اسم ولا تاريخ ولا مادة) ممكن انكتبت من نسخ قديمة من البرنامج، ويمسحها.
+          ما يلمس أي سجل بيه بيانات. تنسوى نسخة احتياطية قبل المسح.</p>
+        <button class="btn" id="brCheck">${icon('search')} افحص</button>
+        <div id="brResult"></div>
+      </div>
+      <div class="card">
         <h3>حول البرنامج</h3>
         <p class="muted" id="setAbout"></p>
       </div>
@@ -50,7 +102,8 @@ export function setupSettings(ctx) {
   async function load() {
     $('#stRun').onclick = run;
     $('#setShopSave').onclick = saveShop;
-    $('#setAdminsSave').onclick = saveAdmins;
+    $('#setUsersSave').onclick = saveUsers;
+    $('#brCheck').onclick = () => broken(false);
     $('#setChoose').onclick = choose;
     $('#setBackups').onclick = async () => {
       try {
@@ -65,10 +118,7 @@ export function setupSettings(ctx) {
       $('#setShop').value = s.shopName || '';
       $('#setPath').textContent = s.dbPath || '—';
       $('#setAbout').innerHTML = `الإصدار ${esc(s.version)} — محرك الحفظ: ${esc(s.engine || 'يشتغل عند أول حفظ')}<br>الإعدادات والسجل: <code>${esc(s.dataDir)}</code>`;
-      const admins = new Set(s.admins || []);
-      $('#setAdmins').innerHTML = (u.users || [])
-        .map((n) => `<label><input type="checkbox" value="${esc(n)}"${admins.has(n) ? ' checked' : ''}> ${esc(n)}</label>`)
-        .join('') || '<span class="muted">ماكو مستخدمين بحساباتي</span>';
+      drawUsers(u.users || [], s);
     } catch (e) {
       toast(e.message, true);
     }
@@ -107,13 +157,101 @@ export function setupSettings(ctx) {
     }
   }
 
-  async function saveAdmins() {
-    const admins = [...document.querySelectorAll('#setAdmins input:checked')].map((i) => i.value);
+  // One card per user: manager switch, a template, and the ticks.
+  function drawUsers(users, s) {
+    const admins = new Set(s.admins || []);
+    const perms = s.perms || {};
+    const def = s.defaultPerms || ['pos', 'sale_cash', 'print'];
+    const host = $('#setUsers');
+    if (!users.length) {
+      host.innerHTML = '<span class="muted">ماكو مستخدمين بحساباتي</span>';
+      return;
+    }
+    host.innerHTML = users
+      .map((n, k) => {
+        const have = new Set(perms[n] || def);
+        return `<details class="perm-user" data-user="${esc(n)}"${k === 0 ? ' open' : ''}>
+          <summary><b>${esc(n)}</b><span class="perm-sum"></span></summary>
+          <div class="perm-body">
+            <div class="row" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <label class="check"><input type="checkbox" data-admin${admins.has(n) ? ' checked' : ''}> مدير (كلشي)</label>
+              <select data-preset>
+                <option value="">قالب جاهز…</option>
+                ${PRESETS.map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="perm-groups">${PERM_GROUPS.map(([g, list]) => `<fieldset><legend>${esc(g)}</legend>${list
+              .map(([id, label]) => `<label class="check"><input type="checkbox" data-perm="${id}"${have.has(id) ? ' checked' : ''}> ${esc(label)}</label>`)
+              .join('')}</fieldset>`).join('')}</div>
+          </div>
+        </details>`;
+      })
+      .join('');
+    host.querySelectorAll('.perm-user').forEach(refreshUser);
+    host.onchange = (e) => {
+      const box = e.target.closest('.perm-user');
+      if (!box) return;
+      if (e.target.matches('[data-preset]') && e.target.value) {
+        const p = new Set(PRESETS.find(([id]) => id === e.target.value)[2]);
+        box.querySelectorAll('[data-perm]').forEach((c) => (c.checked = p.has(c.dataset.perm)));
+        e.target.value = '';
+      }
+      refreshUser(box);
+    };
+  }
+
+  // The summary line, and the ticks greyed out for a manager.
+  function refreshUser(box) {
+    const admin = box.querySelector('[data-admin]').checked;
+    const ticked = [...box.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
+    box.querySelector('.perm-groups').classList.toggle('off', admin);
+    box.querySelectorAll('[data-perm]').forEach((c) => (c.disabled = admin));
+    const preset = PRESETS.find(([, , p]) => p.length === ticked.length && p.every((x) => ticked.includes(x)));
+    const sells = [ticked.includes('sale_cash') && 'نقدي', ticked.includes('sale_credit') && 'آجل', ticked.includes('sale_wholesale') && 'جملة'].filter(Boolean);
+    box.querySelector('.perm-sum').textContent = admin
+      ? 'مدير'
+      : preset
+        ? preset[1]
+        : ticked.length
+          ? `${sells.length ? 'بيع ' + sells.join(' و') + ' — ' : ''}${ticked.length} صلاحية`
+          : 'ما يكدر يسوّي شي';
+  }
+
+  async function saveUsers() {
+    const boxes = [...document.querySelectorAll('#setUsers .perm-user')];
+    const admins = boxes.filter((b) => b.querySelector('[data-admin]').checked).map((b) => b.dataset.user);
+    const perms = {};
+    for (const b of boxes) perms[b.dataset.user] = [...b.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
     try {
-      await api('/api/settings', { method: 'POST', body: { admins } });
-      toast(admins.length ? 'انحفظ ✔ المدراء: ' + admins.join('، ') : 'انحفظ ✔ الكل مدراء');
+      await api('/api/settings', { method: 'POST', body: { admins, perms } });
+      toast(admins.length ? 'انحفظ ✔ المدراء: ' + admins.join('، ') : 'انحفظ ✔ (ما أكو مدير، فالكل مدراء)');
     } catch (e) {
       toast(e.message, true);
+    }
+  }
+
+  async function broken(clean) {
+    const out = $('#brResult');
+    out.innerHTML = '<p class="muted">جاري الفحص…</p>';
+    try {
+      const j = await api('/api/broken', { method: 'POST', body: { clean } });
+      const found = (j.rows || []).filter((r) => r.count > 0);
+      if (clean) {
+        out.innerHTML = `<p class="notice good">✔ انمسحت ${found.reduce((a, r) => a + r.count, 0)} سجلات فارغة.</p>`;
+        await guarded(() => readServer());
+        return;
+      }
+      out.innerHTML = found.length
+        ? `<ul class="steps">${found.map((r) => `<li class="bad"><span class="mark">!</span><span>${esc(r.label)}</span><small>${r.count}</small></li>`).join('')}</ul>
+           <button class="btn danger" id="brClean">${icon('trash')} امسحها</button>`
+        : '<p class="notice good">✔ ماكو سجلات فارغة. البيانات نظيفة.</p>';
+      if ($('#brClean')) {
+        $('#brClean').onclick = () => {
+          if (confirm('تمسح هاي السجلات الفارغة؟ (تنسوى نسخة احتياطية قبلها)')) broken(true);
+        };
+      }
+    } catch (e) {
+      out.innerHTML = `<p class="notice error">${esc(e.message)}</p>`;
     }
   }
 

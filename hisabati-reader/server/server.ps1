@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.2'
+$Version = '1.1.1'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -61,13 +61,16 @@ $AppFile = Join-Path $Here 'lawha.html'
 if (-not (Test-Path $AppFile)) { $AppFile = Join-Path (Join-Path (Split-Path $Here -Parent) 'release') 'hisabati-reader.html' }
 
 function Read-Config {
-    $c = @{ dbPath = ''; shopName = ''; admins = @() }
+    $c = @{ dbPath = ''; shopName = ''; admins = @(); perms = @{} }
     if (Test-Path $ConfigFile) {
         try {
             $j = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($j.dbPath) { $c.dbPath = [string]$j.dbPath }
             if ($j.shopName) { $c.shopName = [string]$j.shopName }
             if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
+            if ($j.perms) {
+                foreach ($p in $j.perms.PSObject.Properties) { $c.perms[$p.Name] = @($p.Value | ForEach-Object { [string]$_ }) }
+            }
         } catch { }
     }
     return $c
@@ -205,11 +208,6 @@ function Q([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
 # Numbers inside SQL text must not follow the Windows regional format.
 function N([double]$n) { return $n.ToString([Globalization.CultureInfo]::InvariantCulture) }
 
-function Nullable($v) {
-    if ($null -eq $v -or ($v -is [string] -and $v.Trim() -eq '')) { return [DBNull]::Value }
-    return $v
-}
-
 function Day([string]$iso) {
     if (-not $iso) { return (Get-Date).Date }
     try {
@@ -235,29 +233,40 @@ function Num($v, [string]$label) {
 
 function Need([bool]$cond, [string]$msg) { if (-not $cond) { throw $msg } }
 
-function Set-Fields($rs, [hashtable]$values) {
-    foreach ($k in $values.Keys) { $rs.Fields.Item($k).Value = (Nullable $values[$k]) }
+# Writes go through SQL text, the same way حساباتي's own code saves
+# (db.Execute "INSERT INTO ..."). Setting recordset fields one by one through
+# COM left every value empty on a real Access 16 install, so values are never
+# passed as COM variants: each becomes an Access SQL literal here.
+function L($v) {
+    if ($null -eq $v -or $v -is [DBNull]) { return 'Null' }
+    if ($v -is [string]) {
+        if ($v.Trim() -eq '') { return 'Null' }
+        return Q $v
+    }
+    if ($v -is [bool]) { return $(if ($v) { 'True' } else { 'False' }) }
+    if ($v -is [datetime]) { return '#' + $v.ToString('yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) + '#' }
+    if ($v -is [int] -or $v -is [long] -or $v -is [double] -or $v -is [decimal] -or $v -is [single] -or $v -is [int16] -or $v -is [byte]) {
+        return N ([double]$v)
+    }
+    return Q ([string]$v)
 }
 
+# INSERT one row; returns the new AutoNumber (SELECT @@IDENTITY) when $idField is given.
 function Add-Row($db, [string]$table, [hashtable]$values, [string]$idField) {
-    $rs = $db.OpenRecordset($table, $dbOpenDynaset, $dbAppendOnly)
-    try {
-        $rs.AddNew()
-        Set-Fields $rs $values
-        $id = if ($idField) { $rs.Fields.Item($idField).Value } else { $null }
-        $rs.Update()
-        return $id
-    } finally { $rs.Close() }
+    $cols = @($values.Keys)
+    $sql = "INSERT INTO [$table] (" + (($cols | ForEach-Object { "[$_]" }) -join ', ') + ') VALUES (' + (($cols | ForEach-Object { L $values[$_] }) -join ', ') + ')'
+    $db.Execute($sql, $dbFailOnError)
+    if (-not $idField) { return $null }
+    $id = Get-Value $db 'SELECT @@IDENTITY'
+    Need ($null -ne $id -and [int]$id -gt 0) "الحفظ بجدول $table ما رجّع رقم السجل"
+    return [int]$id
 }
 
 function Edit-Row($db, [string]$table, [string]$idField, $id, [hashtable]$values) {
-    $rs = $db.OpenRecordset("SELECT * FROM [$table] WHERE [$idField]=$([int]$id)", $dbOpenDynaset)
-    try {
-        Need (-not $rs.EOF) 'السجل مو موجود (يمكن انمسح من حساباتي)'
-        $rs.Edit()
-        Set-Fields $rs $values
-        $rs.Update()
-    } finally { $rs.Close() }
+    $id = [int]$id
+    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE [$idField]=$id") -gt 0) 'السجل مو موجود (يمكن انمسح من حساباتي)'
+    $sets = ($values.Keys | ForEach-Object { "[$_]=" + (L $values[$_]) }) -join ', '
+    $db.Execute("UPDATE [$table] SET $sets WHERE [$idField]=$id", $dbFailOnError)
 }
 
 function Get-Value($db, [string]$sql) {
@@ -286,11 +295,11 @@ function Get-Column($db, [string]$sql) {
 function Count($db, [string]$sql) { return [int](Get-Value $db $sql) }
 
 function Get-MadaItem($db, [string]$name) {
-    $rs = $db.OpenRecordset("SELECT IDcode, BpriceL1, BpriceL2, UnitL1, UnitL2, Fill FROM madaCode WHERE madaName=$(Q $name)", $dbOpenSnapshot)
+    $rs = $db.OpenRecordset("SELECT IDcode, BpriceL1, BpriceL2, UnitL1, UnitL2, Fill, price, priceSeeat FROM madaCode WHERE madaName=$(Q $name)", $dbOpenSnapshot)
     try {
         Need (-not $rs.EOF) "المادة مو موجودة: $name"
         $o = @{}
-        foreach ($f in 'IDcode', 'BpriceL1', 'BpriceL2', 'UnitL1', 'UnitL2', 'Fill') {
+        foreach ($f in 'IDcode', 'BpriceL1', 'BpriceL2', 'UnitL1', 'UnitL2', 'Fill', 'price', 'priceSeeat') {
             $v = $rs.Fields.Item($f).Value
             $o[$f] = if ($v -is [DBNull]) { $null } else { $v }
         }
@@ -602,19 +611,103 @@ $Ops = @{
     saveItem = 'Op-SaveItem'; deleteItem = 'Op-DeleteItem'
 }
 
-# What a cashier (non-manager) may do: new sales, receipts and customers.
+# ---------------------------------------------------------------- permissions
+# Managers can do everything. Everyone else gets the permissions a manager
+# ticked for them in Settings; with nothing set, a user can only make cash
+# sales and print them.
+$AllPerms = @(
+    'pos', 'home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks',
+    'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'sale_edit', 'sale_delete',
+    'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit',
+    'customer_add', 'customer_edit', 'supplier_manage', 'item_manage'
+)
+$DefaultPerms = @('pos', 'sale_cash', 'print')
+
+function Get-Perms([string]$user) {
+    if (Test-Admin $user) { return , $AllPerms }
+    if ($script:Config.perms.ContainsKey($user)) { return , @($script:Config.perms[$user]) }
+    return , $DefaultPerms
+}
+
+$PermNames = @{
+    sale_cash = 'البيع النقدي'; sale_credit = 'البيع الآجل'; sale_wholesale = 'البيع بالجملة (الوحدة الكبيرة)'
+    edit_price = 'تغيير السعر'; sale_edit = 'تعديل قوائم البيع'; sale_delete = 'مسح قوائم البيع'
+    purchase = 'قوائم الشراء'; purchase_edit = 'تعديل ومسح قوائم الشراء'; receipt = 'وصل القبض'
+    payment = 'وصل الدفع والمصاريف'; voucher_edit = 'تعديل ومسح الوصولات'; customer_add = 'إضافة زبون'
+    customer_edit = 'تعديل ومسح الزبائن'; supplier_manage = 'الموردين'; item_manage = 'المواد والأسعار'
+}
+
+function Need-Perm($session, [string]$perm) {
+    $name = if ($PermNames.ContainsKey($perm)) { $PermNames[$perm] } else { $perm }
+    Need ($session.admin -or ($session.perms -contains $perm)) "ما عندك صلاحية: $name. اطلبها من المدير."
+}
+
+# Before running a write: may this user do it at all?
 function Test-Allowed([string]$op, $data, $session) {
     if ($session.admin) { return }
     $isNew = -not $data.id
-    $ok = $isNew -and ($op -in @('saveSale', 'saveReceipt', 'saveCustomer'))
-    Need $ok 'هاي العملية تحتاج صلاحية مدير'
+    switch ($op) {
+        'saveSale' {
+            Need-Perm $session $(if ([string]$data.type -eq 'اجل') { 'sale_credit' } else { 'sale_cash' })
+            if (-not $isNew) { Need-Perm $session 'sale_edit' }
+        }
+        'deleteSale' { Need-Perm $session 'sale_delete' }
+        'savePurchase' { Need-Perm $session $(if ($isNew) { 'purchase' } else { 'purchase_edit' }) }
+        'deletePurchase' { Need-Perm $session 'purchase_edit' }
+        'saveReceipt' { Need-Perm $session $(if ($isNew) { 'receipt' } else { 'voucher_edit' }) }
+        'deleteReceipt' { Need-Perm $session 'voucher_edit' }
+        'savePayment' { Need-Perm $session $(if ($isNew) { 'payment' } else { 'voucher_edit' }) }
+        'deletePayment' { Need-Perm $session 'voucher_edit' }
+        'saveCustomer' { Need-Perm $session $(if ($isNew) { 'customer_add' } else { 'customer_edit' }) }
+        'deleteCustomer' { Need-Perm $session 'customer_edit' }
+        { $_ -in 'saveSupplier', 'deleteSupplier' } { Need-Perm $session 'supplier_manage' }
+        { $_ -in 'saveItem', 'deleteItem' } { Need-Perm $session 'item_manage' }
+        default { Need $false 'هاي العملية تحتاج صلاحية مدير' }
+    }
 }
 
-function Invoke-Write([string]$op, $data) {
+# Inside the save: selling by the big unit (wholesale) and changing a price
+# away from the item card need their own permissions.
+function Test-SaleLines($db, $data, $session) {
+    if ($session.admin) { return }
+    # editing an old invoice may keep the prices it already had
+    $old = @{}
+    if ($data.id) {
+        $rs = $db.OpenRecordset("SELECT madaNameOut, unit, Price FROM subOut WHERE idOut=$([int]$data.id)", $dbOpenSnapshot)
+        try {
+            while (-not $rs.EOF) {
+                $k = [string]$rs.Fields.Item('madaNameOut').Value + '|' + [string]$rs.Fields.Item('unit').Value
+                $v = $rs.Fields.Item('Price').Value
+                if (-not $old.ContainsKey($k)) { $old[$k] = @() }
+                if ($v -isnot [DBNull]) { $old[$k] += [double]$v }
+                $rs.MoveNext()
+            }
+        } finally { $rs.Close() }
+    }
+    foreach ($l in @($data.lines | Where-Object { $null -ne $_ })) {
+        $it = Get-MadaItem $db ([string]$l.item)
+        $k = [string]$l.item + '|' + [string]$l.unit
+        # items with a single unit have no wholesale unit
+        $big = ($it.UnitL2 -and [string]$l.unit -eq $it.UnitL1 -and $it.UnitL1 -ne $it.UnitL2)
+        if ($big -and -not $old.ContainsKey($k)) { Need-Perm $session 'sale_wholesale' }
+        if ($session.perms -contains 'edit_price') { continue }
+        # same rule as the app: big unit → carton price, small unit → piece price
+        $list = if ([string]$l.unit -eq $it.UnitL1) { $it.price } else { $it.priceSeeat }
+        if ($null -eq $list -or $list -is [DBNull]) { $list = 0 }
+        $price = Num $l.price 'السعر'
+        $ok = @(@([double]$list) + @($old[$k]) | Where-Object { $null -ne $_ -and [math]::Abs($price - $_) -le 0.001 }).Count -gt 0
+        Need $ok "ما عندك صلاحية: تغيير السعر ($($l.item)). اطلبها من المدير."
+    }
+}
+
+function Invoke-Write([string]$op, $data, $session = $null) {
     Need ($Ops.ContainsKey($op)) "عملية مو معروفة: $op"
     Backup-Database
     $fn = $Ops[$op]
-    return Use-Database { param($db) & $fn $db $data }
+    return Use-Database { param($db)
+        if ($session -and $op -eq 'saveSale') { Test-SaleLines $db $data $session }
+        & $fn $db $data
+    }
 }
 
 # ---------------------------------------------------------------- users
@@ -664,10 +757,44 @@ function Get-Session($req) {
     $t = [string]$req.Headers['X-Token']
     if ($t -and $script:Sessions.ContainsKey($t)) {
         $s = $script:Sessions[$t]
-        $s.admin = Test-Admin $s.user   # managers can change while signed in
+        # managers and permissions can change while someone is signed in
+        $s.admin = Test-Admin $s.user
+        $s.perms = Get-Perms $s.user
         return $s
     }
     return $null
+}
+
+# ---------------------------------------------------------------- empty rows
+# Versions before 1.1.1 wrote rows whose values all ended up empty on some
+# Access installs. These rules match only rows with every key value empty,
+# which حساباتي itself never writes (its own lines without an invoice still
+# carry an item name, so they are left alone).
+$BrokenRules = @(
+    @{ table = 'MasterOut'; where = '[TOname] IS NULL AND [OutDate] IS NULL AND [OutType] IS NULL'; label = 'قوائم بيع فارغة' },
+    @{ table = 'subOut'; where = '[idOut] IS NULL AND [madaNameOut] IS NULL'; label = 'أسطر بيع فارغة' },
+    @{ table = 'MasterIn'; where = '[fromname] IS NULL AND [InvoiceDate] IS NULL AND [InType] IS NULL'; label = 'قوائم شراء فارغة' },
+    @{ table = 'subIN'; where = '[madaNameIn] IS NULL'; label = 'أسطر شراء فارغة' },
+    @{ table = 'mablakIn'; where = '[mablak] IS NULL AND [dataS] IS NULL AND [classS] IS NULL'; label = 'وصولات قبض فارغة' },
+    @{ table = 'mablakOut'; where = '[mablak] IS NULL AND [dataS] IS NULL AND [classS] IS NULL'; label = 'وصولات دفع فارغة' },
+    @{ table = 'bayeeCode'; where = '[bayeeCode] IS NULL'; label = 'زبائن بدون اسم' },
+    @{ table = 'shiraCode'; where = '[shiraCode] IS NULL'; label = 'موردين بدون اسم' },
+    @{ table = 'madaCode'; where = '[madaName] IS NULL'; label = 'مواد بدون اسم' }
+)
+
+function Get-BrokenRows([switch]$Clean) {
+    if ($Clean) { Backup-Database }
+    $body = { param($db)
+        $out = @()
+        foreach ($r in $BrokenRules) {
+            $n = Count $db "SELECT Count(*) FROM [$($r.table)] WHERE $($r.where)"
+            if ($n -gt 0 -and $Clean) { $db.Execute("DELETE FROM [$($r.table)] WHERE $($r.where)", $dbFailOnError) }
+            $out += @{ table = $r.table; label = $r.label; count = $n }
+        }
+        return , $out
+    }
+    if ($Clean) { return Use-Database $body }
+    return Use-Database -ReadOnly $body
 }
 
 # ---------------------------------------------------------------- self-test
@@ -718,12 +845,20 @@ function Invoke-SelfTest {
             Step 'إضافة زبون' {
                 $script:st.cust = (Op-SaveCustomer $db @{ name = $tag; mobile = '07700000000'; opening = 1000; type = 'جملة'; user = $u }).id
                 Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)") -eq 1) 'الزبون ما انضاف'
+                Need ([string](Get-Value $db "SELECT CMobile FROM bayeeCode WHERE id=$($script:st.cust)") -eq '07700000000') 'الموبايل ما انحفظ'
+                Need ([int](Get-Value $db "SELECT MB FROM bayeeCode WHERE id=$($script:st.cust)") -eq 1000) 'الرصيد الافتتاحي ما انحفظ'
                 "رقم $($script:st.cust)"
             } | Out-Null
             Step 'قائمة بيع آجل' {
                 $script:st.sale = (Op-SaveSale $db @{ type = 'اجل'; customer = $tag; date = $today; paid = 500; user = $u
                         lines = @(@{ item = $item; unit = $small; qty = 2; price = 1500 }) }).id
                 Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 1) 'سطر القائمة ما انضاف'
+                Need ([string](Get-Value $db "SELECT TOname FROM MasterOut WHERE idOut=$($script:st.sale)") -eq $tag) 'اسم الزبون ما انحفظ بالقائمة'
+                Need ([string](Get-Value $db "SELECT OutType FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 'اجل') 'نوع القائمة ما انحفظ'
+                Need ($null -ne (Get-Value $db "SELECT OutDate FROM MasterOut WHERE idOut=$($script:st.sale)")) 'تاريخ القائمة ما انحفظ'
+                Need ([int](Get-Value $db "SELECT Paid FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 500) 'المدفوع ما انحفظ'
+                Need ([double](Get-Value $db "SELECT QuntOut FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'الكمية ما انحفظت'
+                Need ([double](Get-Value $db "SELECT Price FROM subOut WHERE idOut=$($script:st.sale)") -eq 1500) 'السعر ما انحفظ'
                 "رقم $($script:st.sale)"
             } | Out-Null
             Step 'تعديل قائمة البيع' {
@@ -742,6 +877,8 @@ function Invoke-SelfTest {
             } | Out-Null
             Step 'وصل دفع (مصروف)' {
                 $script:st.pay = (Op-SavePayment $db @{ cls = 'مصاريف متفرقة'; name = ''; amount = 100; note = $tag; date = $today; user = $u }).id
+                Need ([double](Get-Value $db "SELECT mablak FROM mablakOut WHERE idS=$($script:st.pay)") -eq 100) 'المبلغ ما انحفظ'
+                Need ([string](Get-Value $db "SELECT classS FROM mablakOut WHERE idS=$($script:st.pay)") -eq 'مصاريف متفرقة') 'نوع المصروف ما انحفظ'
                 "رقم $($script:st.pay)"
             } | Out-Null
             if ($script:st.supplier) {
@@ -940,9 +1077,9 @@ function Handle($ctx) {
                     return Send-Json $ctx 200 @{ ok = $false; error = 'كلمة السر غلط' }
                 }
                 $t = New-Token
-                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user) }
+                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = (Get-Perms $user) }
                 Write-LawhaLog "login $user"
-                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user) }
+                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = (Get-Perms $user) }
             }
             # Choosing the data file: open to anyone before it is set, then managers only.
             { $_ -in '/api/choose-file', '/api/candidates', '/api/browse' } {
@@ -973,7 +1110,7 @@ function Handle($ctx) {
 
         switch ($path) {
             '/api/me' {
-                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin }
+                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin; perms = $s.perms }
             }
             '/api/logout' {
                 $script:Sessions.Remove([string]$req.Headers['X-Token'])
@@ -1003,7 +1140,7 @@ function Handle($ctx) {
                 try {
                     Test-Allowed $op $data $s
                     $data | Add-Member -NotePropertyName user -NotePropertyValue $s.user -Force
-                    $r = Invoke-Write $op $data
+                    $r = Invoke-Write $op $data $s
                     Write-LawhaLog "$($s.user)  $op OK $($r.id)"
                     return Send-Json $ctx 200 @{ ok = $true; result = $r }
                 } catch {
@@ -1021,11 +1158,19 @@ function Handle($ctx) {
                         Need ($list.Count -eq 0 -or $list -contains $s.user) 'لازم تبقى أنت من المدراء'
                         $script:Config.admins = $list
                     }
+                    if ($null -ne $b.perms) {
+                        $perms = @{}
+                        foreach ($p in $b.perms.PSObject.Properties) {
+                            $perms[$p.Name] = @($p.Value | ForEach-Object { [string]$_ } | Where-Object { $AllPerms -contains $_ })
+                        }
+                        $script:Config.perms = $perms
+                    }
                     Save-Config
                     Write-LawhaLog "$($s.user)  settings saved"
                 }
                 return Send-Json $ctx 200 @{
                     ok = $true; shopName = $script:Config.shopName; admins = @($script:Config.admins)
+                    perms = $script:Config.perms; allPerms = $AllPerms; defaultPerms = $DefaultPerms
                     dbPath = (Get-DbPath); dataDir = $DataDir; version = $Version; engine = $script:EngineName
                 }
             }
@@ -1035,6 +1180,13 @@ function Handle($ctx) {
                 $ok = -not ($steps | Where-Object { -not $_.ok })
                 Write-LawhaLog "$($s.user)  selftest $(if ($ok) { 'PASSED' } else { 'FAILED' })"
                 return Send-Json $ctx 200 @{ ok = $true; passed = $ok; steps = $steps; engine = $script:EngineName }
+            }
+            '/api/broken' {
+                Need $s.admin 'تحتاج صلاحية مدير'
+                $b = Read-Body $req
+                $rows = if ($b.clean) { Get-BrokenRows -Clean } else { Get-BrokenRows }
+                if ($b.clean) { Write-LawhaLog "$($s.user)  cleaned empty rows: $((@($rows) | ForEach-Object { "$($_.table)=$($_.count)" }) -join ' ')" }
+                return Send-Json $ctx 200 @{ ok = $true; rows = @($rows); cleaned = [bool]$b.clean }
             }
             '/api/open-backups' {
                 Need $s.admin 'تحتاج صلاحية مدير'

@@ -58,6 +58,7 @@ const state = {
   token: store.get('lawha-token'),
   user: '',
   admin: false,
+  perms: [],
   shopName: '',
   stockByName: null,
 };
@@ -341,13 +342,14 @@ async function loginScreen(error = '', chosen = '') {
 async function signedIn(me) {
   state.user = me.user;
   state.admin = !!me.admin;
+  state.perms = me.perms || [];
   $('#who').hidden = false;
   $('#whoName').textContent = me.user;
-  $('#whoRole').textContent = me.admin ? 'مدير' : 'كاشير';
+  $('#whoRole').textContent = me.admin ? 'مدير' : 'مستخدم';
   $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);
   buildNav();
   POS?.reset();
-  state.view = state.admin ? 'home' : 'pos';
+  state.view = homeView();
   screen('<h1>جاري قراءة البيانات…</h1><p class="muted">لحظات</p>');
   try {
     await readServer();
@@ -366,6 +368,7 @@ function signedOut() {
   store.set('lawha-token', '');
   state.user = '';
   state.admin = false;
+  state.perms = [];
   state.P = null;
   closeModal();
   loginScreen();
@@ -616,15 +619,25 @@ function closeModal() {
 
 let F = null;
 const forms = () =>
-  (F ??= setupForms({ $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, icon }));
+  (F ??= setupForms({ $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, icon, can }));
 const canWrite = () => state.server;
-const canAdmin = () => state.server && state.admin;
-// What a cashier may start; the server enforces the same rule.
-const CASHIER_ACTS = new Set(['newSale', 'newReceipt', 'newCustomer']);
+// Signed in: managers can do everything, everyone else what a manager ticked
+// for them in Settings. The server checks the same permissions on every save.
+const can = (perm) => state.server && (state.admin || state.perms.includes(perm));
+const canSell = () => can('pos') && (can('sale_cash') || can('sale_credit'));
+const ACT_PERM = {
+  newSale: canSell,
+  newPurchase: () => can('purchase'),
+  newReceipt: () => can('receipt'),
+  newPayment: () => can('payment'),
+  newCustomer: () => can('customer_add'),
+  newSupplier: () => can('supplier_manage'),
+  newItem: () => can('item_manage'),
+};
 // Views list their buttons here; render() puts them in the page header.
 let pendingActions = [];
 const actionBar = (buttons) => {
-  if (canWrite()) pendingActions.push(...buttons.filter(([id]) => state.admin || CASHIER_ACTS.has(id)));
+  if (canWrite()) pendingActions.push(...buttons.filter(([id]) => ACT_PERM[id]?.()));
   return '';
 };
 
@@ -633,6 +646,7 @@ document.addEventListener('click', (e) => {
   if (!b || !canWrite()) return;
   const f = forms();
   const a = b.dataset.act;
+  if (!ACT_PERM[a]?.()) return toast('ما عندك صلاحية. اطلبها من المدير.', true);
   if (a === 'newSale') return go('pos');
   if (a === 'newPurchase') f.invoiceEditor('purchase');
   if (a === 'newReceipt') f.voucherEditor('receipt', null, { name: b.dataset.name });
@@ -645,13 +659,16 @@ document.addEventListener('click', (e) => {
 // ---------- views ----------
 
 // Print / edit / delete right on each invoice row, so they don't hide
-// behind opening the invoice. Edit and delete are for managers.
+// behind opening the invoice. Each needs its own permission.
+const canEditInv = (kind) => can(kind === 'sale' ? 'sale_edit' : 'purchase_edit');
+const canDelInv = (kind) => can(kind === 'sale' ? 'sale_delete' : 'purchase_edit');
 const invoiceActions = (kind) =>
-  canWrite()
+  canWrite() && ((kind === 'sale' && can('print')) || canEditInv(kind) || canDelInv(kind))
     ? [{
         key: 'act', label: '', get: () => '', csv: () => '',
-        html: (r) => `<span class="row-acts">${kind === 'sale' ? `<button class="btn small" data-row-act="print" data-kind="sale" data-id="${r.id}" title="طباعة وصل">${icon('print')}</button>` : ''}${canAdmin()
-          ? `<button class="btn small" data-row-act="edit" data-kind="${kind}" data-id="${r.id}">${icon('edit')} تعديل</button><button class="btn small danger" data-row-act="del" data-kind="${kind}" data-id="${r.id}">${icon('trash')} مسح</button>`
+        html: (r) => `<span class="row-acts">${kind === 'sale' && can('print') ? `<button class="btn small" data-row-act="print" data-kind="sale" data-id="${r.id}" title="طباعة وصل">${icon('print')}</button>` : ''}${canEditInv(kind)
+          ? `<button class="btn small" data-row-act="edit" data-kind="${kind}" data-id="${r.id}">${icon('edit')} تعديل</button>` : ''}${canDelInv(kind)
+          ? `<button class="btn small danger" data-row-act="del" data-kind="${kind}" data-id="${r.id}">${icon('trash')} مسح</button>`
           : ''}</span>`,
       }]
     : [];
@@ -663,9 +680,9 @@ function rowAction(btn) {
   if (!inv) return toast('القائمة مو موجودة، سوّي تحديث', true);
   const f = forms();
   const act = btn.dataset.rowAct;
-  if (act === 'print') f.printSale(inv);
-  if (act === 'edit' && canAdmin()) f.invoiceEditor(kind, inv);
-  if (act === 'del' && canAdmin()) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `القائمة رقم ${id} (${fmt(inv.total)} دينار)`);
+  if (act === 'print' && can('print')) f.printSale(inv);
+  if (act === 'edit' && canEditInv(kind)) f.invoiceEditor(kind, inv);
+  if (act === 'del' && canDelInv(kind)) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `القائمة رقم ${id} (${fmt(inv.total)} دينار)`);
 }
 
 const kpi = (label, value, hint = '', accent = false) =>
@@ -756,15 +773,13 @@ function invoiceModal(inv, kind = 'sale') {
       { key: 'total', label: 'المبلغ', money: true, total: true },
     ], { name: `قائمة ${inv.id}` }), { search: false })}
     ${canWrite() ? `<div class="form-actions no-print">
-      ${kind === 'sale' ? `<button class="btn" id="invPrint">${icon('print')} طباعة وصل</button>` : ''}
-      ${canAdmin() ? `<button class="btn primary" id="invEdit">${icon('edit')} تعديل</button>
-      <button class="btn danger" id="invDel">${icon('trash')} مسح القائمة</button>` : ''}
+      ${kind === 'sale' && can('print') ? `<button class="btn" id="invPrint">${icon('print')} طباعة وصل</button>` : ''}
+      ${canEditInv(kind) ? `<button class="btn primary" id="invEdit">${icon('edit')} تعديل</button>` : ''}
+      ${canDelInv(kind) ? `<button class="btn danger" id="invDel">${icon('trash')} مسح القائمة</button>` : ''}
     </div>` : ''}`);
-  if (!canWrite()) return;
-  if (kind === 'sale') $('#invPrint').onclick = () => forms().printSale(inv);
-  if (!canAdmin()) return;
-  $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
-  $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `القائمة رقم ${inv.id}`);
+  if ($('#invPrint')) $('#invPrint').onclick = () => forms().printSale(inv);
+  if ($('#invEdit')) $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
+  if ($('#invDel')) $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `القائمة رقم ${inv.id}`);
 }
 
 function viewSales() {
@@ -816,8 +831,8 @@ function statementModal(kind, name) {
         <label>من <input type="date" id="stFrom" value="${range.from}"></label>
         <label>إلى <input type="date" id="stTo" value="${range.to}"></label>
         ${wa ? `<a class="btn small" href="${wa}" target="_blank" rel="noopener">إرسال الرصيد على واتساب</a>` : ''}
-        ${canAdmin() && person ? `<button class="btn small" id="stEdit">${icon('edit')} تعديل البيانات</button>` : ''}
-        ${person && (canAdmin() || (canWrite() && kind === 'customer')) ? `<button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
+        ${person && can(kind === 'customer' ? 'customer_edit' : 'supplier_manage') ? `<button class="btn small" id="stEdit">${icon('edit')} تعديل البيانات</button>` : ''}
+        ${person && can(kind === 'customer' ? 'receipt' : 'payment') ? `<button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
       </div>
       ${section('الحركات', table(st.rows, [
         { key: 'date', label: 'التاريخ' },
@@ -830,7 +845,7 @@ function statementModal(kind, name) {
         onClick: (r) => {
           const inv = r.kind === 'sale' || r.kind === 'paid' ? P.saleById.get(r.ref) : r.kind === 'purchase' ? P.purchases.find((p) => p.id === r.ref) : null;
           if (inv) return invoiceModal(inv, r.kind === 'purchase' ? 'purchase' : 'sale');
-          if (canAdmin() && (r.kind === 'receipt' || r.kind === 'payment')) {
+          if (can('voucher_edit') && (r.kind === 'receipt' || r.kind === 'payment')) {
             const v = (r.kind === 'receipt' ? P.receipts : P.payments).find((x) => x.id === r.ref);
             if (v) forms().voucherEditor(r.kind, v);
           }
@@ -898,8 +913,8 @@ function viewStock() {
       { key: 'buyL1', label: 'سعر الشراء (كبيرة)', money: true },
       { key: 'value', label: 'القيمة', money: true, total: true },
       { key: 'status', label: 'الحالة', html: (r) => pill(r.status), get: (r) => r.status },
-    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: canAdmin() ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
-    ${canAdmin() ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
+    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: can('item_manage') ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
+    ${can('item_manage') ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
 }
 
 function viewCash() {
@@ -937,7 +952,7 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: canAdmin() ? (r) => forms().voucherEditor('receipt', r) : null }))}
+    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: can('voucher_edit') ? (r) => forms().voucherEditor('receipt', r) : null }))}
     ${section('المدفوعات', table(b.paymentList, [
       { key: 'date', label: 'التاريخ' },
       { key: 'no', label: 'رقم الوصل' },
@@ -945,7 +960,7 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 }, onClick: canAdmin() ? (r) => forms().voucherEditor('payment', r) : null }))}`;
+    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 }, onClick: can('voucher_edit') ? (r) => forms().voucherEditor('payment', r) : null }))}`;
 }
 
 function viewPurchases() {
@@ -1046,28 +1061,29 @@ const onAfter = (fn) => afterRender.push(fn);
 
 let POS = null;
 const pos = () =>
-  (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal }));
+  (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal, can }));
 let SET = null;
 const settings = () =>
   (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal }));
 
 // ---------- navigation ----------
 
-// server: needs server.ps1 (signed in); admin: managers only.
+// server: needs server.ps1 (signed in); admin: managers only. Signed in,
+// every other screen needs the permission with its id.
 const NAV = [
   { group: 'البيع' },
   { id: 'pos', label: 'بيع سريع', server: true },
-  { id: 'home', label: 'الرئيسية', admin: true },
+  { id: 'home', label: 'الرئيسية' },
   { id: 'sales', label: 'المبيعات' },
-  { id: 'purchases', label: 'المشتريات', admin: true },
+  { id: 'purchases', label: 'المشتريات' },
   { group: 'الحسابات' },
   { id: 'customers', label: 'الزبائن' },
-  { id: 'suppliers', label: 'الموردين', admin: true },
-  { id: 'cash', label: 'الصندوق', admin: true },
-  { id: 'profit', label: 'الأرباح', admin: true },
+  { id: 'suppliers', label: 'الموردين' },
+  { id: 'cash', label: 'الصندوق' },
+  { id: 'profit', label: 'الأرباح' },
   { group: 'المخزن' },
   { id: 'stock', label: 'المخزن والأسعار' },
-  { id: 'checks', label: 'ملاحظات البيانات', admin: true },
+  { id: 'checks', label: 'ملاحظات البيانات' },
   { group: 'النظام', server: true, admin: true },
   { id: 'settings', label: 'الإعدادات', server: true, admin: true },
 ];
@@ -1084,10 +1100,23 @@ const TITLES = {
   profit: ['الأرباح', ''],
   checks: ['ملاحظات البيانات', 'أشياء تستاهل تصلّحها بحساباتي'],
   settings: ['الإعدادات', ''],
+  none: ['أهلاً', ''],
 };
 
-// In read-only mode everything readable is open; signed in, cashiers see less.
-const visible = (n) => (n.server ? state.server && (!n.admin || state.admin) : !state.server || !n.admin || state.admin);
+// In read-only mode everything readable is open; signed in, each user sees
+// the screens they were given.
+const visible = (n) => {
+  if (!state.server) return !n.server;
+  if (n.group) return !n.admin || state.admin;
+  if (n.admin) return state.admin;
+  return n.id === 'pos' ? canSell() : can(n.id);
+};
+// Where a user lands: the dashboard if they may see it, else the sale screen,
+// else the first screen they have.
+function homeView() {
+  for (const id of ['home', 'pos']) if (NAV.some((n) => n.id === id && visible(n))) return id;
+  return NAV.find((n) => n.id && visible(n))?.id || 'none';
+}
 
 function buildNav() {
   const items = NAV.filter(visible);
@@ -1099,7 +1128,7 @@ function buildNav() {
 }
 
 function go(view) {
-  if (!NAV.some((n) => n.id === view && visible(n))) view = state.server && !state.admin ? 'pos' : 'home';
+  if (!NAV.some((n) => n.id === view && visible(n))) view = homeView();
   state.view = view;
   $('#app').classList.remove('menu-open');
   render();
@@ -1119,12 +1148,13 @@ const views = {
   profit: viewProfit,
   checks: viewChecks,
   settings: () => settings().view(),
+  none: () => '<div class="card"><h3>ما عندك شاشات</h3><p class="muted">المدير ما أعطاك صلاحية على أي شاشة بعد. اطلب منه يأشّرلك من الإعدادات.</p></div>',
 };
 const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
 
 function render() {
   if (!state.P) return;
-  if (!NAV.some((n) => n.id === state.view && visible(n))) state.view = state.server && !state.admin ? 'pos' : 'home';
+  if (!NAV.some((n) => n.id === state.view && visible(n))) state.view = homeView();
   tables.clear();
   pendingActions = [];
   afterRender = [];

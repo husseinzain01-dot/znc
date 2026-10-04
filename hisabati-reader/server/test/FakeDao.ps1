@@ -5,9 +5,12 @@
 # (type, text size, autonumber) and rows. It is strict where Access is: an
 # unknown column, text longer than the field, a non-number in a number
 # field, a value outside the Long/Integer range or a bad date all throw, as
-# do writes on a read-only database or after Close. SQL is limited to what
-# server.ps1 sends (SELECT [TOP n] cols|*|Count(*) FROM t [WHERE a=x AND b<>y]
-# [ORDER BY c], DELETE FROM t WHERE ..., UPDATE t SET a=x, ... WHERE ...).
+# do writes on a read-only database or after Close, and a required (NOT
+# NULL) column left empty. SQL is limited to what server.ps1 sends:
+# SELECT [TOP n] cols|*|Count(*) FROM t [WHERE a=x AND b<>y AND c IS NULL]
+# [ORDER BY c], SELECT @@IDENTITY, INSERT INTO t (a, b) VALUES (x, y),
+# DELETE FROM t WHERE ..., UPDATE t SET a=x, ... WHERE ...; literals are
+# 'text', numbers, #yyyy-MM-dd HH:mm:ss#, Null, True, False.
 
 function New-FakeEngine([string]$jsonPath) {
     $j = Get-Content -LiteralPath $jsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -25,7 +28,7 @@ function New-FakeEngine([string]$jsonPath) {
         if ($auto -and $rows.Count) { $next = [int](($rows | ForEach-Object { [int]$_[$auto] } | Measure-Object -Maximum).Maximum) + 1 }
         $tables[$p.Name] = @{ name = $p.Name; columns = $cols; rows = $rows; auto = $auto; next = $next }
     }
-    $state = @{ tables = $tables; snapshot = $null; inTrans = $false; statements = New-Object System.Collections.Generic.List[string] }
+    $state = @{ tables = $tables; snapshot = $null; inTrans = $false; identity = 0; statements = New-Object System.Collections.Generic.List[string] }
 
     $ws = [pscustomobject]@{ State = $state }
     $ws | Add-Member ScriptMethod BeginTrans {
@@ -139,12 +142,17 @@ function Split-FakeSql([string]$sql) {
             }
             $tokens.Add(@{ k = 'str'; v = $sb.ToString() }); continue
         }
+        if ($ch -eq '#') {
+            $end = $sql.IndexOf('#', $i + 1)
+            $tokens.Add(@{ k = 'date'; v = [datetime]::ParseExact($sql.Substring($i + 1, $end - $i - 1), 'yyyy-MM-dd HH:mm:ss', [Globalization.CultureInfo]::InvariantCulture) }); $i = $end + 1; continue
+        }
         if ($ch -eq '[') {
             $end = $sql.IndexOf(']', $i)
             $tokens.Add(@{ k = 'id'; v = $sql.Substring($i + 1, $end - $i - 1) }); $i = $end + 1; continue
         }
         if ($ch -eq '<' -and $i + 1 -lt $sql.Length -and $sql[$i + 1] -eq '>') { $tokens.Add(@{ k = 'op'; v = '<>' }); $i += 2; continue }
         if ('=,*();'.Contains([string]$ch)) { $tokens.Add(@{ k = 'op'; v = [string]$ch }); $i++; continue }
+        if ($ch -eq '@' -and $sql.Substring($i).StartsWith('@@IDENTITY')) { $tokens.Add(@{ k = 'identity'; v = '@@IDENTITY' }); $i += 10; continue }
         if ([char]::IsDigit($ch) -or ($ch -eq '-' -and $i + 1 -lt $sql.Length -and [char]::IsDigit($sql[$i + 1]))) {
             $j = $i + 1
             while ($j -lt $sql.Length -and ([char]::IsDigit($sql[$j]) -or $sql[$j] -eq '.')) { $j++ }
@@ -158,15 +166,35 @@ function Split-FakeSql([string]$sql) {
     return , $tokens.ToArray()
 }
 
+# A literal token as a value: 'text', number, #date#, Null, True, False.
+function Get-FakeLiteral($tok) {
+    switch ($tok.k) {
+        'str' { return @{ ok = $true; v = $tok.v } }
+        'num' { return @{ ok = $true; v = $tok.v } }
+        'date' { return @{ ok = $true; v = $tok.v } }
+        'id' {
+            if ($tok.v -ieq 'Null') { return @{ ok = $true; v = $null } }
+            if ($tok.v -ieq 'True') { return @{ ok = $true; v = $true } }
+            if ($tok.v -ieq 'False') { return @{ ok = $true; v = $false } }
+        }
+    }
+    return @{ ok = $false }
+}
+
 function Read-FakeWhere($t, [ref]$pos) {
     $conds = @()
     while ($pos.Value -lt $t.Count) {
         $col = $t[$pos.Value]; $op = $t[$pos.Value + 1]; $val = $t[$pos.Value + 2]
-        if ($col.k -ne 'id' -or $op.k -ne 'op' -or $op.v -notin '=', '<>' -or $val.k -notin 'str', 'num') {
-            throw 'FakeDao: unsupported WHERE clause'
+        if ($col.k -eq 'id' -and $op.v -ieq 'IS' -and $val.v -ieq 'NULL') {
+            $conds += @{ col = $col.v; op = 'isnull' }
+            $pos.Value += 3
+        } else {
+            if ($col.k -ne 'id' -or $op.k -ne 'op' -or $op.v -notin '=', '<>' -or $val.k -notin 'str', 'num') {
+                throw 'FakeDao: unsupported WHERE clause'
+            }
+            $conds += @{ col = $col.v; op = $op.v; val = $val.v }
+            $pos.Value += 3
         }
-        $conds += @{ col = $col.v; op = $op.v; val = $val.v }
-        $pos.Value += 3
         if ($pos.Value -lt $t.Count -and $t[$pos.Value].v -ieq 'AND') { $pos.Value++; continue }
         break
     }
@@ -177,6 +205,7 @@ function Test-FakeRow($row, $conds, $table) {
     foreach ($c in $conds) {
         [void](Get-FakeColumn $table $c.col)
         $v = $row[$c.col]
+        if ($c.op -eq 'isnull') { if ($null -ne $v) { return $false } else { continue } }
         if ($null -eq $v) { return $false }
         $eq = if ($c.val -is [string]) { ([string]$v).TrimEnd() -ieq $c.val.TrimEnd() } else { [double]$v -eq [double]$c.val }
         if ($c.op -eq '=' -and -not $eq) { return $false }
@@ -232,6 +261,9 @@ function New-FakeDb($state, [bool]$readOnly) {
         param([string]$source, $type, $options)
         if ($this.Closed) { throw 'FakeDao: database is closed' }
         $this.State.statements.Add($source)
+        if ($source -match '^\s*SELECT\s+@@IDENTITY\s*$') {
+            return New-FakeRecordset $this @{ name = '@@IDENTITY'; columns = @(); auto = $null } @(@{ Expr1000 = $this.State.identity }) @('Expr1000') $true $false
+        }
         if ($source -notmatch '^\s*SELECT\s') {
             $table = Get-FakeTable $this.State $source
             $rows = if ($options -eq 8) { @() } else { @($table.rows) }
@@ -270,8 +302,11 @@ function New-FakeDb($state, [bool]$readOnly) {
             while ($t[$p].v -ine 'WHERE') {
                 if ($t[$p].k -eq 'op' -and $t[$p].v -eq ',') { $p++; continue }
                 $col = Get-FakeColumn $table $t[$p].v
-                if ($t[$p + 1].v -ne '=' -or $t[$p + 2].k -notin 'str', 'num') { throw "FakeDao: unsupported SET: $sql" }
-                $sets += @{ col = $col; val = (ConvertTo-FakeValue $col $t[$p + 2].v $table.name) }
+                $lit = Get-FakeLiteral $t[$p + 2]
+                if ($t[$p + 1].v -ne '=' -or -not $lit.ok) { throw "FakeDao: unsupported SET: $sql" }
+                if ($col.auto) { throw "FakeDao: cannot update autonumber $($col.name)" }
+                if ($null -eq $lit.v -and -not $col.nullable) { throw "FakeDao: You must enter a value in the '$($table.name).$($col.name)' field." }
+                $sets += @{ col = $col; val = (ConvertTo-FakeValue $col $lit.v $table.name) }
                 $p += 3
             }
             $p++
@@ -279,6 +314,40 @@ function New-FakeDb($state, [bool]$readOnly) {
             foreach ($r in @($table.rows | Where-Object { Test-FakeRow $_ $conds $table })) {
                 foreach ($s in $sets) { $r[$s.col.name] = $s.val }
             }
+            return
+        }
+        if ($t[0].v -ieq 'INSERT') {
+            if ($t[1].v -ine 'INTO' -or $t[3].v -ne '(') { throw "FakeDao: unsupported INSERT: $sql" }
+            $table = Get-FakeTable $this.State $t[2].v
+            $p = 4
+            $cols = @()
+            while ($t[$p].v -ne ')') { if ($t[$p].v -ne ',') { $cols += (Get-FakeColumn $table $t[$p].v) }; $p++ }
+            $p++
+            if ($t[$p].v -ine 'VALUES' -or $t[$p + 1].v -ne '(') { throw "FakeDao: unsupported INSERT: $sql" }
+            $p += 2
+            $vals = @()
+            while ($t[$p].v -ne ')' -or $t[$p].k -ne 'op') {
+                if ($t[$p].k -eq 'op' -and $t[$p].v -eq ',') { $p++; continue }
+                $lit = Get-FakeLiteral $t[$p]
+                if (-not $lit.ok) { throw "FakeDao: unsupported value '$($t[$p].v)' in: $sql" }
+                $vals += , $lit.v
+                $p++
+            }
+            if ($cols.Count -ne $vals.Count) { throw "FakeDao: $($cols.Count) columns but $($vals.Count) values" }
+            $row = @{}
+            foreach ($c in $table.columns) { $row[$c.name] = $null }
+            for ($i = 0; $i -lt $cols.Count; $i++) {
+                if ($cols[$i].auto) { throw "FakeDao: cannot insert into autonumber $($cols[$i].name)" }
+                $row[$cols[$i].name] = ConvertTo-FakeValue $cols[$i] $vals[$i] $table.name
+            }
+            foreach ($c in $table.columns) {
+                if (-not $c.nullable -and -not $c.auto -and $null -eq $row[$c.name] -and $c.type -ne 'boolean') {
+                    throw "FakeDao: You must enter a value in the '$($table.name).$($c.name)' field."
+                }
+                if ($c.type -eq 'boolean' -and $null -eq $row[$c.name]) { $row[$c.name] = $false }
+            }
+            if ($table.auto) { $row[$table.auto] = $table.next; $this.State.identity = $table.next; $table.next++ }
+            $table.rows.Add($row)
             return
         }
         throw "FakeDao: unsupported statement: $sql"
