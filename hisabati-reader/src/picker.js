@@ -55,7 +55,16 @@ export function databasePicker(ctx, host, onDone) {
     if (f) return choose(f.dataset.path, f);
     const d = e.target.closest('[data-dir]');
     if (d) return browse(d.dataset.dir);
+    if (e.target.closest('#pkPcGo')) return openPc();
   });
+  host.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.id === 'pkPc') openPc();
+  });
+  // a computer typed by name or IP: \\NAME
+  function openPc() {
+    const v = q('#pkPc')?.value.trim().replace(/^\\+/, '').replace(/[\\/]+$/, '');
+    if (v) browse('\\\\' + v);
+  }
 
   api('/api/candidates', { method: 'POST', body: {} })
     .then((j) => {
@@ -66,16 +75,35 @@ export function databasePicker(ctx, host, onDone) {
     })
     .catch((e) => (q('#pkFound').innerHTML = `<p class="notice error">${esc(e.message)}</p>`));
 
+  const pcBox = `<div class="row" style="display:flex;gap:8px;margin-top:10px">
+      <input id="pkPc" dir="ltr" placeholder="اسم الحاسبة أو IP، مثل SHOP-PC أو 192.168.1.10" style="flex:1">
+      <button class="btn" id="pkPcGo">افتح</button>
+    </div>`;
+
   async function browse(dir = '') {
     const box = q('#pkBrowse');
     box.hidden = false;
-    box.innerHTML = '<p class="muted">جاري الفتح…</p>';
+    box.innerHTML = `<p class="muted">${dir === 'net:' ? 'جاري البحث عن الحاسبات بالشبكة… (ممكن ياخذ لحد 15 ثانية)' : /^\\\\[^\\]+$/.test(dir) ? 'جاري فتح الحاسبة…' : 'جاري الفتح…'}</p>`;
     try {
       const j = await api('/api/browse', { method: 'POST', body: { dir } });
       if (!dir) {
         box.innerHTML = `<div class="pk-list">${(j.places || [])
-          .map((p) => `<button class="pk-dir" data-dir="${esc(p.path)}">${icon(p.kind === 'folder' ? 'file' : 'stock')} <b>${esc(p.name)}</b></button>`)
+          .map((p) => `<button class="pk-dir" data-dir="${esc(p.path)}">${p.kind === 'network' ? '🖧' : icon(p.kind === 'folder' ? 'file' : 'stock')} <b>${esc(p.name)}</b></button>`)
           .join('')}</div>`;
+        return;
+      }
+      // the network: computers, then a computer's shared folders
+      if (j.computers || j.shares) {
+        const list = j.computers
+          ? j.computers.map((c) => `<button class="pk-dir" data-dir="${esc('\\\\' + c)}">🖥 <b>${esc(c)}</b></button>`)
+          : j.shares.map((sh) => `<button class="pk-dir" data-dir="${esc(j.dir + '\\' + sh)}">📁 <b>${esc(sh)}</b></button>`);
+        const empty = j.computers
+          ? '<p class="muted">ما لكيت حاسبات. إذا الحاسبة الثانية شغّالة، اكتب اسمها أو رقم الـ IP مالها جوّه. (بالويندوز: Network discovery لازم يكون شغّال)</p>'
+          : '<p class="muted">ما بيها فولدرات مشاركة. على الحاسبة اللي بيها الملف: كلك يمين على الفولدر ← Properties ← Sharing ← Share.</p>';
+        box.innerHTML = `
+          <div class="pk-crumb"><button class="btn small" data-dir="${esc(j.parent || '')}">⬆ رجوع</button><code dir="ltr">${esc(j.computers ? 'الشبكة' : j.dir)}</code></div>
+          <div class="pk-list">${list.join('') || empty}</div>
+          ${j.computers ? pcBox : ''}`;
         return;
       }
       box.innerHTML = `
@@ -86,7 +114,9 @@ export function databasePicker(ctx, host, onDone) {
           ${!(j.files || []).length && !(j.folders || []).length ? '<p class="muted">الفولدر فارغ</p>' : ''}
         </div>`;
     } catch (e) {
-      box.innerHTML = `<p class="notice error">${esc(e.message)}</p><button class="btn small" data-dir="">رجوع للبداية</button>`;
+      box.innerHTML = `<p class="notice error">${esc(e.message)}</p>
+        <button class="btn small" data-dir="">رجوع للبداية</button> <button class="btn small" data-dir="net:">الشبكة</button>
+        ${/^\\\\/.test(dir) || dir === 'net:' ? pcBox : ''}`;
     }
   }
 

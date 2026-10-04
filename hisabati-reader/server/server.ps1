@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.5'
+$Version = '1.1.6'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -99,7 +99,8 @@ function Read-Config {
     if (Test-Path $ConfigFile) {
         try {
             $j = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($j.dbPath) { $c.dbPath = [string]$j.dbPath }
+            # older versions saved network paths as "Microsoft.PowerShell.Core\FileSystem::\\PC\..."
+            if ($j.dbPath) { $c.dbPath = ([string]$j.dbPath) -replace '^Microsoft\.PowerShell\.Core\\FileSystem::', '' }
             if ($j.shopName) { $c.shopName = [string]$j.shopName }
             if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
             if ($j.perms) {
@@ -1258,6 +1259,9 @@ function Choose-File {
 # Places to start browsing from: drives and the usual user folders.
 function Get-Places {
     $out = New-Object System.Collections.Generic.List[object]
+    $cur = Get-DbPath
+    if ($cur) { $out.Add(@{ name = 'فولدر الملف الحالي'; path = (Split-Path $cur -Parent); kind = 'folder' }) }
+    $out.Add(@{ name = 'الشبكة (الحاسبات الثانية)'; path = 'net:'; kind = 'network' })
     $userHome = $env:USERPROFILE
     foreach ($f in @(
             @{ name = 'سطح المكتب'; path = [Environment]::GetFolderPath('Desktop') },
@@ -1276,21 +1280,152 @@ function Get-Places {
 }
 
 # One folder: its sub-folders and Access files.
+# ---------------------------------------------------------------- network
+# The picker's "الشبكة": computers Windows sees on the network (like
+# Explorer's Network), then a computer's shared folders, then normal
+# folders inside a share. Network calls can hang, so they run on the side
+# with a time limit and never hold up the cashiers' requests for long.
+function Invoke-Limited([scriptblock]$sb, $arg, [int]$ms) {
+    $rs = [runspacefactory]::CreateRunspace()
+    try { $rs.ApartmentState = 'STA' } catch { }
+    $rs.Open()
+    $ps = [PowerShell]::Create()
+    $ps.Runspace = $rs
+    [void]$ps.AddScript($sb.ToString()).AddArgument($arg)
+    $h = $ps.BeginInvoke()
+    if (-not $h.AsyncWaitHandle.WaitOne($ms)) {
+        # left to finish on its own; Stop() could block as long as the call
+        $script:Abandoned += , @($ps, $rs)
+        throw 'timeout'
+    }
+    try {
+        $r = $ps.EndInvoke($h)
+        if ($ps.Streams.Error.Count -and -not $r) { throw $ps.Streams.Error[0].Exception }
+        return , @($r)
+    } catch {
+        $e = $_.Exception
+        while ($e.InnerException) { $e = $e.InnerException }
+        throw $e.Message
+    } finally { $ps.Dispose(); $rs.Dispose() }
+}
+$script:Abandoned = @()
+
+# test hook: LAWHA_FAKENET='{"PC":{"Share":"/local/folder"}}'
+function Get-FakeNet { if ($env:LAWHA_FAKENET) { return ($env:LAWHA_FAKENET | ConvertFrom-Json) } }
+function ConvertFrom-NetPath([string]$p) {
+    $net = Get-FakeNet
+    if ($net -and $p -match '^\\\\([^\\]+)\\([^\\]+)(.*)$') {
+        $pc = $net.PSObject.Properties[$Matches[1]]
+        if ($pc -and $pc.Value.PSObject.Properties[$Matches[2]]) { return [string]$pc.Value.($Matches[2]) + ($Matches[3] -replace '\\', '/') }
+    }
+    return $p
+}
+
+function Get-NetComputers {
+    $net = Get-FakeNet
+    if ($net) { return , @($net.PSObject.Properties.Name) }
+    $names = @{}
+    try {
+        $found = Invoke-Limited {
+            $sh = New-Object -ComObject Shell.Application
+            $ns = $sh.NameSpace(0x12)
+            if ($ns) { foreach ($it in $ns.Items()) { [string]$it.Path } }
+        } $null 12000
+        foreach ($p in $found) { if ($p -match '^\\\\([^\\]+)$') { $names[$Matches[1].ToUpper()] = $Matches[1] } }
+    } catch { }
+    # servers behind mapped drives and the current data file
+    try {
+        foreach ($d in (Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=4' -ErrorAction Stop)) {
+            if ([string]$d.ProviderName -match '^\\\\([^\\]+)') { $names[$Matches[1].ToUpper()] = $Matches[1] }
+        }
+    } catch { }
+    if ((Get-DbPath) -match '^\\\\([^\\]+)') { $names[$Matches[1].ToUpper()] = $Matches[1] }
+    return , @($names.Values | Sort-Object)
+}
+
+$NetShareCode = @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class LawhaNetShares {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct SHARE_INFO_1 { public string netname; public uint type; public string remark; }
+    [DllImport("Netapi32.dll", CharSet = CharSet.Unicode)]
+    static extern int NetShareEnum(string server, int level, out IntPtr buf, int prefmaxlen, out int entriesread, out int totalentries, ref int resume);
+    [DllImport("Netapi32.dll")]
+    static extern int NetApiBufferFree(IntPtr buf);
+    public static string[] List(string server) {
+        IntPtr buf;
+        int read, total, resume = 0;
+        int rc = NetShareEnum(server, 1, out buf, -1, out read, out total, ref resume);
+        if (rc != 0) throw new Exception("code " + rc);
+        List<string> list = new List<string>();
+        try {
+            int size = Marshal.SizeOf(typeof(SHARE_INFO_1));
+            for (int i = 0; i < read; i++) {
+                SHARE_INFO_1 s = (SHARE_INFO_1)Marshal.PtrToStructure(new IntPtr(buf.ToInt64() + i * size), typeof(SHARE_INFO_1));
+                // folders only (not printers), no hidden admin shares like C$
+                if ((s.type & 0xFF) == 0 && !s.netname.EndsWith("$")) list.Add(s.netname);
+            }
+        } finally { NetApiBufferFree(buf); }
+        return list.ToArray();
+    }
+}
+'@
+
+function Get-NetShares([string]$pc) {
+    $net = Get-FakeNet
+    if ($net) {
+        $p = $net.PSObject.Properties[$pc]
+        Need ($null -ne $p) "ما لكيت الحاسبة $pc"
+        return , @($p.Value.PSObject.Properties.Name)
+    }
+    if (-not ('LawhaNetShares' -as [type])) { Add-Type -TypeDefinition $NetShareCode }
+    try {
+        return , @(Invoke-Limited { param($s) [LawhaNetShares]::List($s) } "\\$pc" 15000)
+    } catch {
+        $m = [string]$_
+        if ($m -eq 'timeout' -or $m -match 'code (53|51|1231|1232|2114)\b') { throw "ما وصلت للحاسبة $pc. تأكد إنها شغّالة وعلى نفس الشبكة، أو جرّب رقم الـ IP مالها." }
+        if ($m -match 'code (5|1326|1327|1331)\b') { throw "الحاسبة $pc تحتاج اسم مستخدم وكلمة سر. افتحها مرة من File Explorer (اكتب \\$pc بشريط العنوان) واحفظ كلمة السر، وبعدين ارجع هنا." }
+        throw "ما كدرت أقرا الفولدرات المشاركة على $pc ($m)"
+    }
+}
+
 function Get-FolderListing([string]$dir) {
-    Need (Test-Path -LiteralPath $dir -PathType Container) "الفولدر مو موجود: $dir"
+    $dir = $dir.Trim()
+    if ($dir -eq 'net:') {
+        return @{ dir = 'net:'; title = 'الشبكة'; parent = ''; computers = (Get-NetComputers) }
+    }
+    if ($dir -match '^\\\\([^\\]+)\\?$') {
+        $pc = $Matches[1]
+        return @{ dir = "\\$pc"; title = $pc; parent = 'net:'; shares = (Get-NetShares $pc) }
+    }
+    $real = ConvertFrom-NetPath $dir
+    if ($real -ne $dir) { return (Get-RealFolderListing $real $dir) }
+    return (Get-RealFolderListing $dir $null)
+}
+
+# $shown: the network path to show for a test folder (see ConvertFrom-NetPath)
+function Get-RealFolderListing([string]$dir, [string]$shown) {
+    Need (Test-Path -LiteralPath $dir -PathType Container) "الفولدر مو موجود: $(if ($shown) { $shown } else { $dir })"
     $folders = New-Object System.Collections.Generic.List[string]
     $files = New-Object System.Collections.Generic.List[object]
+    $full = if ($shown) { $shown.TrimEnd('\') } else { (Resolve-Path -LiteralPath $dir).ProviderPath }
     foreach ($i in (Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue)) {
         $hidden = ($i.Attributes -band [IO.FileAttributes]::Hidden) -or ($i.Attributes -band [IO.FileAttributes]::System)
         if ($hidden) { continue }
         if ($i.PSIsContainer) { $folders.Add($i.Name) }
         elseif ($i.Extension -in '.accdb', '.mdb') {
-            $files.Add(@{ name = $i.Name; path = $i.FullName; size = $i.Length; modified = $i.LastWriteTime.ToString('yyyy-MM-dd HH:mm') })
+            $fp = if ($shown) { $full + '\' + $i.Name } else { $i.FullName }
+            $files.Add(@{ name = $i.Name; path = $fp; size = $i.Length; modified = $i.LastWriteTime.ToString('yyyy-MM-dd HH:mm') })
         }
     }
-    $parent = Split-Path $dir -Parent
+    # up from a share's top folder: the computer's shares
+    $parent = if ($full -match '^(\\\\[^\\]+)\\[^\\]+\\?$') { $Matches[1] }
+    elseif ($full -match '^\\\\') { $full.Substring(0, $full.TrimEnd('\').LastIndexOf('\')) }
+    else { Split-Path $full -Parent }
     return @{
-        dir = (Resolve-Path -LiteralPath $dir).Path; parent = $(if ($parent) { $parent } else { '' })
+        dir = $full; parent = $(if ($parent) { $parent } else { '' })
         folders = @($folders | Sort-Object); files = @($files | Sort-Object { $_.name })
     }
 }
@@ -1326,7 +1461,8 @@ function Find-Candidates {
 
 function Set-Database([string]$file) {
     Need (Test-DbFile $file) "هذا مو ملف Access (accdb): $file"
-    $script:Config.dbPath = (Resolve-Path -LiteralPath $file).Path
+    # ProviderPath: a plain path also for \\PC\share (Path would add "FileSystem::")
+    $script:Config.dbPath = (Resolve-Path -LiteralPath $file).ProviderPath
     Save-Config
     Close-Engine
     $script:BackupDay = ''
