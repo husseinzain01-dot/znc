@@ -175,6 +175,35 @@ tfoot td { font-weight: 700; background: var(--surface-2); }
 .notice { padding: 10px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); margin: 10px 0; }
 .error { background: var(--bad-bg); color: var(--bad); }
 
+/* entry forms */
+.actions-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.server-box { display: inline-flex; gap: 8px; align-items: center; }
+.server-box select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 8px; }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn.danger:hover { background: var(--bad-bg); }
+.btn:disabled { opacity: .6; cursor: wait; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; margin: 6px 0 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+.field.wide { grid-column: 1 / -1; }
+.field input, .field select, .add-line input, table.lines input, table.lines select {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 10px; font-size: 15px; color: var(--text); min-width: 0;
+}
+.field input:focus, .add-line input:focus, table.lines input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: var(--surface); padding: 8px 14px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.add-line { display: flex; gap: 8px; margin: 8px 0; }
+.add-line input { flex: 1; }
+table.lines input.qty { width: 80px; }
+table.lines input.price { width: 120px; }
+table.lines th { cursor: default; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 60;
+  background: var(--good-bg); color: var(--good); border: 1px solid var(--good); padding: 10px 18px; border-radius: 10px; box-shadow: var(--shadow);
+}
+.toast.bad { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); }
+
 @media (max-width: 600px) {
   .top, .tabs, .filters, main { padding-inline: 12px; }
   .two { grid-template-columns: 1fr; }

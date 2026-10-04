@@ -1,8 +1,10 @@
-// لوحة المحل — UI. Opens a حساباتي Access file read-only and renders reports.
+// لوحة المحل — UI. Opens a حساباتي Access file and renders reports. Opened
+// as a file it is read-only; served by server.ps1 it can also save entries.
 import { Buffer } from 'buffer';
 import MDBReader from 'mdb-reader';
 import { loadDatabase } from './load.js';
 import * as C from './calc.js';
+import { setupForms } from './forms.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -17,6 +19,22 @@ const addDays = (iso, n) => {
   return localDay(d);
 };
 const noName = (s) => s || '(بدون اسم)';
+const store = {
+  get: (k) => {
+    try {
+      return localStorage.getItem(k) || '';
+    } catch {
+      return '';
+    }
+  },
+  set: (k, v) => {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* per-device preference only */
+    }
+  },
+};
 
 const state = {
   P: null,
@@ -27,6 +45,11 @@ const state = {
   fileName: '',
   loadedAt: null,
   timer: null,
+  server: false, // served by server.ps1: can write
+  mock: false,
+  user: store.get('lawha-user'),
+  shopName: store.get('lawha-shop'),
+  stockByName: null,
 };
 
 // ---------- remembered file handle (IndexedDB) ----------
@@ -68,6 +91,7 @@ async function readBuffer(buf, name) {
   const reader = new MDBReader(Buffer.from(buf));
   const P = C.prepare(loadDatabase(reader));
   state.P = P;
+  state.stockByName = new Map(C.stock(P).map((x) => [x.name, x]));
   state.fileName = name;
   state.loadedAt = new Date();
   const users = $('#user');
@@ -76,10 +100,61 @@ async function readBuffer(buf, name) {
   users.value = P.users.includes(keep) ? keep : '';
   $('#welcome')?.remove();
   $('#tabs').hidden = false;
-  $('#btnReload').hidden = !state.handle;
-  $('#autoWrap').hidden = !state.handle;
+  $('#btnReload').hidden = !state.handle && !state.server;
+  $('#autoWrap').hidden = !state.handle && !state.server;
+  if (state.server) fillUserPick();
   status();
   render();
+}
+
+// ---------- server mode (server.ps1) ----------
+
+async function readServer() {
+  const r = await fetch('/api/file', { cache: 'no-store' });
+  if (!r.ok) throw new Error('الخادم ما رجّع الملف (' + r.status + ')');
+  const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
+  return readBuffer(await r.arrayBuffer(), name);
+}
+
+async function write(op, data) {
+  const r = await fetch('/api/write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Lawha': '1' },
+    body: JSON.stringify({ op, data }),
+  });
+  const j = await r.json().catch(() => ({ ok: false, error: 'رد غير مفهوم من الخادم' }));
+  if (!j.ok) throw new Error(j.error || 'ما انحفظ');
+  await readServer();
+  return j.result || {};
+}
+
+function toast(msg, bad = false) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('bad', bad);
+  t.hidden = false;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => (t.hidden = true), bad ? 5000 : 2500);
+}
+
+function fillUserPick() {
+  const names = [...new Set([...state.P.userNames, ...state.P.users, state.user].filter(Boolean))];
+  const sel = $('#userPick');
+  sel.innerHTML = '<option value="">— اختار —</option>' + names.map((n) => `<option${n === state.user ? ' selected' : ''}>${esc(n)}</option>`).join('');
+}
+
+async function detectServer() {
+  if (!location.protocol.startsWith('http')) return false;
+  try {
+    const r = await fetch('/api/ping', { cache: 'no-store' });
+    const j = await r.json();
+    if (!j.ok) return false;
+    state.server = true;
+    state.mock = !!j.mock;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function readHandle(handle) {
@@ -113,6 +188,7 @@ async function openFile() {
 }
 
 async function reload() {
+  if (state.server) return guarded(readServer);
   if (!state.handle) return openFile();
   if ((await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') {
     if ((await state.handle.requestPermission?.({ mode: 'read' })) !== 'granted') return;
@@ -149,13 +225,19 @@ function status() {
     return;
   }
   const t = state.loadedAt.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-  s.textContent = `${state.fileName} — آخر قراءة ${t} — البيانات لحد ${state.P.lastDate || '—'}`;
+  const mode = state.server ? (state.mock ? ' — وضع تجربة (ما ينحفظ شي)' : ' — الحفظ شغّال') : ' — قراءة فقط';
+  s.textContent = `${state.fileName} — آخر قراءة ${t}${mode}`;
 }
 
 function setAuto(on) {
   clearInterval(state.timer);
   state.timer = null;
   if (on) state.timer = setInterval(async () => {
+    if (state.server) {
+      // Don't swap the data under an open form.
+      if ($('#modal').hidden) readServer().catch((e) => console.warn('auto refresh failed', e));
+      return;
+    }
     if (!state.handle) return;
     if ((await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') return;
     try {
@@ -384,6 +466,29 @@ function closeModal() {
   $('#modal').hidden = true;
 }
 
+// ---------- forms (server mode) ----------
+
+let F = null;
+const forms = () =>
+  (F ??= setupForms({ $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast }));
+const canWrite = () => state.server;
+const actionBar = (buttons) =>
+  canWrite() ? `<div class="actions-bar no-print">${buttons.map(([id, label]) => `<button class="btn primary" data-act="${id}">${esc(label)}</button>`).join('')}</div>` : '';
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b || !canWrite()) return;
+  const f = forms();
+  const a = b.dataset.act;
+  if (a === 'newSale') f.invoiceEditor('sale');
+  if (a === 'newPurchase') f.invoiceEditor('purchase');
+  if (a === 'newReceipt') f.voucherEditor('receipt', null, { name: b.dataset.name });
+  if (a === 'newPayment') f.voucherEditor('payment', null, { name: b.dataset.name, cls: b.dataset.cls });
+  if (a === 'newCustomer') f.personEditor('customer');
+  if (a === 'newSupplier') f.personEditor('supplier');
+  if (a === 'newItem') f.itemEditor();
+});
+
 // ---------- views ----------
 
 const kpi = (label, value, hint = '') =>
@@ -417,7 +522,7 @@ function viewHome() {
 
   const topItems = s.byItem.slice(0, 8);
   const maxItem = topItems[0]?.total || 1;
-  return `${hint}
+  return `${actionBar([['newSale', '+ قائمة بيع'], ['newPurchase', '+ قائمة شراء'], ['newReceipt', '+ وصل قبض'], ['newPayment', '+ وصل دفع / مصروف']])}${hint}
   <div class="grid kpis">
     ${kpi('المبيعات', s.total, `${s.count} قائمة — ${periodLabel()}`)}
     ${kpi('نقدي', s.cash)}
@@ -472,14 +577,23 @@ function invoiceModal(inv, kind = 'sale') {
       { key: 'unit', label: 'الوحدة' },
       { key: 'price', label: 'السعر', money: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
-    ], { name: `قائمة ${inv.id}` }), { search: false })}`);
+    ], { name: `قائمة ${inv.id}` }), { search: false })}
+    ${canWrite() ? `<div class="form-actions no-print">
+      <button class="btn primary" id="invEdit">تعديل</button>
+      ${kind === 'sale' ? '<button class="btn" id="invPrint">طباعة وصل</button>' : ''}
+      <button class="btn danger" id="invDel">مسح القائمة</button>
+    </div>` : ''}`);
+  if (!canWrite()) return;
+  $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
+  if (kind === 'sale') $('#invPrint').onclick = () => forms().printSale(inv);
+  $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `القائمة رقم ${inv.id}`);
 }
 
 function viewSales() {
   const P = state.P;
   const s = C.salesSummary(P, state.filter);
   const rows = s.list.map((x) => ({ ...x, n: x.lines.length, who: x.type === C.CREDIT ? noName(x.customer) : 'نقدي' }));
-  return `<div class="grid kpis">
+  return `${actionBar([['newSale', '+ قائمة بيع']])}<div class="grid kpis">
       ${kpi('المجموع', s.total, `${s.count} قائمة`)}${kpi('نقدي', s.cash)}${kpi('آجل', s.credit)}
     </div>
     ${section('القوائم', table(rows, [
@@ -523,6 +637,8 @@ function statementModal(kind, name) {
         <label>من <input type="date" id="stFrom" value="${range.from}"></label>
         <label>إلى <input type="date" id="stTo" value="${range.to}"></label>
         ${wa ? `<a class="btn small" href="${wa}" target="_blank" rel="noopener">إرسال الرصيد على واتساب</a>` : ''}
+        ${canWrite() && person ? `<button class="btn small" id="stEdit">تعديل البيانات</button>
+          <button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
       </div>
       ${section('الحركات', table(st.rows, [
         { key: 'date', label: 'التاريخ' },
@@ -534,9 +650,18 @@ function statementModal(kind, name) {
         name: `كشف حساب ${noName(name)}`,
         onClick: (r) => {
           const inv = r.kind === 'sale' || r.kind === 'paid' ? P.saleById.get(r.ref) : r.kind === 'purchase' ? P.purchases.find((p) => p.id === r.ref) : null;
-          if (inv) invoiceModal(inv, r.kind === 'purchase' ? 'purchase' : 'sale');
+          if (inv) return invoiceModal(inv, r.kind === 'purchase' ? 'purchase' : 'sale');
+          if (canWrite() && (r.kind === 'receipt' || r.kind === 'payment')) {
+            const v = (r.kind === 'receipt' ? P.receipts : P.payments).find((x) => x.id === r.ref);
+            if (v) forms().voucherEditor(r.kind, v);
+          }
         },
       }), { search: false })}`);
+    if (canWrite() && person) {
+      $('#stEdit').onclick = () => forms().personEditor(kind, person);
+      $('#stPay').onclick = () =>
+        kind === 'customer' ? forms().voucherEditor('receipt', null, { name }) : forms().voucherEditor('payment', null, { name, cls: C.SETTLE });
+    }
     $('#stFrom').onchange = (e) => ((range.from = e.target.value), draw());
     $('#stTo').onchange = (e) => ((range.to = e.target.value), draw());
   };
@@ -558,7 +683,8 @@ function viewPeople(kind) {
     { key: 'balance', label: 'الرصيد', money: true, total: true },
     { key: 'last', label: 'آخر حركة' },
   ];
-  return `<div class="grid kpis">
+  return `${actionBar(kind === 'customer' ? [['newCustomer', '+ زبون جديد'], ['newReceipt', '+ وصل قبض']] : [['newSupplier', '+ مورد جديد'], ['newPayment', '+ وصل دفع']])}
+    <div class="grid kpis">
       ${kpi(kind === 'customer' ? 'مجموع الديون على الزبائن' : 'مجموع ديون الموردين', owed, `${list.filter((x) => x.balance > 0).length} ${kind === 'customer' ? 'زبون' : 'مورد'} عليهم رصيد`)}
     </div>
     <p class="muted">دوس على أي اسم حتى يطلعلك كشف الحساب.</p>
@@ -573,7 +699,7 @@ function viewStock() {
   const st = C.stock(P);
   const pill = (s) => `<span class="pill ${s === 'نافد' || s === 'بالسالب' ? 'bad' : s === 'قليل' ? 'warn' : 'good'}">${s}</span>`;
   const classes = [...new Set(st.map((x) => x.cls))].sort();
-  return `<div class="grid kpis">
+  return `${actionBar([['newItem', '+ مادة جديدة']])}<div class="grid kpis">
       ${kpi('قيمة المخزن بسعر الشراء', st.reduce((a, x) => a + Math.max(0, x.value), 0))}
       <div class="card kpi"><div class="label">مواد نافدة</div><div class="value num">${st.filter((x) => x.status === 'نافد').length}</div></div>
       <div class="card kpi"><div class="label">مواد رصيدها بالسالب</div><div class="value num">${st.filter((x) => x.status === 'بالسالب').length}</div><div class="hint">مبيوع أكثر من المشترى — تأكد من قوائم الشراء</div></div>
@@ -593,7 +719,8 @@ function viewStock() {
       { key: 'buyL1', label: 'سعر الشراء (كبيرة)', money: true },
       { key: 'value', label: 'القيمة', money: true, total: true },
       { key: 'status', label: 'الحالة', html: (r) => pill(r.status), get: (r) => r.status },
-    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن' }))}`;
+    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: canWrite() ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
+    ${canWrite() ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
 }
 
 function viewCash() {
@@ -607,7 +734,7 @@ function viewCash() {
     line('مشتريات نقدي', b.cashPurchases, -1),
     line('مدفوعات (تسديد موردين ومصاريف)', b.payments, -1),
   ];
-  return `<div class="grid kpis">
+  return `${actionBar([['newReceipt', '+ وصل قبض'], ['newPayment', '+ وصل دفع / مصروف']])}<div class="grid kpis">
       ${kpi('الداخل', b.totalIn)}${kpi('الطالع', b.totalOut)}${kpi('الصافي', b.net, periodLabel())}
     </div>
     ${section('حركة الصندوق', table(rows, [
@@ -631,7 +758,7 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 } }))}
+    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: canWrite() ? (r) => forms().voucherEditor('receipt', r) : null }))}
     ${section('المدفوعات', table(b.paymentList, [
       { key: 'date', label: 'التاريخ' },
       { key: 'no', label: 'رقم الوصل' },
@@ -639,7 +766,35 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 } }))}`;
+    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 }, onClick: canWrite() ? (r) => forms().voucherEditor('payment', r) : null }))}`;
+}
+
+function viewPurchases() {
+  const P = state.P;
+  const f = state.filter;
+  const list = P.purchases.filter((p) => C.inRange(p.date, f.from, f.to) && (!f.user || p.user === f.user));
+  const sum = (arr) => arr.reduce((a, p) => a + p.total, 0);
+  const bySupplier = new Map();
+  for (const p of list) bySupplier.set(p.supplier, (bySupplier.get(p.supplier) || 0) + p.total);
+  return `${actionBar([['newPurchase', '+ قائمة شراء']])}<div class="grid kpis">
+      ${kpi('المشتريات', sum(list), `${list.length} قائمة — ${periodLabel()}`)}
+      ${kpi('نقدي', sum(list.filter((p) => p.type === C.CASH)))}
+      ${kpi('آجل', sum(list.filter((p) => p.type === C.CREDIT)))}
+    </div>
+    ${section('قوائم الشراء', table(list.map((p) => ({ ...p, n: p.lines.length })), [
+      { key: 'id', label: 'رقم', num: true },
+      { key: 'no', label: 'رقم قائمة المورد' },
+      { key: 'date', label: 'التاريخ' },
+      { key: 'type', label: 'النوع' },
+      { key: 'supplier', label: 'المورد' },
+      { key: 'user', label: 'المستخدم' },
+      { key: 'n', label: 'عدد المواد', num: true },
+      { key: 'total', label: 'المبلغ', money: true, total: true },
+    ], { onClick: (r) => invoiceModal(r, 'purchase'), sort: { key: 'id', dir: -1 }, name: 'المشتريات' }))}
+    ${section('المشتريات حسب المورد', table([...bySupplier].map(([s, t]) => ({ s, t })), [
+      { key: 's', label: 'المورد' },
+      { key: 't', label: 'المبلغ', money: true, total: true },
+    ], { name: 'المشتريات حسب المورد' }), { search: false })}`;
 }
 
 function viewProfit() {
@@ -707,6 +862,7 @@ function viewChecks() {
 const views = {
   home: viewHome,
   sales: viewSales,
+  purchases: viewPurchases,
   customers: () => viewPeople('customer'),
   suppliers: () => viewPeople('supplier'),
   stock: viewStock,
@@ -714,7 +870,7 @@ const views = {
   profit: viewProfit,
   checks: viewChecks,
 };
-const periodViews = new Set(['home', 'sales', 'cash', 'profit']);
+const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
 
 function render() {
   if (!state.P) return;
@@ -756,11 +912,34 @@ function init() {
   $('#from').onchange = (e) => ((state.filter.from = e.target.value), (state.preset = ''), $$('#presets button').forEach((b) => b.classList.remove('on')), render());
   $('#to').onchange = (e) => ((state.filter.to = e.target.value), (state.preset = ''), $$('#presets button').forEach((b) => b.classList.remove('on')), render());
   $('#user').onchange = (e) => ((state.filter.user = e.target.value), render());
+  // An open entry form only closes from its own buttons, so a stray click
+  // outside it doesn't throw away what was typed.
+  const formOpen = () => !!$('#modal .form-actions [id$="Save"]');
   $('#modalClose').onclick = closeModal;
-  $('#modal').onclick = (e) => e.target.id === 'modal' && closeModal();
-  document.addEventListener('keydown', (e) => e.key === 'Escape' && closeModal());
+  $('#modal').onclick = (e) => e.target.id === 'modal' && !formOpen() && closeModal();
+  document.addEventListener('keydown', (e) => e.key === 'Escape' && !formOpen() && closeModal());
   applyPreset('today');
 
+  detectServer().then((on) => {
+    if (!on) return rememberedFile();
+    $('#btnOpen').hidden = true;
+    $('#serverBox').hidden = false;
+    $('#welcome')?.remove();
+    $('#userPick').onchange = (e) => {
+      state.user = e.target.value;
+      store.set('lawha-user', state.user);
+    };
+    $('#btnShop').onclick = () => {
+      const n = prompt('اسم المحل (يطلع بوصل الطباعة):', state.shopName || '');
+      if (n == null) return;
+      state.shopName = n.trim();
+      store.set('lawha-shop', state.shopName);
+    };
+    guarded(readServer);
+  });
+}
+
+function rememberedFile() {
   // Offer the file used last time; reading it needs one click for permission.
   idb.get('file').then((h) => {
     if (!h) return;

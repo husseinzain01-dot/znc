@@ -114,5 +114,13 @@ export function loadDatabase(reader) {
   const receipts = rows(reader, 'mablakIn').map((r) => money(r, 'nameFrom'));
   const payments = rows(reader, 'mablakOut').map((r) => money(r, 'nameto'));
 
-  return { items, sales, saleLines, purchases, purchaseLines, customers, suppliers, receipts, payments };
+  const classes = (t) => rows(reader, t).map((r) => str(r.quodCode)).filter(Boolean);
+  const classesIn = classes('quodCodeIn');
+  const classesOut = classes('quodCodeOut');
+  // Only the user names; the password column is never read.
+  const userNames = reader.getTableNames().includes('tblUsers')
+    ? reader.getTable('tblUsers').getData({ columns: ['UserName'] }).map((r) => str(r.UserName)).filter(Boolean)
+    : [];
+
+  return { items, sales, saleLines, purchases, purchaseLines, customers, suppliers, receipts, payments, classesIn, classesOut, userNames };
 }
