@@ -3,69 +3,75 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>لوحة المحل</title>
+<link rel="icon" href="/*FAVICON*/">
+<style>/*FONTS*/</style>
 <style>/*STYLES*/</style>
 </head>
 <body>
-<header class="top no-print">
-  <div class="brand">
-    <span class="logo" aria-hidden="true">▦</span>
-    <div>
-      <h1>لوحة المحل</h1>
-      <p class="sub" id="fileStatus">ما انفتح ملف بعد</p>
+
+<!-- full-screen states: loading, first-run setup, sign-in, read-only welcome -->
+<div class="screen" id="screen">
+  <div class="screen-card" id="screenCard">
+    <div class="brand-mark big" aria-hidden="true">/*LOGO*/</div>
+    <h1>لوحة المحل</h1>
+    <p class="muted">جاري التشغيل…</p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside class="side" id="side">
+    <div class="side-brand">
+      <div class="brand-mark" aria-hidden="true">/*LOGO*/</div>
+      <div class="side-brand-text">
+        <b id="shopTitle">لوحة المحل</b>
+        <small id="fileStatus"></small>
+      </div>
     </div>
-  </div>
-  <div class="file-actions">
-    <button class="btn primary" id="btnOpen">فتح ملف البيانات</button>
-    <button class="btn" id="btnReload" hidden>تحديث</button>
-    <label class="check" id="autoWrap" hidden><input type="checkbox" id="auto"> تحديث تلقائي كل دقيقة</label>
-    <input type="file" id="fileInput" accept=".accdb,.mdb" hidden>
-    <span class="server-box" id="serverBox" hidden>
-      <label class="check">المستخدم <select id="userPick"></select></label>
-      <button class="btn small" id="btnShop" title="اسم المحل للطباعة">اسم المحل</button>
-    </span>
-  </div>
-</header>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="who" id="who" hidden>
+        <span class="avatar" id="whoAvatar"></span>
+        <span class="who-text"><b id="whoName"></b><small id="whoRole"></small></span>
+        <button class="icon-btn" id="btnLogout" title="تسجيل خروج" aria-label="تسجيل خروج"></button>
+      </div>
+      <div class="sync">
+        <button class="btn ghost small" id="btnReload"></button>
+        <label class="check small" id="autoWrap"><input type="checkbox" id="auto"> تحديث تلقائي</label>
+      </div>
+      <button class="btn small ghost" id="btnOpen" hidden>فتح ملف ثاني</button>
+      <input type="file" id="fileInput" accept=".accdb,.mdb" hidden>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
 
-<nav class="tabs no-print" id="tabs" hidden>
-  <button data-view="home" class="on">الرئيسية</button>
-  <button data-view="sales">المبيعات</button>
-  <button data-view="purchases">المشتريات</button>
-  <button data-view="customers">الزبائن</button>
-  <button data-view="suppliers">الموردين</button>
-  <button data-view="stock">المخزن</button>
-  <button data-view="cash">الصندوق</button>
-  <button data-view="profit">الأرباح</button>
-  <button data-view="checks">ملاحظات البيانات</button>
-</nav>
+  <main class="content">
+    <header class="page-head no-print">
+      <button class="icon-btn menu-btn" id="btnMenu" aria-label="القائمة"></button>
+      <div class="page-title">
+        <h1 id="pageTitle"></h1>
+        <p id="pageSub" class="muted"></p>
+      </div>
+      <div class="page-actions" id="pageActions"></div>
+    </header>
 
-<section class="filters no-print" id="filters" hidden>
-  <div class="presets" id="presets">
-    <button data-p="today">اليوم</button>
-    <button data-p="yesterday">أمس</button>
-    <button data-p="week">آخر 7 أيام</button>
-    <button data-p="month">هذا الشهر</button>
-    <button data-p="all">الكل</button>
-  </div>
-  <label>من <input type="date" id="from"></label>
-  <label>إلى <input type="date" id="to"></label>
-  <label>الكاشير <select id="user"><option value="">الكل</option></select></label>
-</section>
+    <section class="filters no-print" id="filters" hidden>
+      <div class="seg" id="presets">
+        <button data-p="today">اليوم</button>
+        <button data-p="yesterday">أمس</button>
+        <button data-p="week">آخر 7 أيام</button>
+        <button data-p="month">هذا الشهر</button>
+        <button data-p="all">الكل</button>
+      </div>
+      <label>من <input type="date" id="from"></label>
+      <label>إلى <input type="date" id="to"></label>
+      <label>المستخدم <select id="user"><option value="">الكل</option></select></label>
+    </section>
 
-<main id="main">
-  <div class="welcome" id="welcome">
-    <h2>أهلاً بيك</h2>
-    <p>هذا البرنامج يقرا بيانات برنامج <b>حساباتي</b> (ملف <code>Units2026.accdb</code>) ويطلّعلك التقارير.
-       ما يغيّر أي شي بالملف، فتكدر تشتغل على حساباتي وهذا مفتوح بنفس الوقت.</p>
-    <ol>
-      <li>دوس <b>فتح ملف البيانات</b> واختار ملف <code>Units2026.accdb</code>.</li>
-      <li>البرنامج يتذكر الملف، والمرة الجاية تدوس <b>تحديث</b> بس.</li>
-      <li>إذا تريد الأرقام تتحدث وحدها، أشّر على <b>تحديث تلقائي</b>.</li>
-    </ol>
-    <button class="btn primary big" id="btnOpen2">فتح ملف البيانات</button>
-    <p class="muted" id="lastHint"></p>
-  </div>
-</main>
+    <div id="main" class="main"></div>
+  </main>
+</div>
 
 <div class="modal" id="modal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true">

@@ -1,24 +1,31 @@
-﻿# لوحة المحل — local helper for writing to the حساباتي file.
+﻿# لوحة المحل — local helper.
 #
 # Serves the app at http://localhost:8765/, hands the browser the .accdb bytes
-# for reading, and performs writes (invoices, vouchers, customers, items)
-# through Microsoft's own Access engine (DAO), inside a transaction. Field
-# values follow what حساباتي itself stores, so entries show up there as usual.
+# for reading, signs users in against حساباتي's own tblUsers, and performs
+# writes (invoices, vouchers, customers, items) through Microsoft's Access
+# engine (DAO), one transaction per save. Field values follow what حساباتي
+# stores, so entries show up there as usual.
 #
-# Only answers requests from this computer (localhost). Makes a backup copy of
-# the file before the first write of each day.
+# Settings (database path, shop name, managers) live in
+# %APPDATA%\LawhatAlMahal\config.json, so they survive updates and reinstalls.
+# A copy of the database is made before the first write of each day.
 #
-# Set $env:LAWHA_MOCK = '1' to run without Access (writes are logged, not
-# saved) — used for testing on machines without Office.
+# Testing without Access: set $env:LAWHA_FAKEDAO to a JSON export of the
+# tables (test/export-tables.mjs); writes then go to an in-memory copy.
 
 param(
     [int]$Port = 8765,
-    [string]$DbPath = '',
+    [string]$DataDir = '',
     [switch]$NoBrowser
 )
 
 $ErrorActionPreference = 'Stop'
-# start.bat runs this minimised, so show startup failures in a message box.
+$Version = '1.0.0'
+$Here = $PSScriptRoot
+# The launcher runs this without a window; then there is no console to print to.
+$Hidden = $env:LAWHA_HIDDEN -eq '1'
+
+# Startup failures in a hidden window would go unseen; show them.
 trap {
     try {
         Add-Type -AssemblyName System.Windows.Forms
@@ -26,11 +33,8 @@ trap {
     } catch { Write-Host $_ }
     break
 }
-$Here = $PSScriptRoot
-$AppFile = Join-Path $Here 'lawha.html'
-if (-not (Test-Path $AppFile)) { $AppFile = Join-Path $Here '..\release\hisabati-reader.html' }
-$ConfigFile = Join-Path $Here 'lawha-config.json'
-$Mock = $env:LAWHA_MOCK -eq '1'
+
+if ($env:LAWHA_FAKEDAO) { . (Join-Path (Join-Path $Here 'test') 'FakeDao.ps1') }
 
 # DAO constants
 $dbOpenDynaset = 2
@@ -38,50 +42,76 @@ $dbOpenSnapshot = 4
 $dbAppendOnly = 8
 $dbFailOnError = 128
 
-# ---------------------------------------------------------------- file path
+# ---------------------------------------------------------------- settings
 
-function Find-Database {
-    if ($DbPath -and (Test-Path $DbPath)) { return (Resolve-Path $DbPath).Path }
+if (-not $DataDir) {
+    $DataDir = if ($env:APPDATA) { Join-Path $env:APPDATA 'LawhatAlMahal' } else { Join-Path $Here '.data' }
+}
+New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+$ConfigFile = Join-Path $DataDir 'config.json'
+$LogDir = Join-Path $DataDir 'logs'
+New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
+
+$AppFile = Join-Path $Here 'lawha.html'
+if (-not (Test-Path $AppFile)) { $AppFile = Join-Path (Join-Path (Split-Path $Here -Parent) 'release') 'hisabati-reader.html' }
+
+function Read-Config {
+    $c = @{ dbPath = ''; shopName = ''; admins = @() }
     if (Test-Path $ConfigFile) {
         try {
-            $p = (Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json).dbPath
-            if ($p -and (Test-Path $p)) { return $p }
+            $j = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($j.dbPath) { $c.dbPath = [string]$j.dbPath }
+            if ($j.shopName) { $c.shopName = [string]$j.shopName }
+            if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
         } catch { }
     }
-    foreach ($c in @((Join-Path $Here 'Units2026.accdb'), 'C:\Units2026\Units2026.accdb', 'D:\Units2026\Units2026.accdb')) {
-        if (Test-Path $c) { return $c }
-    }
-    if ($Mock) { throw 'LAWHA_MOCK needs -DbPath' }
-    Add-Type -AssemblyName System.Windows.Forms
-    $dlg = New-Object System.Windows.Forms.OpenFileDialog -Property @{
-        Title  = 'اختار ملف حساباتي (Units2026.accdb)'
-        Filter = 'Access (*.accdb;*.mdb)|*.accdb;*.mdb'
-    }
-    if ($dlg.ShowDialog() -ne 'OK') { throw 'No database file chosen' }
-    return $dlg.FileName
+    return $c
 }
 
-$DbPath = Find-Database
-@{ dbPath = $DbPath } | ConvertTo-Json | Set-Content $ConfigFile -Encoding UTF8
+function Save-Config {
+    $script:Config | ConvertTo-Json -Depth 4 | Set-Content $ConfigFile -Encoding UTF8
+}
+
+$script:Config = Read-Config
+
+function Get-DbPath {
+    $p = $script:Config.dbPath
+    if ($p -and (Test-Path -LiteralPath $p)) { return $p }
+    return ''
+}
+
+function Write-LawhaLog([string]$line) {
+    $file = Join-Path $LogDir ('lawha-' + (Get-Date -Format 'yyyy-MM') + '.log')
+    Add-Content -LiteralPath $file -Encoding UTF8 -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $line)
+    if (-not $Hidden) { Write-Host $line }
+}
 
 # ---------------------------------------------------------------- engine
 
 $script:Engine = $null
+$script:EngineName = ''
 $script:AccessApp = $null
 $script:LastUse = Get-Date
 
 function Get-Engine {
     $script:LastUse = Get-Date
     if ($script:Engine) { return $script:Engine }
+    if ($env:LAWHA_FAKEDAO) {
+        $script:Engine = New-FakeEngine $env:LAWHA_FAKEDAO
+        $script:EngineName = 'FakeDao (test)'
+        return $script:Engine
+    }
     # In-process DAO is quickest; it only loads when its bitness matches this
     # PowerShell. Otherwise drive DAO through an invisible Access instance.
     try {
         $script:Engine = New-Object -ComObject DAO.DBEngine.120
+        $script:EngineName = 'DAO.DBEngine.120'
         return $script:Engine
     } catch { }
     try {
         $script:AccessApp = New-Object -ComObject Access.Application
         $script:Engine = $script:AccessApp.DBEngine
+        $script:EngineName = 'Access.Application ' + $script:AccessApp.Version
         return $script:Engine
     } catch {
         throw 'ما لكيت Microsoft Access على هذا الجهاز. الحفظ يحتاج Access أو Access Runtime.'
@@ -94,8 +124,36 @@ function Close-Engine {
         try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($script:AccessApp) } catch { }
     }
     $script:AccessApp = $null
-    $script:Engine = $null
+    if (-not $env:LAWHA_FAKEDAO) { $script:Engine = $null }
     [GC]::Collect()
+}
+
+# Opens the database and runs $body($db). Writes run inside a transaction
+# that commits, or rolls back on any error (always, with -Rollback).
+function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) {
+    $path = Get-DbPath
+    Need ($path -ne '') 'ما محدد ملف البيانات. اختاره من الإعدادات.'
+    $engine = Get-Engine
+    $ws = $engine.Workspaces.Item(0)
+    try {
+        $db = $ws.OpenDatabase($path, $false, [bool]$ReadOnly)
+    } catch {
+        throw "ما كدرت أفتح ملف البيانات. إذا حساباتي فاتحه بشكل حصري سدّه وجرّب مرة ثانية. ($($_.Exception.Message))"
+    }
+    try {
+        if ($ReadOnly) { return (& $body $db) }
+        $ws.BeginTrans()
+        try {
+            $result = & $body $db
+            if ($Rollback) { $ws.Rollback() } else { $ws.CommitTrans() }
+            return $result
+        } catch {
+            try { $ws.Rollback() } catch { }
+            throw
+        }
+    } finally {
+        try { $db.Close() } catch { }
+    }
 }
 
 # ---------------------------------------------------------------- backup
@@ -104,16 +162,17 @@ $script:BackupDay = ''
 function Backup-Database {
     $today = Get-Date -Format 'yyyy-MM-dd'
     if ($script:BackupDay -eq $today) { return }
-    $dir = Join-Path (Split-Path $DbPath -Parent) 'backups-lawha'
+    $path = Get-DbPath
+    Need ($path -ne '') 'ما محدد ملف البيانات'
+    $dir = Join-Path (Split-Path $path -Parent) 'backups-lawha'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $name = [IO.Path]::GetFileNameWithoutExtension($DbPath)
+    $name = [IO.Path]::GetFileNameWithoutExtension($path)
     $target = Join-Path $dir ("$name-" + (Get-Date -Format 'yyyy-MM-dd_HH-mm') + '.accdb')
-    $src = [IO.File]::Open($DbPath, 'Open', 'Read', 'ReadWrite')
+    $src = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
     try {
         $dst = [IO.File]::Create($target)
         try { $src.CopyTo($dst) } finally { $dst.Close() }
     } finally { $src.Close() }
-    # keep the 30 newest
     Get-ChildItem $dir -Filter "$name-*.accdb" | Sort-Object Name -Descending | Select-Object -Skip 30 | Remove-Item -Force
     $script:BackupDay = $today
 }
@@ -132,13 +191,25 @@ function Nullable($v) {
 
 function Day([string]$iso) {
     if (-not $iso) { return (Get-Date).Date }
-    return [datetime]::ParseExact($iso, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+    try {
+        return [datetime]::ParseExact($iso, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+    } catch { throw "التاريخ غلط: $iso" }
 }
 
 function Text([string]$s, [int]$max, [string]$label) {
     $s = if ($null -eq $s) { '' } else { $s.Trim() }
     if ($s.Length -gt $max) { throw "$label طويل: الحد $max حرف" }
     return $s
+}
+
+function Num($v, [string]$label) {
+    if ($null -eq $v -or "$v".Trim() -eq '') { return 0.0 }
+    if ($v -is [double] -or $v -is [int] -or $v -is [long] -or $v -is [decimal]) { return [double]$v }
+    $d = 0.0
+    if (-not [double]::TryParse("$v".Replace(',', ''), [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$d)) {
+        throw "$label لازم يكون رقم"
+    }
+    return $d
 }
 
 function Need([bool]$cond, [string]$msg) { if (-not $cond) { throw $msg } }
@@ -178,6 +249,21 @@ function Get-Value($db, [string]$sql) {
     } finally { $rs.Close() }
 }
 
+function Get-Column($db, [string]$sql) {
+    $rs = $db.OpenRecordset($sql, $dbOpenSnapshot)
+    $out = New-Object System.Collections.Generic.List[object]
+    try {
+        while (-not $rs.EOF) {
+            $v = $rs.Fields.Item(0).Value
+            if (-not ($v -is [DBNull]) -and $null -ne $v) { $out.Add($v) }
+            $rs.MoveNext()
+        }
+    } finally { $rs.Close() }
+    return , $out.ToArray()
+}
+
+function Count($db, [string]$sql) { return [int](Get-Value $db $sql) }
+
 function Get-MadaItem($db, [string]$name) {
     $rs = $db.OpenRecordset("SELECT IDcode, BpriceL1, BpriceL2, UnitL1, UnitL2, Fill FROM madaCode WHERE madaName=$(Q $name)", $dbOpenSnapshot)
     try {
@@ -192,33 +278,29 @@ function Get-MadaItem($db, [string]$name) {
 }
 
 function Next-VoucherNo($db, [string]$table) {
-    $rs = $db.OpenRecordset("SELECT mostandNO FROM [$table]", $dbOpenSnapshot)
     $max = 0
-    try {
-        while (-not $rs.EOF) {
-            $n = 0
-            if ([int]::TryParse([string]$rs.Fields.Item(0).Value, [ref]$n) -and $n -gt $max) { $max = $n }
-            $rs.MoveNext()
-        }
-    } finally { $rs.Close() }
+    foreach ($v in (Get-Column $db "SELECT mostandNO FROM [$table]")) {
+        $n = 0
+        if ([int]::TryParse([string]$v, [ref]$n) -and $n -gt $max) { $max = $n }
+    }
     return [string]($max + 1)
 }
 
-function Count($db, [string]$sql) { return [int](Get-Value $db $sql) }
-
 # ---------------------------------------------------------------- operations
-# Each takes ($db, $d) where $d is the JSON payload, and returns a hashtable.
+# Each takes ($db, $d): $d is the JSON payload; $d.user is set by the server
+# from the signed-in session, never taken from the browser.
 
 function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
+    $lines = @($lines | Where-Object { $null -ne $_ })
     Need ($lines.Count -gt 0) 'القائمة ما بيها مواد'
     foreach ($l in $lines) {
         $name = Text $l.item 150 'اسم المادة'
         $it = Get-MadaItem $db $name
         $unit = Text $l.unit 10 'الوحدة'
         Need ($unit -eq $it.UnitL1 -or $unit -eq $it.UnitL2) "وحدة غلط للمادة $name"
-        $qty = [double]$l.qty
+        $qty = Num $l.qty 'الكمية'
         Need ($qty -gt 0) "الكمية لازم أكثر من صفر ($name)"
-        $price = [double]$l.price
+        $price = Num $l.price 'السعر'
         Need ($price -ge 0) "السعر غلط ($name)"
         $small = ($unit -eq $it.UnitL2 -and $it.UnitL1 -ne $it.UnitL2)
         if ($kind -eq 'sale') {
@@ -226,15 +308,15 @@ function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
                 idOut = $masterId; madaNameOut = $name; QuntOut = $qty; Price = $price
                 IDcode = $it.IDcode; unit = $unit
                 BpriceL1 = $it.BpriceL1; BpriceL2 = $it.BpriceL2
-                UnitFactor = $(if ($small) { 1 } else { 0 }); note = $l.note
-            } $null | Out-Null
+                UnitFactor = $(if ($small) { 1 } else { 0 }); note = (Text $l.note 255 'الملاحظة')
+            } '' | Out-Null
         } else {
             Add-Row $db 'subIN' @{
                 IdIn = $masterId; madaNameIn = $name; QuntIn = $qty; Price = $price
                 IDcode = $it.IDcode; unit = $unit
-                UnitFactor = $(if ($small) { 1 } else { 0 }); note = $l.note
+                UnitFactor = $(if ($small) { 1 } else { 0 }); note = (Text $l.note 255 'الملاحظة')
                 expireDate = $(if ($l.expire) { Day $l.expire } else { $null })
-            } $null | Out-Null
+            } '' | Out-Null
         }
     }
 }
@@ -246,12 +328,14 @@ function Op-SaveSale($db, $d) {
     if ($type -eq 'اجل') {
         Need ($customer -ne '') 'القائمة الآجل تحتاج اسم زبون'
         Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $customer)") -gt 0) "الزبون مو موجود: $customer"
-    } else {
-        if (-not $customer) { $customer = 'قائمة نقدي' }
+    } elseif (-not $customer) {
+        $customer = 'قائمة نقدي'
     }
+    $paid = Num $d.paid 'المدفوع'
+    Need ($paid -ge 0) 'المدفوع غلط'
     $values = @{
         TOname = $customer; OutDate = (Day $d.date); OutType = $type
-        Paid = [int]([double]$d.paid); strUserName = (Text $d.user 45 'اسم المستخدم')
+        Paid = [int]$(if ($type -eq 'اجل') { $paid } else { 0 }); strUserName = (Text $d.user 45 'اسم المستخدم')
         note = (Text $d.note 255 'الملاحظة')
     }
     if ($d.id) {
@@ -262,7 +346,7 @@ function Op-SaveSale($db, $d) {
         $values.timeS = Get-Date
         $values.Mandob = 'مباشر'
         $values.Tagheez = $false
-        $id = Add-Row $db 'MasterOut' $values 'idOut'
+        $id = [int](Add-Row $db 'MasterOut' $values 'idOut')
     }
     Save-Lines $db 'sale' $id $d.lines
     return @{ id = $id }
@@ -270,16 +354,17 @@ function Op-SaveSale($db, $d) {
 
 function Op-DeleteSale($db, $d) {
     $id = [int]$d.id
+    Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$id") -gt 0) 'القائمة مو موجودة'
     $db.Execute("DELETE FROM subOut WHERE idOut=$id", $dbFailOnError)
     $db.Execute("DELETE FROM MasterOut WHERE idOut=$id", $dbFailOnError)
     return @{ id = $id }
 }
 
 function Update-BuyPrices($db, $lines) {
-    foreach ($l in $lines) {
+    foreach ($l in @($lines)) {
         $it = Get-MadaItem $db $l.item
-        $price = [double]$l.price
-        $fill = [double]$(if ($it.Fill) { $it.Fill } else { 0 })
+        $price = Num $l.price 'السعر'
+        $fill = if ($it.Fill) { [double]$it.Fill } else { 0.0 }
         $name = Q $l.item
         if ($l.unit -eq $it.UnitL1) {
             $p2 = if ($fill -gt 0) { [math]::Round($price / $fill) } else { $price }
@@ -298,7 +383,11 @@ function Op-SavePurchase($db, $d) {
     Need ($supplier -ne '') 'لازم تختار المورد'
     Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $supplier)") -gt 0) "المورد مو موجود: $supplier"
     $no = $null
-    if ("$($d.no)".Trim()) { $n = 0; Need ([int]::TryParse("$($d.no)", [ref]$n)) 'رقم قائمة المورد لازم يكون رقم'; $no = $n }
+    if ("$($d.no)".Trim()) {
+        $n = 0
+        Need ([int]::TryParse("$($d.no)".Trim(), [ref]$n)) 'رقم قائمة المورد لازم يكون رقم'
+        $no = $n
+    }
     $values = @{
         fromname = $supplier; InvoiceDate = (Day $d.date); InType = $type; InvoiceNo = $no
         strUserName = (Text $d.user 45 'اسم المستخدم'); note = (Text $d.note 255 'الملاحظة')
@@ -309,7 +398,7 @@ function Op-SavePurchase($db, $d) {
         $db.Execute("DELETE FROM subIN WHERE IdIn=$id", $dbFailOnError)
     } else {
         $values.timeS = Get-Date
-        $id = Add-Row $db 'MasterIn' $values 'IdIn'
+        $id = [int](Add-Row $db 'MasterIn' $values 'IdIn')
     }
     Save-Lines $db 'purchase' $id $d.lines
     if ($d.updatePrices) { Update-BuyPrices $db $d.lines }
@@ -318,13 +407,14 @@ function Op-SavePurchase($db, $d) {
 
 function Op-DeletePurchase($db, $d) {
     $id = [int]$d.id
+    Need ((Count $db "SELECT Count(*) FROM MasterIn WHERE IdIn=$id") -gt 0) 'القائمة مو موجودة'
     $db.Execute("DELETE FROM subIN WHERE IdIn=$id", $dbFailOnError)
     $db.Execute("DELETE FROM MasterIn WHERE IdIn=$id", $dbFailOnError)
     return @{ id = $id }
 }
 
 function Save-Voucher($db, $d, [string]$table, [string]$nameField) {
-    $amount = [double]$d.amount
+    $amount = Num $d.amount 'المبلغ'
     Need ($amount -gt 0) 'المبلغ لازم أكثر من صفر'
     $cls = Text $d.cls 35 'النوع'
     Need ($cls -ne '') 'لازم تختار النوع'
@@ -341,25 +431,35 @@ function Save-Voucher($db, $d, [string]$table, [string]$nameField) {
     } else {
         $values.timeS = Get-Date
         $values.mostandNO = Next-VoucherNo $db $table
-        $id = Add-Row $db $table $values 'idS'
+        $id = [int](Add-Row $db $table $values 'idS')
     }
     return @{ id = $id }
 }
 
 function Op-SaveReceipt($db, $d) {
     if ($d.cls -eq 'تسديد') {
+        Need ("$($d.name)".Trim() -ne '') 'التسديد يحتاج اسم'
         Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $d.name)") -gt 0) "الزبون مو موجود: $($d.name)"
     }
     return Save-Voucher $db $d 'mablakIn' 'nameFrom'
 }
+
 function Op-SavePayment($db, $d) {
     if ($d.cls -eq 'تسديد') {
+        Need ("$($d.name)".Trim() -ne '') 'التسديد يحتاج اسم'
         Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $d.name)") -gt 0) "المورد مو موجود: $($d.name)"
     }
     return Save-Voucher $db $d 'mablakOut' 'nameto'
 }
-function Op-DeleteReceipt($db, $d) { $db.Execute("DELETE FROM mablakIn WHERE idS=$([int]$d.id)", $dbFailOnError); return @{ id = $d.id } }
-function Op-DeletePayment($db, $d) { $db.Execute("DELETE FROM mablakOut WHERE idS=$([int]$d.id)", $dbFailOnError); return @{ id = $d.id } }
+
+function Delete-Voucher($db, [string]$table, $d) {
+    $id = [int]$d.id
+    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE idS=$id") -gt 0) 'الوصل مو موجود'
+    $db.Execute("DELETE FROM [$table] WHERE idS=$id", $dbFailOnError)
+    return @{ id = $id }
+}
+function Op-DeleteReceipt($db, $d) { return Delete-Voucher $db 'mablakIn' $d }
+function Op-DeletePayment($db, $d) { return Delete-Voucher $db 'mablakOut' $d }
 
 # Names link invoices and vouchers to people and items, so a rename is
 # carried into every table that stores the name.
@@ -389,17 +489,18 @@ function Op-SaveCustomer($db, $d) {
     $id = if ($d.id) { [int]$d.id } else { 0 }
     Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $name) AND id<>$id") -eq 0) "أكو زبون بنفس الاسم: $name"
     $values = @{
-        bayeeCode = $name; MB = [int]([double]$d.opening); CMobile = (Text $d.mobile 12 'الموبايل')
+        bayeeCode = $name; MB = [int](Num $d.opening 'الرصيد الافتتاحي'); CMobile = (Text $d.mobile 12 'الموبايل')
         Cadress = (Text $d.address 255 'العنوان'); Ctype = (Text $d.type 30 'النوع')
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT bayeeCode FROM bayeeCode WHERE id=$id")
+        Need ($old -ne '') 'الزبون مو موجود'
         Edit-Row $db 'bayeeCode' 'id' $id $values
         Rename-Links $db 'customer' $old $name
     } else {
         $now = Get-Date
         $values += @{ credit = 0; RegDate = $now.Date; Cdate = $now.Date; Ctime = $now; Mandob = 'مباشر'; Group = 'المجموعة العامة' }
-        $id = Add-Row $db 'bayeeCode' $values 'id'
+        $id = [int](Add-Row $db 'bayeeCode' $values 'id')
     }
     return @{ id = $id }
 }
@@ -410,17 +511,18 @@ function Op-SaveSupplier($db, $d) {
     $id = if ($d.id) { [int]$d.id } else { 0 }
     Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $name) AND ID<>$id") -eq 0) "أكو مورد بنفس الاسم: $name"
     $values = @{
-        shiraCode = $name; MB = [double]$d.opening; CMobile = (Text $d.mobile 12 'الموبايل')
+        shiraCode = $name; MB = (Num $d.opening 'الرصيد الافتتاحي'); CMobile = (Text $d.mobile 12 'الموبايل')
         Cadress = (Text $d.address 255 'العنوان')
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT shiraCode FROM shiraCode WHERE ID=$id")
+        Need ($old -ne '') 'المورد مو موجود'
         Edit-Row $db 'shiraCode' 'ID' $id $values
         Rename-Links $db 'supplier' $old $name
     } else {
         $now = Get-Date
         $values += @{ RegDate = $now.Date; Cdate = $now.Date; Ctime = $now }
-        $id = Add-Row $db 'shiraCode' $values 'ID'
+        $id = [int](Add-Row $db 'shiraCode' $values 'ID')
     }
     return @{ id = $id }
 }
@@ -428,7 +530,8 @@ function Op-SaveSupplier($db, $d) {
 function Op-SaveItem($db, $d) {
     $name = Text $d.name 150 'اسم المادة'
     Need ($name -ne '') 'لازم تكتب اسم المادة'
-    $code = Text $d.code 255 'الرمز'
+    # subOut.IDcode holds 15 characters
+    $code = Text $d.code 15 'الرمز'
     $u1 = Text $d.unitL1 10 'الوحدة الكبيرة'
     $u2 = Text $d.unitL2 10 'الوحدة الصغيرة'
     Need ($u1 -ne '') 'لازم تكتب الوحدة الكبيرة'
@@ -436,20 +539,21 @@ function Op-SaveItem($db, $d) {
     $id = if ($d.id) { [int]$d.id } else { 0 }
     Need ((Count $db "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $name) AND ID<>$id") -eq 0) "أكو مادة بنفس الاسم: $name"
     if ($code) { Need ((Count $db "SELECT Count(*) FROM madaCode WHERE IDcode=$(Q $code) AND ID<>$id") -eq 0) "أكو مادة بنفس الرمز: $code" }
-    $price = [int]([double]$d.priceL1)
+    $price = [int](Num $d.priceL1 'سعر البيع')
     $values = @{
         madaName = $name; IDcode = $code; MadaClass = (Text $d.cls 255 'الصنف')
-        price = $price; 'price$' = $price; priceSeeat = [int]([double]$d.priceL2)
-        Fill = [int]([double]$d.fill); BpriceL1 = [double]$d.buyL1; BpriceL2 = [double]$d.buyL2
-        UnitL1 = $u1; UnitL2 = $u2; harig = [int]([double]$d.harig)
-        Pr = [double]$d.openL1; Pru = [double]$d.openL2
+        price = $price; 'price$' = $price; priceSeeat = [int](Num $d.priceL2 'سعر البيع')
+        Fill = [int](Num $d.fill 'التعبئة'); BpriceL1 = (Num $d.buyL1 'سعر الشراء'); BpriceL2 = (Num $d.buyL2 'سعر الشراء')
+        UnitL1 = $u1; UnitL2 = $u2; harig = [int](Num $d.harig 'حد الطلب')
+        Pr = (Num $d.openL1 'الرصيد الافتتاحي'); Pru = (Num $d.openL2 'الرصيد الافتتاحي')
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT madaName FROM madaCode WHERE ID=$id")
+        Need ($old -ne '') 'المادة مو موجودة'
         Edit-Row $db 'madaCode' 'ID' $id $values
         Rename-Links $db 'item' $old $name
     } else {
-        $id = Add-Row $db 'madaCode' $values 'ID'
+        $id = [int](Add-Row $db 'madaCode' $values 'ID')
     }
     return @{ id = $id }
 }
@@ -463,9 +567,9 @@ function Delete-Named($db, [string]$kind, [string]$table, [string]$idField, [str
     $db.Execute("DELETE FROM [$table] WHERE [$idField]=$id", $dbFailOnError)
     return @{ id = $id }
 }
-function Op-DeleteCustomer($db, $d) { Delete-Named $db 'customer' 'bayeeCode' 'id' 'bayeeCode' $d }
-function Op-DeleteSupplier($db, $d) { Delete-Named $db 'supplier' 'shiraCode' 'ID' 'shiraCode' $d }
-function Op-DeleteItem($db, $d) { Delete-Named $db 'item' 'madaCode' 'ID' 'madaName' $d }
+function Op-DeleteCustomer($db, $d) { return Delete-Named $db 'customer' 'bayeeCode' 'id' 'bayeeCode' $d }
+function Op-DeleteSupplier($db, $d) { return Delete-Named $db 'supplier' 'shiraCode' 'ID' 'shiraCode' $d }
+function Op-DeleteItem($db, $d) { return Delete-Named $db 'item' 'madaCode' 'ID' 'madaName' $d }
 
 $Ops = @{
     saveSale = 'Op-SaveSale'; deleteSale = 'Op-DeleteSale'
@@ -477,33 +581,181 @@ $Ops = @{
     saveItem = 'Op-SaveItem'; deleteItem = 'Op-DeleteItem'
 }
 
+# What a cashier (non-manager) may do: new sales, receipts and customers.
+function Test-Allowed([string]$op, $data, $session) {
+    if ($session.admin) { return }
+    $isNew = -not $data.id
+    $ok = $isNew -and ($op -in @('saveSale', 'saveReceipt', 'saveCustomer'))
+    Need $ok 'هاي العملية تحتاج صلاحية مدير'
+}
+
 function Invoke-Write([string]$op, $data) {
     Need ($Ops.ContainsKey($op)) "عملية مو معروفة: $op"
-    if ($Mock) {
-        Add-Content (Join-Path $Here 'mock-writes.log') -Encoding UTF8 -Value (@{ op = $op; data = $data } | ConvertTo-Json -Depth 6 -Compress)
-        return @{ id = 999999; mock = $true }
-    }
     Backup-Database
-    $engine = Get-Engine
-    $ws = $engine.Workspaces.Item(0)
-    try {
-        $db = $ws.OpenDatabase($DbPath, $false, $false)
-    } catch {
-        throw "ما كدرت أفتح الملف للكتابة. إذا حساباتي فاتحه بشكل حصري سدّه وجرّب مرة ثانية. ($($_.Exception.Message))"
+    $fn = $Ops[$op]
+    return Use-Database { param($db) & $fn $db $data }
+}
+
+# ---------------------------------------------------------------- users
+
+function Get-TableNames($db) {
+    $names = @()
+    foreach ($t in $db.TableDefs) { $names += [string]$t.Name }
+    return , $names
+}
+
+function Get-UserNames {
+    return Use-Database -ReadOnly { param($db)
+        if ((Get-TableNames $db) -notcontains 'tblUsers') { return , @() }
+        return , @((Get-Column $db 'SELECT UserName FROM tblUsers') | ForEach-Object { [string]$_ } | Where-Object { $_ })
     }
-    try {
-        $ws.BeginTrans()
+}
+
+# Same rule as حساباتي's login (Module1.sec): the stored password must equal
+# what was typed.
+function Test-Login([string]$user, [string]$password) {
+    return Use-Database -ReadOnly { param($db)
+        if ((Get-TableNames $db) -notcontains 'tblUsers') { return $true }
+        $rs = $db.OpenRecordset("SELECT UserPWD FROM tblUsers WHERE UserName=$(Q $user)", $dbOpenSnapshot)
         try {
-            $result = & $Ops[$op] $db $data
-            $ws.CommitTrans()
-            return $result
-        } catch {
-            try { $ws.Rollback() } catch { }
-            throw
-        }
-    } finally {
-        try { $db.Close() } catch { }
+            if ($rs.EOF) { return $false }
+            $stored = $rs.Fields.Item(0).Value
+            if ($stored -is [DBNull] -or $null -eq $stored) { return $false }
+            return ([string]$stored -ceq $password)
+        } finally { $rs.Close() }
     }
+}
+
+function Test-Admin([string]$user) {
+    $admins = @($script:Config.admins)
+    return ($admins.Count -eq 0 -or $admins -contains $user)
+}
+
+$script:Sessions = @{}
+
+function New-Token {
+    $bytes = New-Object byte[] 24
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    return [BitConverter]::ToString($bytes).Replace('-', '').ToLower()
+}
+
+function Get-Session($req) {
+    $t = [string]$req.Headers['X-Token']
+    if ($t -and $script:Sessions.ContainsKey($t)) {
+        $s = $script:Sessions[$t]
+        $s.admin = Test-Admin $s.user   # managers can change while signed in
+        return $s
+    }
+    return $null
+}
+
+# ---------------------------------------------------------------- self-test
+
+# Runs every kind of save inside one transaction, checks each result, then
+# rolls everything back, so the data file is left exactly as it was.
+function Invoke-SelfTest {
+    $steps = New-Object System.Collections.Generic.List[object]
+    function Step([string]$name, [scriptblock]$body) {
+        try {
+            $msg = & $body
+            $steps.Add(@{ name = $name; ok = $true; msg = [string]$msg })
+            return $true
+        } catch {
+            $steps.Add(@{ name = $name; ok = $false; msg = $_.Exception.Message })
+            return $false
+        }
+    }
+    $today = Get-Date -Format 'yyyy-MM-dd'
+
+    if (-not (Step 'ملف البيانات محدد وموجود' { $p = Get-DbPath; Need ($p -ne '') 'ما محدد ملف البيانات'; $p })) { return , $steps.ToArray() }
+    if (-not (Step 'محرك Access' { [void](Get-Engine); $script:EngineName })) { return , $steps.ToArray() }
+    Step 'فولدر النسخ الاحتياطي' {
+        $dir = Join-Path (Split-Path (Get-DbPath) -Parent) 'backups-lawha'
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $probe = Join-Path $dir 'lawha-write-test.tmp'
+        Set-Content -LiteralPath $probe 'ok'
+        Remove-Item -LiteralPath $probe -Force
+        $dir
+    } | Out-Null
+
+    $tag = 'فحص-لوحة-' + (Get-Random -Maximum 99999)
+    $u = 'فحص النظام'
+    $script:st = @{}
+    try {
+        Use-Database -Rollback { param($db)
+            Step 'قراءة المواد والموردين' {
+                $script:st.item = [string](Get-Value $db 'SELECT TOP 1 madaName FROM madaCode ORDER BY ID')
+                $script:st.supplier = [string](Get-Value $db 'SELECT TOP 1 shiraCode FROM shiraCode ORDER BY ID')
+                Need ($script:st.item -ne '') 'ماكو مواد'
+                "$($script:st.item) / $($script:st.supplier)"
+            } | Out-Null
+            $it = Get-MadaItem $db $script:st.item
+            $small = if ($it.UnitL2) { [string]$it.UnitL2 } else { [string]$it.UnitL1 }
+            $big = [string]$it.UnitL1
+            $item = $script:st.item
+
+            Step 'إضافة زبون' {
+                $script:st.cust = (Op-SaveCustomer $db @{ name = $tag; mobile = '07700000000'; opening = 1000; type = 'جملة'; user = $u }).id
+                Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)") -eq 1) 'الزبون ما انضاف'
+                "رقم $($script:st.cust)"
+            } | Out-Null
+            Step 'قائمة بيع آجل' {
+                $script:st.sale = (Op-SaveSale $db @{ type = 'اجل'; customer = $tag; date = $today; paid = 500; user = $u
+                        lines = @(@{ item = $item; unit = $small; qty = 2; price = 1500 }) }).id
+                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 1) 'سطر القائمة ما انضاف'
+                "رقم $($script:st.sale)"
+            } | Out-Null
+            Step 'تعديل قائمة البيع' {
+                Op-SaveSale $db @{ id = $script:st.sale; type = 'اجل'; customer = $tag; date = $today; paid = 0; user = $u
+                    lines = @(@{ item = $item; unit = $small; qty = 3; price = 1500 }, @{ item = $item; unit = $big; qty = 1; price = 1000 }) } | Out-Null
+                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'التعديل ما انحفظ'
+                'تمام'
+            } | Out-Null
+            Step 'قائمة بيع نقدي' {
+                $script:st.cash = (Op-SaveSale $db @{ type = 'نقدي'; date = $today; user = $u; lines = @(@{ item = $item; unit = $small; qty = 1; price = 1000 }) }).id
+                "رقم $($script:st.cash)"
+            } | Out-Null
+            Step 'وصل قبض' {
+                $script:st.rec = (Op-SaveReceipt $db @{ cls = 'تسديد'; name = $tag; amount = 2500; date = $today; user = $u }).id
+                "رقم $($script:st.rec)"
+            } | Out-Null
+            Step 'وصل دفع (مصروف)' {
+                $script:st.pay = (Op-SavePayment $db @{ cls = 'مصاريف متفرقة'; name = ''; amount = 100; note = $tag; date = $today; user = $u }).id
+                "رقم $($script:st.pay)"
+            } | Out-Null
+            if ($script:st.supplier) {
+                Step 'قائمة شراء وتحديث سعر الشراء' {
+                    $script:st.pur = (Op-SavePurchase $db @{ type = 'اجل'; supplier = $script:st.supplier; date = $today; user = $u; updatePrices = $true
+                            lines = @(@{ item = $item; unit = $big; qty = 1; price = 1 }) }).id
+                    "رقم $($script:st.pur)"
+                } | Out-Null
+            }
+            Step 'إضافة وتعديل ومسح مادة' {
+                $iid = (Op-SaveItem $db @{ name = $tag; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10; priceL1 = 10000; priceL2 = 1000; buyL1 = 9000; buyL2 = 900 }).id
+                Op-SaveItem $db @{ id = $iid; name = "$tag-2"; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10; priceL1 = 11000; priceL2 = 1100; buyL1 = 9000; buyL2 = 900 } | Out-Null
+                Op-DeleteItem $db @{ id = $iid } | Out-Null
+                'تمام'
+            } | Out-Null
+            Step 'مسح القوائم والوصولات' {
+                Op-DeleteSale $db @{ id = $script:st.sale } | Out-Null
+                Op-DeleteSale $db @{ id = $script:st.cash } | Out-Null
+                Op-DeleteReceipt $db @{ id = $script:st.rec } | Out-Null
+                Op-DeletePayment $db @{ id = $script:st.pay } | Out-Null
+                if ($script:st.pur) { Op-DeletePurchase $db @{ id = $script:st.pur } | Out-Null }
+                Op-DeleteCustomer $db @{ id = $script:st.cust } | Out-Null
+                Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 0) 'القائمة ما انمسحت'
+                'تمام'
+            } | Out-Null
+        }
+    } catch {
+        $steps.Add(@{ name = 'فتح الملف للكتابة'; ok = $false; msg = $_.Exception.Message })
+    }
+    Step 'الملف رجع مثل ما جان (التجربة انلغت)' {
+        $left = Use-Database -ReadOnly { param($db) Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)" }
+        Need ($left -eq 0) 'بقت بيانات تجربة بالملف!'
+        'تمام'
+    } | Out-Null
+    return , $steps.ToArray()
 }
 
 # ---------------------------------------------------------------- http
@@ -523,6 +775,29 @@ function Send-Json($ctx, [int]$status, $obj) {
     Send $ctx $status ([Text.Encoding]::UTF8.GetBytes($json)) 'application/json; charset=utf-8'
 }
 
+function Read-Body($req) {
+    $body = (New-Object IO.StreamReader($req.InputStream, [Text.Encoding]::UTF8)).ReadToEnd()
+    if (-not $body) { return [pscustomobject]@{} }
+    return $body | ConvertFrom-Json
+}
+
+function Choose-File {
+    Add-Type -AssemblyName System.Windows.Forms
+    $owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }
+    $dlg = New-Object System.Windows.Forms.OpenFileDialog -Property @{
+        Title  = 'اختار ملف حساباتي (Units2026.accdb)'
+        Filter = 'Access (*.accdb;*.mdb)|*.accdb;*.mdb'
+    }
+    $cur = Get-DbPath
+    if ($cur) { $dlg.InitialDirectory = Split-Path $cur -Parent }
+    try {
+        if ($dlg.ShowDialog($owner) -ne 'OK') { return '' }
+        return $dlg.FileName
+    } finally { $owner.Dispose() }
+}
+
+$script:Stop = $false
+
 function Handle($ctx) {
     $req = $ctx.Request
     # Refuse anything not addressed to this machine (DNS rebinding).
@@ -531,49 +806,145 @@ function Handle($ctx) {
         return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden host' }
     }
     $path = $req.Url.AbsolutePath
-    switch ($path) {
-        '/' {
-            return Send $ctx 200 ([IO.File]::ReadAllBytes($AppFile)) 'text/html; charset=utf-8'
-        }
-        '/api/ping' {
-            return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($DbPath); writable = $true; mock = $Mock }
-        }
-        '/api/file' {
-            $fs = [IO.File]::Open($DbPath, 'Open', 'Read', 'ReadWrite')
-            try {
-                $res = $ctx.Response
-                $res.StatusCode = 200
-                $res.ContentType = 'application/octet-stream'
-                $res.Headers['Cache-Control'] = 'no-store'
-                $res.Headers['X-File-Name'] = [Uri]::EscapeDataString([IO.Path]::GetFileName($DbPath))
-                $res.ContentLength64 = $fs.Length
-                $fs.CopyTo($res.OutputStream)
-                $res.OutputStream.Close()
-            } finally { $fs.Close() }
-            return
-        }
-        '/api/write' {
-            # A custom header forces a CORS preflight, which this server never
-            # approves, so other web pages cannot post here.
-            if ($req.HttpMethod -ne 'POST' -or $req.Headers['X-Lawha'] -ne '1') {
-                return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden' }
-            }
-            $body = (New-Object IO.StreamReader($req.InputStream, [Text.Encoding]::UTF8)).ReadToEnd()
-            $msg = $body | ConvertFrom-Json
-            try {
-                $r = Invoke-Write ([string]$msg.op) $msg.data
-                Write-Host ("{0:HH:mm:ss}  {1} OK {2}" -f (Get-Date), $msg.op, $r.id) -ForegroundColor Green
-                return Send-Json $ctx 200 @{ ok = $true; result = $r }
-            } catch {
-                Write-Host ("{0:HH:mm:ss}  {1} FAILED: {2}" -f (Get-Date), $msg.op, $_.Exception.Message) -ForegroundColor Red
-                return Send-Json $ctx 200 @{ ok = $false; error = $_.Exception.Message }
-            }
-        }
-        default {
-            return Send-Json $ctx 404 @{ ok = $false; error = 'not found' }
+    if ($path -eq '/') {
+        return Send $ctx 200 ([IO.File]::ReadAllBytes($AppFile)) 'text/html; charset=utf-8'
+    }
+    if ($path -eq '/api/ping') {
+        $p = Get-DbPath
+        return Send-Json $ctx 200 @{
+            ok = $true; version = $Version; configured = ($p -ne '')
+            file = $(if ($p) { [IO.Path]::GetFileName($p) } else { '' })
+            shopName = $script:Config.shopName; test = [bool]$env:LAWHA_FAKEDAO
         }
     }
+    # Everything else must come from the app itself: a custom header forces a
+    # CORS preflight, which this server never approves.
+    if ($req.Headers['X-Lawha'] -ne '1') { return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden' } }
+
+    try {
+        switch ($path) {
+            '/api/users' {
+                return Send-Json $ctx 200 @{ ok = $true; users = @(Get-UserNames) }
+            }
+            '/api/login' {
+                $b = Read-Body $req
+                $user = [string]$b.user
+                Need ($user -ne '') 'اختار المستخدم'
+                if (-not (Test-Login $user ([string]$b.password))) {
+                    Write-LawhaLog "login FAILED $user"
+                    return Send-Json $ctx 200 @{ ok = $false; error = 'كلمة السر غلط' }
+                }
+                $t = New-Token
+                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user) }
+                Write-LawhaLog "login $user"
+                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user) }
+            }
+            '/api/choose-file' {
+                $s = Get-Session $req
+                Need ((Get-DbPath) -eq '' -or ($s -and $s.admin)) 'تغيير ملف البيانات يحتاج صلاحية مدير'
+                $b = Read-Body $req
+                $file = if ($env:LAWHA_FAKEDAO -and $b.path) { [string]$b.path } else { Choose-File }
+                if (-not $file) { return Send-Json $ctx 200 @{ ok = $false; error = 'ما اخترت ملف' } }
+                Need (Test-Path -LiteralPath $file) 'الملف مو موجود'
+                $script:Config.dbPath = $file
+                Save-Config
+                Close-Engine
+                $script:BackupDay = ''
+                Write-LawhaLog "database set to $file"
+                return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($file) }
+            }
+            '/api/shutdown' {
+                $script:Stop = $true
+                return Send-Json $ctx 200 @{ ok = $true }
+            }
+        }
+
+        $s = Get-Session $req
+        if (-not $s) { return Send-Json $ctx 401 @{ ok = $false; error = 'سجّل دخول'; login = $true } }
+
+        switch ($path) {
+            '/api/me' {
+                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin }
+            }
+            '/api/logout' {
+                $script:Sessions.Remove([string]$req.Headers['X-Token'])
+                return Send-Json $ctx 200 @{ ok = $true }
+            }
+            '/api/file' {
+                $p = Get-DbPath
+                Need ($p -ne '') 'ما محدد ملف البيانات'
+                $fs = [IO.File]::Open($p, 'Open', 'Read', 'ReadWrite')
+                try {
+                    $res = $ctx.Response
+                    $res.StatusCode = 200
+                    $res.ContentType = 'application/octet-stream'
+                    $res.Headers['Cache-Control'] = 'no-store'
+                    $res.Headers['X-File-Name'] = [Uri]::EscapeDataString([IO.Path]::GetFileName($p))
+                    $res.ContentLength64 = $fs.Length
+                    $fs.CopyTo($res.OutputStream)
+                    $res.OutputStream.Close()
+                } finally { $fs.Close() }
+                return
+            }
+            '/api/write' {
+                $msg = Read-Body $req
+                $op = [string]$msg.op
+                $data = $msg.data
+                if ($null -eq $data) { $data = [pscustomobject]@{} }
+                try {
+                    Test-Allowed $op $data $s
+                    $data | Add-Member -NotePropertyName user -NotePropertyValue $s.user -Force
+                    $r = Invoke-Write $op $data
+                    Write-LawhaLog "$($s.user)  $op OK $($r.id)"
+                    return Send-Json $ctx 200 @{ ok = $true; result = $r }
+                } catch {
+                    Write-LawhaLog "$($s.user)  $op FAILED: $($_.Exception.Message)"
+                    return Send-Json $ctx 200 @{ ok = $false; error = $_.Exception.Message }
+                }
+            }
+            '/api/settings' {
+                if ($req.HttpMethod -eq 'POST') {
+                    Need $s.admin 'الإعدادات تحتاج صلاحية مدير'
+                    $b = Read-Body $req
+                    if ($null -ne $b.shopName) { $script:Config.shopName = (Text ([string]$b.shopName) 60 'اسم المحل') }
+                    if ($null -ne $b.admins) {
+                        $list = @($b.admins | ForEach-Object { [string]$_ } | Where-Object { $_ })
+                        Need ($list.Count -eq 0 -or $list -contains $s.user) 'لازم تبقى أنت من المدراء'
+                        $script:Config.admins = $list
+                    }
+                    Save-Config
+                    Write-LawhaLog "$($s.user)  settings saved"
+                }
+                return Send-Json $ctx 200 @{
+                    ok = $true; shopName = $script:Config.shopName; admins = @($script:Config.admins)
+                    dbPath = (Get-DbPath); dataDir = $DataDir; version = $Version; engine = $script:EngineName
+                }
+            }
+            '/api/selftest' {
+                Need $s.admin 'فحص النظام يحتاج صلاحية مدير'
+                $steps = Invoke-SelfTest
+                $ok = -not ($steps | Where-Object { -not $_.ok })
+                Write-LawhaLog "$($s.user)  selftest $(if ($ok) { 'PASSED' } else { 'FAILED' })"
+                return Send-Json $ctx 200 @{ ok = $true; passed = $ok; steps = $steps; engine = $script:EngineName }
+            }
+            '/api/open-backups' {
+                Need $s.admin 'تحتاج صلاحية مدير'
+                $dir = Join-Path (Split-Path (Get-DbPath) -Parent) 'backups-lawha'
+                New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                if (-not $env:LAWHA_FAKEDAO) { Start-Process explorer.exe $dir }
+                return Send-Json $ctx 200 @{ ok = $true; dir = $dir }
+            }
+            default {
+                return Send-Json $ctx 404 @{ ok = $false; error = 'not found' }
+            }
+        }
+    } catch {
+        return Send-Json $ctx 200 @{ ok = $false; error = $_.Exception.Message }
+    }
 }
+
+# Dot-sourcing (tests) loads the functions without starting the server.
+if ($MyInvocation.InvocationName -eq '.') { return }
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
@@ -585,15 +956,15 @@ try {
     exit
 }
 
-Write-Host ''
-Write-Host "  Lawhat Al-Mahal is running:  http://localhost:$Port/" -ForegroundColor Cyan
-Write-Host "  Database: $DbPath"
-Write-Host '  Keep this window open while you use the program. Press Ctrl+C to stop.'
-Write-Host ''
+Write-LawhaLog "server $Version started on port $Port"
+if (-not $Hidden) {
+    Write-Host "  Lawhat Al-Mahal $Version  http://localhost:$Port/" -ForegroundColor Cyan
+    Write-Host '  Keep this window open while you use the program. Press Ctrl+C to stop.'
+}
 if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
 
 try {
-    while ($listener.IsListening) {
+    while ($listener.IsListening -and -not $script:Stop) {
         $async = $listener.BeginGetContext($null, $null)
         while (-not $async.AsyncWaitHandle.WaitOne(1000)) {
             # Let an idle Access instance go after two minutes.
@@ -607,6 +978,7 @@ try {
         }
     }
 } finally {
+    Write-LawhaLog 'server stopped'
     Close-Engine
     $listener.Close()
 }

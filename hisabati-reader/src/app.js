@@ -1,10 +1,14 @@
-// لوحة المحل — UI. Opens a حساباتي Access file and renders reports. Opened
-// as a file it is read-only; served by server.ps1 it can also save entries.
+// لوحة المحل — UI. Opens a حساباتي Access file and renders reports.
+// Opened as a file it is read-only; served by server.ps1 it signs users in
+// against حساباتي's own users and can save entries into the same file.
 import { Buffer } from 'buffer';
 import MDBReader from 'mdb-reader';
 import { loadDatabase } from './load.js';
 import * as C from './calc.js';
 import { setupForms } from './forms.js';
+import { setupPos } from './pos.js';
+import { setupSettings } from './settings.js';
+import { icon, LOGO } from './icons.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -19,6 +23,7 @@ const addDays = (iso, n) => {
   return localDay(d);
 };
 const noName = (s) => s || '(بدون اسم)';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const store = {
   get: (k) => {
     try {
@@ -29,7 +34,8 @@ const store = {
   },
   set: (k, v) => {
     try {
-      localStorage.setItem(k, v);
+      if (v) localStorage.setItem(k, v);
+      else localStorage.removeItem(k);
     } catch {
       /* per-device preference only */
     }
@@ -45,14 +51,17 @@ const state = {
   fileName: '',
   loadedAt: null,
   timer: null,
-  server: false, // served by server.ps1: can write
-  mock: false,
-  user: store.get('lawha-user'),
-  shopName: store.get('lawha-shop'),
+  server: false, // served by server.ps1: signed in, can write
+  test: false,
+  version: '',
+  token: store.get('lawha-token'),
+  user: '',
+  admin: false,
+  shopName: '',
   stockByName: null,
 };
 
-// ---------- remembered file handle (IndexedDB) ----------
+// ---------- remembered file handle (IndexedDB, read-only mode) ----------
 
 const idb = {
   open() {
@@ -87,7 +96,7 @@ const idb = {
 
 // ---------- loading ----------
 
-async function readBuffer(buf, name) {
+async function readBuffer(buf, name, { quiet = false } = {}) {
   const reader = new MDBReader(Buffer.from(buf));
   const P = C.prepare(loadDatabase(reader));
   state.P = P;
@@ -98,63 +107,12 @@ async function readBuffer(buf, name) {
   const keep = users.value;
   users.innerHTML = '<option value="">الكل</option>' + P.users.map((u) => `<option>${esc(u)}</option>`).join('');
   users.value = P.users.includes(keep) ? keep : '';
-  $('#welcome')?.remove();
-  $('#tabs').hidden = false;
-  $('#btnReload').hidden = !state.handle && !state.server;
-  $('#autoWrap').hidden = !state.handle && !state.server;
-  if (state.server) fillUserPick();
+  showApp();
   status();
-  render();
-}
-
-// ---------- server mode (server.ps1) ----------
-
-async function readServer() {
-  const r = await fetch('/api/file', { cache: 'no-store' });
-  if (!r.ok) throw new Error('الخادم ما رجّع الملف (' + r.status + ')');
-  const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
-  return readBuffer(await r.arrayBuffer(), name);
-}
-
-async function write(op, data) {
-  const r = await fetch('/api/write', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Lawha': '1' },
-    body: JSON.stringify({ op, data }),
-  });
-  const j = await r.json().catch(() => ({ ok: false, error: 'رد غير مفهوم من الخادم' }));
-  if (!j.ok) throw new Error(j.error || 'ما انحفظ');
-  await readServer();
-  return j.result || {};
-}
-
-function toast(msg, bad = false) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.toggle('bad', bad);
-  t.hidden = false;
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => (t.hidden = true), bad ? 5000 : 2500);
-}
-
-function fillUserPick() {
-  const names = [...new Set([...state.P.userNames, ...state.P.users, state.user].filter(Boolean))];
-  const sel = $('#userPick');
-  sel.innerHTML = '<option value="">— اختار —</option>' + names.map((n) => `<option${n === state.user ? ' selected' : ''}>${esc(n)}</option>`).join('');
-}
-
-async function detectServer() {
-  if (!location.protocol.startsWith('http')) return false;
-  try {
-    const r = await fetch('/api/ping', { cache: 'no-store' });
-    const j = await r.json();
-    if (!j.ok) return false;
-    state.server = true;
-    state.mock = !!j.mock;
-    return true;
-  } catch {
-    return false;
-  }
+  // A background refresh must not wipe what someone is typing.
+  if (quiet && state.view === 'pos') pos().onData();
+  else if (quiet && !$('#modal').hidden) return;
+  else render();
 }
 
 async function readHandle(handle) {
@@ -165,7 +123,7 @@ async function readHandle(handle) {
       return await readBuffer(await f.arrayBuffer(), f.name);
     } catch (e) {
       if (i === 1) throw e;
-      await new Promise((r) => setTimeout(r, 800));
+      await sleep(800);
     }
   }
 }
@@ -188,7 +146,7 @@ async function openFile() {
 }
 
 async function reload() {
-  if (state.server) return guarded(readServer);
+  if (state.server) return guarded(() => readServer());
   if (!state.handle) return openFile();
   if ((await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') {
     if ((await state.handle.requestPermission?.({ mode: 'read' })) !== 'granted') return;
@@ -197,62 +155,253 @@ async function reload() {
 }
 
 async function guarded(fn) {
-  const btns = $$('#btnOpen, #btnReload, #btnOpen2');
-  btns.forEach((b) => (b.disabled = true));
-  $('#fileStatus').textContent = 'جاري قراءة الملف…';
+  const btn = $('#btnReload');
+  btn.disabled = true;
+  $('#fileStatus').textContent = 'جاري قراءة البيانات…';
   try {
     await fn();
   } catch (e) {
     showError(e);
   } finally {
-    btns.forEach((b) => (b.disabled = false));
+    btn.disabled = false;
+    status();
   }
 }
 
 function showError(e) {
   console.error(e);
-  status();
   const msg = /not a valid|unsupported|jet|format/i.test(String(e?.message))
     ? 'هذا الملف مو ملف حساباتي (Access). اختار ملف Units2026.accdb.'
-    : 'ما كدرت أقرا الملف: ' + (e?.message || e);
+    : 'ما كدرت أقرا البيانات: ' + (e?.message || e);
+  if ($('#app').hidden) {
+    toast(msg, true);
+    return;
+  }
   openModal(`<h2>صار خطأ</h2><p class="notice error">${esc(msg)}</p>`);
 }
 
 function status() {
   const s = $('#fileStatus');
   if (!state.P) {
-    s.textContent = 'ما انفتح ملف بعد';
+    s.textContent = '';
     return;
   }
-  const t = state.loadedAt.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-  const mode = state.server ? (state.mock ? ' — وضع تجربة (ما ينحفظ شي)' : ' — الحفظ شغّال') : ' — قراءة فقط';
-  s.textContent = `${state.fileName} — آخر قراءة ${t}${mode}`;
+  const t = state.loadedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  s.textContent = `${state.test ? 'وضع تجربة — ' : ''}${state.server ? '' : 'قراءة فقط — '}آخر تحديث ${t}`;
+  s.title = state.fileName;
 }
 
 function setAuto(on) {
   clearInterval(state.timer);
   state.timer = null;
-  if (on) state.timer = setInterval(async () => {
-    if (state.server) {
-      // Don't swap the data under an open form.
-      if ($('#modal').hidden) readServer().catch((e) => console.warn('auto refresh failed', e));
-      return;
-    }
-    if (!state.handle) return;
-    if ((await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') return;
+  store.set('lawha-auto', on ? '1' : '0');
+  if (on)
+    state.timer = setInterval(async () => {
+      if (state.server) {
+        readServer({ quiet: true }).catch((e) => console.warn('auto refresh failed', e));
+        return;
+      }
+      if (!state.handle || (await state.handle.queryPermission?.({ mode: 'read' })) !== 'granted') return;
+      try {
+        await readHandle(state.handle);
+      } catch (e) {
+        console.warn('auto refresh failed', e);
+      }
+    }, 60000);
+}
+
+function toast(msg, bad = false) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('bad', bad);
+  t.hidden = false;
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => (t.hidden = true), bad ? 6000 : 2600);
+}
+
+// ---------- server (server.ps1) ----------
+
+async function api(path, { method = 'GET', body } = {}) {
+  const headers = { 'X-Lawha': '1', 'X-Token': state.token || '' };
+  if (body) headers['Content-Type'] = 'application/json';
+  let r;
+  try {
+    r = await fetch(path, { method, headers, cache: 'no-store', body: body ? JSON.stringify(body) : undefined });
+  } catch {
+    throw new Error('البرنامج المساعد مو شغّال. سد البرنامج وافتحه مرة ثانية.');
+  }
+  if (r.status === 401) {
+    signedOut();
+    throw new Error('انتهت الجلسة، سجّل دخول مرة ثانية');
+  }
+  if (path === '/api/file') {
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'ما كدرت أقرا الملف');
+    return r;
+  }
+  const j = await r.json().catch(() => ({ ok: false, error: 'رد غير مفهوم من البرنامج المساعد' }));
+  if (!j.ok) throw new Error(j.error || 'صار خطأ');
+  return j;
+}
+
+async function readServer({ quiet = false } = {}) {
+  for (let i = 0; i < 2; i++) {
     try {
-      await readHandle(state.handle);
+      const r = await api('/api/file');
+      const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
+      return await readBuffer(await r.arrayBuffer(), name, { quiet });
     } catch (e) {
-      console.warn('auto refresh failed', e);
+      if (i === 1 || /سجّل دخول|مو شغّال/.test(e.message)) throw e;
+      await sleep(800);
     }
-  }, 60000);
+  }
+}
+
+// Saves through server.ps1, then re-reads the file. With background, the
+// caller gets the result straight away and the data refreshes behind it.
+async function write(op, data, { background = false } = {}) {
+  const j = await api('/api/write', { method: 'POST', body: { op, data } });
+  const refreshed = readServer({ quiet: background }).catch((e) => toast('انحفظ، بس ما تحدّثت الشاشة: ' + e.message, true));
+  if (!background) await refreshed;
+  return j.result || {};
+}
+
+async function detectServer() {
+  if (!location.protocol.startsWith('http')) return null;
+  try {
+    const r = await fetch('/api/ping', { cache: 'no-store' });
+    const j = await r.json();
+    return j.ok ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- full-screen states ----------
+
+function screen(html, wide = false) {
+  $('#screen').hidden = false;
+  $('#app').hidden = true;
+  const card = $('#screenCard');
+  card.classList.toggle('wide', wide);
+  card.innerHTML = `<div class="brand-mark big" aria-hidden="true">${LOGO}</div>${html}`;
+}
+
+function showApp() {
+  $('#screen').hidden = true;
+  $('#app').hidden = false;
+}
+
+function setupScreen(error = '') {
+  screen(`<h1>أهلاً بيك بلوحة المحل</h1>
+    <p class="muted">أول خطوة: اختار ملف بيانات حساباتي (<code>Units2026.accdb</code>). البرنامج يحفظ مكانه وما يسألك عنه مرة ثانية.</p>
+    ${error ? `<p class="notice error">${esc(error)}</p>` : ''}
+    <button class="btn primary big block" id="btnChoose">${icon('file')} اختار ملف البيانات</button>
+    <p class="muted" style="font-size:13px">إذا الملف على حاسبة ثانية بالشبكة، افتحه من "Network" بنافذة الاختيار.</p>`);
+  $('#btnChoose').onclick = async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'اختار الملف من النافذة اللي انفتحت…';
+    try {
+      await api('/api/choose-file', { method: 'POST', body: {} });
+      loginScreen();
+    } catch (err) {
+      setupScreen(err.message);
+    }
+  };
+}
+
+async function loginScreen(error = '', chosen = '') {
+  let users = [];
+  try {
+    users = (await api('/api/users')).users || [];
+  } catch (e) {
+    return setupScreen(e.message);
+  }
+  const last = chosen || store.get('lawha-last-user');
+  screen(`<h1>${esc(state.shopName || 'لوحة المحل')}</h1>
+    <p class="muted">سجّل دخول بنفس اسمك وكلمة السر مال حساباتي</p>
+    <form id="loginForm" autocomplete="off">
+      <label class="field">المستخدم
+        ${users.length
+          ? `<select id="lUser">${users.map((u) => `<option${u === last ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>`
+          : `<input id="lUser" placeholder="اسمك" value="${esc(last)}">`}
+      </label>
+      <label class="field">كلمة السر <input id="lPass" type="password" autocomplete="current-password"></label>
+      ${error ? `<p class="notice error" style="margin:0">${esc(error)}</p>` : ''}
+      <button class="btn primary big block" type="submit">دخول</button>
+    </form>
+    <p class="muted" style="font-size:12px;margin-top:18px">لوحة المحل ${esc(state.version)}${state.test ? ' — وضع تجربة' : ''}</p>`);
+  $('#lPass').focus();
+  $('#loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    try {
+      const j = await api('/api/login', { method: 'POST', body: { user: $('#lUser').value.trim(), password: $('#lPass').value } });
+      state.token = j.token;
+      store.set('lawha-token', j.token);
+      store.set('lawha-last-user', j.user);
+      signedIn(j);
+    } catch (err) {
+      loginScreen(err.message, $('#lUser').value.trim());
+    }
+  };
+}
+
+async function signedIn(me) {
+  state.user = me.user;
+  state.admin = !!me.admin;
+  $('#who').hidden = false;
+  $('#whoName').textContent = me.user;
+  $('#whoRole').textContent = me.admin ? 'مدير' : 'كاشير';
+  $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);
+  buildNav();
+  POS?.reset();
+  state.view = state.admin ? 'home' : 'pos';
+  screen('<h1>جاري قراءة البيانات…</h1><p class="muted">لحظات</p>');
+  try {
+    await readServer();
+  } catch (e) {
+    if (!state.token) return;
+    screen(`<h1>ما كدرت أقرا البيانات</h1><p class="notice error">${esc(e.message)}</p>
+      <button class="btn primary block" id="btnRetry">${icon('refresh')} حاول مرة ثانية</button>
+      ${state.admin ? `<button class="btn block" id="btnRechoose" style="margin-top:8px">${icon('file')} اختار ملف ثاني</button>` : ''}`);
+    $('#btnRetry').onclick = () => signedIn(me);
+    if ($('#btnRechoose')) $('#btnRechoose').onclick = () => setupScreen();
+  }
+}
+
+function signedOut() {
+  state.token = '';
+  store.set('lawha-token', '');
+  state.user = '';
+  state.admin = false;
+  state.P = null;
+  closeModal();
+  loginScreen();
+}
+
+// Read-only mode: the page was opened straight from a file.
+function fileScreen() {
+  screen(`<h1>لوحة المحل</h1>
+    <p class="muted">هذا البرنامج يقرا بيانات <b>حساباتي</b> (ملف <code>Units2026.accdb</code>) ويطلّعلك التقارير، بدون ما يغيّر شي بالملف.</p>
+    <button class="btn primary big block" id="btnOpen2">${icon('file')} فتح ملف البيانات</button>
+    <p class="muted" id="lastHint" style="font-size:13px"></p>`);
+  $('#btnOpen2').onclick = openFile;
+  buildNav();
+  $('#btnOpen').hidden = false;
+  idb.get('file').then((h) => {
+    if (!h) return;
+    state.handle = h;
+    $('#lastHint').innerHTML = `آخر ملف: <b>${esc(h.name)}</b> <button class="btn small" id="btnLast">افتحه</button>`;
+    $('#btnLast').onclick = reload;
+    h.queryPermission?.({ mode: 'read' }).then((p) => p === 'granted' && reload());
+  });
 }
 
 // ---------- period filter ----------
 
-function applyPreset(p) {
+function applyPreset(p, { draw = true } = {}) {
   const today = localDay();
-  const P = state.P;
   const ranges = {
     today: [today, today],
     yesterday: [addDays(today, -1), addDays(today, -1)],
@@ -267,7 +416,7 @@ function applyPreset(p) {
   $('#from').value = from;
   $('#to').value = to;
   $$('#presets button').forEach((b) => b.classList.toggle('on', b.dataset.p === p));
-  if (P) render();
+  if (draw && state.P) render();
 }
 
 function periodLabel() {
@@ -470,17 +619,24 @@ function closeModal() {
 
 let F = null;
 const forms = () =>
-  (F ??= setupForms({ $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast }));
+  (F ??= setupForms({ $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, icon }));
 const canWrite = () => state.server;
-const actionBar = (buttons) =>
-  canWrite() ? `<div class="actions-bar no-print">${buttons.map(([id, label]) => `<button class="btn primary" data-act="${id}">${esc(label)}</button>`).join('')}</div>` : '';
+const canAdmin = () => state.server && state.admin;
+// What a cashier may start; the server enforces the same rule.
+const CASHIER_ACTS = new Set(['newSale', 'newReceipt', 'newCustomer']);
+// Views list their buttons here; render() puts them in the page header.
+let pendingActions = [];
+const actionBar = (buttons) => {
+  if (canWrite()) pendingActions.push(...buttons.filter(([id]) => state.admin || CASHIER_ACTS.has(id)));
+  return '';
+};
 
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (!b || !canWrite()) return;
   const f = forms();
   const a = b.dataset.act;
-  if (a === 'newSale') f.invoiceEditor('sale');
+  if (a === 'newSale') return go('pos');
   if (a === 'newPurchase') f.invoiceEditor('purchase');
   if (a === 'newReceipt') f.voucherEditor('receipt', null, { name: b.dataset.name });
   if (a === 'newPayment') f.voucherEditor('payment', null, { name: b.dataset.name, cls: b.dataset.cls });
@@ -491,8 +647,8 @@ document.addEventListener('click', (e) => {
 
 // ---------- views ----------
 
-const kpi = (label, value, hint = '') =>
-  `<div class="card kpi"><div class="label">${esc(label)}</div><div class="value">${money(value)}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+const kpi = (label, value, hint = '', accent = false) =>
+  `<div class="card kpi${accent ? ' accent' : ''}"><div class="label">${esc(label)}</div><div class="value">${money(value)}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
 
 function viewHome() {
   const P = state.P;
@@ -524,7 +680,7 @@ function viewHome() {
   const maxItem = topItems[0]?.total || 1;
   return `${actionBar([['newSale', '+ قائمة بيع'], ['newPurchase', '+ قائمة شراء'], ['newReceipt', '+ وصل قبض'], ['newPayment', '+ وصل دفع / مصروف']])}${hint}
   <div class="grid kpis">
-    ${kpi('المبيعات', s.total, `${s.count} قائمة — ${periodLabel()}`)}
+    ${kpi('المبيعات', s.total, `${s.count} قائمة — ${periodLabel()}`, true)}
     ${kpi('نقدي', s.cash)}
     ${kpi('آجل', s.credit)}
     ${kpi('ربح المواد', pr.gross, `بعد المصاريف: ${fmt(pr.net)}`)}
@@ -579,13 +735,14 @@ function invoiceModal(inv, kind = 'sale') {
       { key: 'total', label: 'المبلغ', money: true, total: true },
     ], { name: `قائمة ${inv.id}` }), { search: false })}
     ${canWrite() ? `<div class="form-actions no-print">
-      <button class="btn primary" id="invEdit">تعديل</button>
-      ${kind === 'sale' ? '<button class="btn" id="invPrint">طباعة وصل</button>' : ''}
-      <button class="btn danger" id="invDel">مسح القائمة</button>
+      ${kind === 'sale' ? `<button class="btn" id="invPrint">${icon('print')} طباعة وصل</button>` : ''}
+      ${canAdmin() ? `<button class="btn primary" id="invEdit">${icon('edit')} تعديل</button>
+      <button class="btn danger" id="invDel">${icon('trash')} مسح القائمة</button>` : ''}
     </div>` : ''}`);
   if (!canWrite()) return;
-  $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
   if (kind === 'sale') $('#invPrint').onclick = () => forms().printSale(inv);
+  if (!canAdmin()) return;
+  $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
   $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `القائمة رقم ${inv.id}`);
 }
 
@@ -637,8 +794,8 @@ function statementModal(kind, name) {
         <label>من <input type="date" id="stFrom" value="${range.from}"></label>
         <label>إلى <input type="date" id="stTo" value="${range.to}"></label>
         ${wa ? `<a class="btn small" href="${wa}" target="_blank" rel="noopener">إرسال الرصيد على واتساب</a>` : ''}
-        ${canWrite() && person ? `<button class="btn small" id="stEdit">تعديل البيانات</button>
-          <button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
+        ${canAdmin() && person ? `<button class="btn small" id="stEdit">${icon('edit')} تعديل البيانات</button>` : ''}
+        ${person && (canAdmin() || (canWrite() && kind === 'customer')) ? `<button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
       </div>
       ${section('الحركات', table(st.rows, [
         { key: 'date', label: 'التاريخ' },
@@ -651,14 +808,14 @@ function statementModal(kind, name) {
         onClick: (r) => {
           const inv = r.kind === 'sale' || r.kind === 'paid' ? P.saleById.get(r.ref) : r.kind === 'purchase' ? P.purchases.find((p) => p.id === r.ref) : null;
           if (inv) return invoiceModal(inv, r.kind === 'purchase' ? 'purchase' : 'sale');
-          if (canWrite() && (r.kind === 'receipt' || r.kind === 'payment')) {
+          if (canAdmin() && (r.kind === 'receipt' || r.kind === 'payment')) {
             const v = (r.kind === 'receipt' ? P.receipts : P.payments).find((x) => x.id === r.ref);
             if (v) forms().voucherEditor(r.kind, v);
           }
         },
       }), { search: false })}`);
-    if (canWrite() && person) {
-      $('#stEdit').onclick = () => forms().personEditor(kind, person);
+    if ($('#stEdit')) $('#stEdit').onclick = () => forms().personEditor(kind, person);
+    if ($('#stPay')) {
       $('#stPay').onclick = () =>
         kind === 'customer' ? forms().voucherEditor('receipt', null, { name }) : forms().voucherEditor('payment', null, { name, cls: C.SETTLE });
     }
@@ -719,8 +876,8 @@ function viewStock() {
       { key: 'buyL1', label: 'سعر الشراء (كبيرة)', money: true },
       { key: 'value', label: 'القيمة', money: true, total: true },
       { key: 'status', label: 'الحالة', html: (r) => pill(r.status), get: (r) => r.status },
-    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: canWrite() ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
-    ${canWrite() ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
+    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: canAdmin() ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
+    ${canAdmin() ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
 }
 
 function viewCash() {
@@ -758,7 +915,7 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: canWrite() ? (r) => forms().voucherEditor('receipt', r) : null }))}
+    ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: canAdmin() ? (r) => forms().voucherEditor('receipt', r) : null }))}
     ${section('المدفوعات', table(b.paymentList, [
       { key: 'date', label: 'التاريخ' },
       { key: 'no', label: 'رقم الوصل' },
@@ -766,7 +923,7 @@ function viewCash() {
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
       { key: 'amount', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 }, onClick: canWrite() ? (r) => forms().voucherEditor('payment', r) : null }))}`;
+    ], { name: 'المدفوعات', sort: { key: 'date', dir: -1 }, onClick: canAdmin() ? (r) => forms().voucherEditor('payment', r) : null }))}`;
 }
 
 function viewPurchases() {
@@ -859,7 +1016,76 @@ function viewChecks() {
     ], { onClick: (r) => r.open?.(), empty: 'ما لكيت أي مشكلة', name: 'ملاحظات البيانات' }))}`;
 }
 
+// ---------- quick sale & settings pages (server mode) ----------
+
+let afterRender = [];
+const onAfter = (fn) => afterRender.push(fn);
+
+let POS = null;
+const pos = () =>
+  (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store }));
+let SET = null;
+const settings = () =>
+  (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen }));
+
+// ---------- navigation ----------
+
+// server: needs server.ps1 (signed in); admin: managers only.
+const NAV = [
+  { group: 'البيع' },
+  { id: 'pos', label: 'بيع سريع', server: true },
+  { id: 'home', label: 'الرئيسية', admin: true },
+  { id: 'sales', label: 'المبيعات' },
+  { id: 'purchases', label: 'المشتريات', admin: true },
+  { group: 'الحسابات' },
+  { id: 'customers', label: 'الزبائن' },
+  { id: 'suppliers', label: 'الموردين', admin: true },
+  { id: 'cash', label: 'الصندوق', admin: true },
+  { id: 'profit', label: 'الأرباح', admin: true },
+  { group: 'المخزن' },
+  { id: 'stock', label: 'المخزن والأسعار' },
+  { id: 'checks', label: 'ملاحظات البيانات', admin: true },
+  { group: 'النظام', server: true, admin: true },
+  { id: 'settings', label: 'الإعدادات', server: true, admin: true },
+];
+
+const TITLES = {
+  pos: ['بيع سريع', 'اختار المواد، وبعدين احفظ القائمة'],
+  home: ['الرئيسية', ''],
+  sales: ['المبيعات', ''],
+  purchases: ['المشتريات', ''],
+  customers: ['الزبائن', 'الأرصدة وكشوفات الحساب'],
+  suppliers: ['الموردين', 'الأرصدة وكشوفات الحساب'],
+  stock: ['المخزن والأسعار', 'رصيد كل مادة وأسعارها'],
+  cash: ['الصندوق', ''],
+  profit: ['الأرباح', ''],
+  checks: ['ملاحظات البيانات', 'أشياء تستاهل تصلّحها بحساباتي'],
+  settings: ['الإعدادات', ''],
+};
+
+// In read-only mode everything readable is open; signed in, cashiers see less.
+const visible = (n) => (n.server ? state.server && (!n.admin || state.admin) : !state.server || !n.admin || state.admin);
+
+function buildNav() {
+  const items = NAV.filter(visible);
+  // drop group headings with nothing under them
+  const out = items.filter((n, i) => !n.group || (items[i + 1] && !items[i + 1].group));
+  $('#nav').innerHTML = out
+    .map((n) => (n.group ? `<div class="group">${esc(n.group)}</div>` : `<button data-view="${n.id}">${icon(n.id)}<span>${esc(n.label)}</span></button>`))
+    .join('');
+}
+
+function go(view) {
+  if (!NAV.some((n) => n.id === view && visible(n))) view = state.server && !state.admin ? 'pos' : 'home';
+  state.view = view;
+  $('#app').classList.remove('menu-open');
+  render();
+  $('#main').scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
 const views = {
+  pos: () => pos().view(),
   home: viewHome,
   sales: viewSales,
   purchases: viewPurchases,
@@ -869,15 +1095,28 @@ const views = {
   cash: viewCash,
   profit: viewProfit,
   checks: viewChecks,
+  settings: () => settings().view(),
 };
 const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
 
 function render() {
   if (!state.P) return;
+  if (!NAV.some((n) => n.id === state.view && visible(n))) state.view = state.server && !state.admin ? 'pos' : 'home';
   tables.clear();
-  $('#filters').hidden = !periodViews.has(state.view);
-  $$('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.view === state.view));
+  pendingActions = [];
+  afterRender = [];
+  const period = periodViews.has(state.view);
+  $('#filters').hidden = !period;
+  $$('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === state.view));
+  const [title, sub] = TITLES[state.view] || ['', ''];
+  $('#pageTitle').textContent = title;
+  $('#pageSub').textContent = period ? periodLabel() : sub;
   $('#main').innerHTML = views[state.view]();
+  $('#pageActions').innerHTML = pendingActions
+    .map(([id, label]) => `<button class="btn primary" data-act="${id}">${esc(label)}</button>`)
+    .join('');
+  $('#shopTitle').textContent = state.shopName || 'لوحة المحل';
+  for (const fn of afterRender) fn();
   $('#goLast')?.addEventListener('click', () => {
     state.preset = '';
     state.filter.from = state.filter.to = state.P.lastDate;
@@ -891,66 +1130,82 @@ function render() {
 
 function init() {
   $('#btnOpen').onclick = openFile;
-  $('#btnOpen2').onclick = openFile;
+  $('#btnReload').innerHTML = `${icon('refresh')} تحديث`;
   $('#btnReload').onclick = reload;
+  $('#btnLogout').innerHTML = icon('logout', 'flip');
+  $('#btnLogout').onclick = async () => {
+    try {
+      await api('/api/logout', { method: 'POST', body: {} });
+    } catch {
+      /* signed out locally either way */
+    }
+    signedOut();
+  };
+  $('#btnMenu').innerHTML = icon('menu');
+  $('#btnMenu').onclick = () => $('#app').classList.toggle('menu-open');
+  $('#scrim').onclick = () => $('#app').classList.remove('menu-open');
+  $('#nav').onclick = (e) => {
+    const b = e.target.closest('button[data-view]');
+    if (b) go(b.dataset.view);
+  };
   $('#auto').onchange = (e) => setAuto(e.target.checked);
   $('#fileInput').onchange = async (e) => {
     const f = e.target.files[0];
     if (f) await guarded(async () => readBuffer(await f.arrayBuffer(), f.name));
     e.target.value = '';
   };
-  $('#tabs').onclick = (e) => {
-    const b = e.target.closest('button[data-view]');
-    if (!b) return;
-    state.view = b.dataset.view;
-    render();
-  };
   $('#presets').onclick = (e) => {
     const b = e.target.closest('button[data-p]');
     if (b) applyPreset(b.dataset.p);
   };
-  $('#from').onchange = (e) => ((state.filter.from = e.target.value), (state.preset = ''), $$('#presets button').forEach((b) => b.classList.remove('on')), render());
-  $('#to').onchange = (e) => ((state.filter.to = e.target.value), (state.preset = ''), $$('#presets button').forEach((b) => b.classList.remove('on')), render());
+  const custom = () => {
+    state.preset = '';
+    $$('#presets button').forEach((b) => b.classList.remove('on'));
+    render();
+  };
+  $('#from').onchange = (e) => ((state.filter.from = e.target.value), custom());
+  $('#to').onchange = (e) => ((state.filter.to = e.target.value), custom());
   $('#user').onchange = (e) => ((state.filter.user = e.target.value), render());
+
   // An open entry form only closes from its own buttons, so a stray click
   // outside it doesn't throw away what was typed.
   const formOpen = () => !!$('#modal .form-actions [id$="Save"]');
   $('#modalClose').onclick = closeModal;
   $('#modal').onclick = (e) => e.target.id === 'modal' && !formOpen() && closeModal();
-  document.addEventListener('keydown', (e) => e.key === 'Escape' && !formOpen() && closeModal());
-  applyPreset('today');
-
-  detectServer().then((on) => {
-    if (!on) return rememberedFile();
-    $('#btnOpen').hidden = true;
-    $('#serverBox').hidden = false;
-    $('#welcome')?.remove();
-    $('#userPick').onchange = (e) => {
-      state.user = e.target.value;
-      store.set('lawha-user', state.user);
-    };
-    $('#btnShop').onclick = () => {
-      const n = prompt('اسم المحل (يطلع بوصل الطباعة):', state.shopName || '');
-      if (n == null) return;
-      state.shopName = n.trim();
-      store.set('lawha-shop', state.shopName);
-    };
-    guarded(readServer);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !formOpen()) closeModal();
+    if (e.key === 'F2' && state.server && state.P) {
+      e.preventDefault();
+      closeModal();
+      go('pos');
+    }
   });
-}
+  applyPreset('today', { draw: false });
 
-function rememberedFile() {
-  // Offer the file used last time; reading it needs one click for permission.
-  idb.get('file').then((h) => {
-    if (!h) return;
-    state.handle = h;
-    $('#btnReload').hidden = false;
-    $('#btnReload').textContent = 'فتح آخر ملف';
-    const hint = $('#lastHint');
-    if (hint) hint.innerHTML = `آخر ملف فتحته: <b>${esc(h.name)}</b> — دوس <b>فتح آخر ملف</b> فوك.`;
-    h.queryPermission?.({ mode: 'read' }).then((p) => p === 'granted' && reload());
+  const auto = store.get('lawha-auto') !== '0';
+  $('#auto').checked = auto;
+
+  detectServer().then(async (ping) => {
+    if (!ping) {
+      $('#auto').checked = false;
+      return fileScreen();
+    }
+    state.server = true;
+    state.test = !!ping.test;
+    state.version = ping.version || '';
+    state.shopName = ping.shopName || '';
+    document.title = state.shopName || 'لوحة المحل';
+    setAuto(auto);
+    if (!ping.configured) return setupScreen();
+    if (state.token) {
+      try {
+        return signedIn(await api('/api/me'));
+      } catch {
+        /* expired: sign in again */
+      }
+    }
+    loginScreen();
   });
-  $('#btnReload').addEventListener('click', () => ($('#btnReload').textContent = 'تحديث'));
 }
 
 init();

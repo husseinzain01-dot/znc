@@ -17,8 +17,7 @@ export function setupForms(ctx) {
 
   function requireUser() {
     if (state.user) return true;
-    toast('اختار اسم المستخدم من فوك (المستخدم) قبل الحفظ', true);
-    $('#userPick')?.focus();
+    toast('سجّل دخول أول', true);
     return false;
   }
 
@@ -370,10 +369,12 @@ export function setupForms(ctx) {
 
   // ------------------------------------------------------------ receipt print
 
-  function printSale(inv) {
+  // opts.balance: the customer's balance after this invoice, when the data
+  // on screen does not include it yet (printing straight after saving).
+  function printSale(inv, opts = {}) {
     if (!inv) return;
     const credit = inv.type === C.CREDIT;
-    const bal = credit ? C.customerBalances(P()).find((b) => b.name === inv.customer)?.balance : null;
+    const bal = !credit ? null : opts.balance != null ? opts.balance : C.customerBalances(P()).find((b) => b.name === inv.customer)?.balance;
     const shop = state.shopName || 'لوحة المحل';
     const rows = inv.lines
       .map((l) => `<tr><td>${esc(l.item)}<br><small>${fmt(l.qty)} ${esc(l.unit)} × ${fmt(l.price)}</small></td><td class="n">${fmt(l.qty * l.price)}</td></tr>`)
@@ -394,7 +395,7 @@ export function setupForms(ctx) {
         .tot td { border: 0; font-weight: bold; font-size: 15px; }
       </style></head><body>
       <h1>${esc(shop)}</h1>
-      <div class="c">قائمة ${credit ? 'آجل' : 'نقدي'} رقم ${inv.id}<br>${inv.date} ${esc(inv.time.slice(11, 16))}</div>
+      <div class="c">قائمة ${credit ? 'آجل' : 'نقدي'} رقم ${inv.id}<br>${inv.date} ${esc(String(inv.time || '').slice(11, 16))}</div>
       ${credit ? `<div>الزبون: <b>${esc(inv.customer)}</b></div>` : ''}
       <table>${rows}
         <tr class="tot"><td>المجموع</td><td class="n">${fmt(inv.total)}</td></tr>
