@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.2.0'
+$Version = '1.3.0'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -95,13 +95,15 @@ function ConvertTo-PermText($v) {
 }
 
 function Read-Config {
-    $c = @{ dbPath = ''; shopName = ''; admins = @(); perms = @{} }
+    $c = @{ dbPath = ''; shopName = ''; admins = @(); perms = @{}; allowRemote = $false; remoteUrl = '' }
     if (Test-Path $ConfigFile) {
         try {
             $j = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
             # older versions saved network paths as "Microsoft.PowerShell.Core\FileSystem::\\PC\..."
             if ($j.dbPath) { $c.dbPath = ([string]$j.dbPath) -replace '^Microsoft\.PowerShell\.Core\\FileSystem::', '' }
             if ($j.shopName) { $c.shopName = [string]$j.shopName }
+            if ($j.allowRemote) { $c.allowRemote = $true }
+            if ($j.remoteUrl) { $c.remoteUrl = [string]$j.remoteUrl }
             if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
             if ($j.perms) {
                 foreach ($p in $j.perms.PSObject.Properties) {
@@ -205,11 +207,13 @@ function Close-Engine {
 # Opens the database and runs $body($db). Writes run inside a transaction
 # that commits, or rolls back on any error (always, with -Rollback).
 # Opening the file is the slow part of a save, above all when it is on
-# another computer, so it stays open between requests and closes after 20
-# idle seconds (main loop). Before each use the engine refreshes its cache,
+# another computer, so it stays open between requests and closes after 15
+# idle minutes (main loop). Before each use the engine refreshes its cache,
 # so what حساباتي saved meanwhile is seen.
 $script:Db = $null
 $script:DbOpenPath = ''
+# a shop saves every few minutes: reopening each time would cost the most
+$DbIdleSeconds = 900
 $script:DbLastUse = Get-Date
 
 function Close-Db {
@@ -273,23 +277,71 @@ function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) 
 # ---------------------------------------------------------------- backup
 
 $script:BackupDay = ''
-function Backup-Database {
-    if ($script:DbOverride) { return }
-    $today = Get-Date -Format 'yyyy-MM-dd'
-    if ($script:BackupDay -eq $today) { return }
-    $path = Get-DbPath
-    Need ($path -ne '') 'ما محدد ملف البيانات'
+# The daily copy of the data file. It runs on the side, started as soon as
+# the program starts (and again after midnight), so the day's first save
+# never waits for it: copying 15 MB over a slow network can take a minute.
+$BackupScript = {
+    param($path)
     $dir = Join-Path (Split-Path $path -Parent) 'backups-lawha'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     $name = [IO.Path]::GetFileNameWithoutExtension($path)
     $target = Join-Path $dir ("$name-" + (Get-Date -Format 'yyyy-MM-dd_HH-mm') + '.accdb')
+    # a half-written copy never looks like a finished one
+    $part = $target + '.part'
     $src = [IO.File]::Open($path, 'Open', 'Read', 'ReadWrite')
     try {
-        $dst = [IO.File]::Create($target)
-        try { $src.CopyTo($dst) } finally { $dst.Close() }
+        $dst = [IO.File]::Create($part)
+        try { $src.CopyTo($dst, 1048576) } finally { $dst.Close() }
     } finally { $src.Close() }
+    Move-Item -LiteralPath $part -Destination $target -Force
     Get-ChildItem $dir -Filter "$name-*.accdb" | Sort-Object Name -Descending | Select-Object -Skip 30 | Remove-Item -Force
-    $script:BackupDay = $today
+    $target
+}
+$script:BackupJob = $null
+$script:BackupFailedAt = [datetime]::MinValue
+
+# Collect a finished copy (called from the main loop and before saves).
+function Update-Backup {
+    $j = $script:BackupJob
+    if (-not $j -or -not $j.h.IsCompleted) { return }
+    try {
+        $r = $j.ps.EndInvoke($j.h)
+        if ($j.ps.Streams.Error.Count) { throw $j.ps.Streams.Error[0].Exception }
+        $script:BackupDay = $j.day
+        Write-LawhaLog "backup done: $r"
+    } catch {
+        $script:BackupFailedAt = Get-Date
+        Write-LawhaLog "backup FAILED: $($_.Exception.Message)"
+    } finally {
+        $j.ps.Dispose(); $j.rs.Dispose()
+        $script:BackupJob = $null
+    }
+}
+
+function Start-Backup {
+    Update-Backup
+    $today = Get-Date -Format 'yyyy-MM-dd'
+    if ($script:BackupDay -eq $today -or $script:BackupJob -or $script:DbOverride) { return }
+    # after a failure, try again in half an hour, not at every save
+    if (((Get-Date) - $script:BackupFailedAt).TotalMinutes -lt 30) { return }
+    $path = Get-DbPath
+    if (-not $path) { return }
+    $rs = [runspacefactory]::CreateRunspace()
+    $rs.Open()
+    $ps = [PowerShell]::Create()
+    $ps.Runspace = $rs
+    [void]$ps.AddScript($BackupScript.ToString()).AddArgument($path)
+    $script:BackupJob = @{ ps = $ps; rs = $rs; h = $ps.BeginInvoke(); day = $today }
+}
+
+# Before a save: make sure today's copy is on its way; never wait for it.
+function Backup-Database { Start-Backup }
+
+# For tests and shutting down.
+function Wait-Backup([int]$seconds = 120) {
+    $until = (Get-Date).AddSeconds($seconds)
+    while ($script:BackupJob -and -not $script:BackupJob.h.IsCompleted -and (Get-Date) -lt $until) { Start-Sleep -Milliseconds 100 }
+    Update-Backup
 }
 
 # ---------------------------------------------------------------- helpers
@@ -385,7 +437,16 @@ function Get-Column($db, [string]$sql) {
 
 function Count($db, [string]$sql) { return [int](Get-Value $db $sql) }
 
+# Within one save the same item is looked up once (Invoke-Write sets the
+# cache; each round trip counts when the file is on another computer).
+$script:ItemCache = $null
 function Get-MadaItem($db, [string]$name) {
+    if ($null -ne $script:ItemCache -and $script:ItemCache.ContainsKey($name)) { return $script:ItemCache[$name] }
+    $o = Read-MadaItem $db $name
+    if ($null -ne $script:ItemCache) { $script:ItemCache[$name] = $o }
+    return $o
+}
+function Read-MadaItem($db, [string]$name) {
     $rs = $db.OpenRecordset("SELECT IDcode, BpriceL1, BpriceL2, UnitL1, UnitL2, Fill, price, priceSeeat FROM madaCode WHERE madaName=$(Q $name)", $dbOpenSnapshot)
     try {
         Need (-not $rs.EOF) "المادة مو موجودة: $name"
@@ -816,10 +877,14 @@ function Invoke-Write([string]$op, $data, $session = $null) {
     Need ($Ops.ContainsKey($op)) "عملية مو معروفة: $op"
     Backup-Database
     $fn = $Ops[$op]
-    return Use-Database { param($db)
-        if ($session -and $op -eq 'saveSale') { Test-SaleLines $db $data $session }
-        & $fn $db $data
-    }
+    $script:ItemCache = @{}
+    $script:DataCache = $null
+    try {
+        return Use-Database { param($db)
+            if ($session -and $op -eq 'saveSale') { Test-SaleLines $db $data $session }
+            & $fn $db $data
+        }
+    } finally { $script:ItemCache = $null }
 }
 
 # ---------------------------------------------------------------- users
@@ -1106,6 +1171,172 @@ function Invoke-FullTestClean {
     return @{ steps = $S.list.ToArray() }
 }
 
+# ---------------------------------------------------------------- data for other devices
+# A device that connects to this computer over the network (or a VPN) gets
+# the data from here as compact JSON, read by DAO from the file on this
+# computer, instead of copying the whole 15 MB file across the network after
+# every save: only the columns the app uses, rows as arrays, gzip-compressed
+# (about 150 KB). Kept until the file changes.
+$DataTables = [ordered]@{
+    madaCode   = 'ID,IDcode,MadaClass,madaName,harig,price,priceSeeat,Fill,BpriceL1,BpriceL2,UnitL1,UnitL2,Pr,Pru'
+    MasterOut  = 'idOut,InvoiceNo,TOname,note,OutDate,timeS,OutType,Paid,strUserName,Mandob'
+    subOut     = 'id,idOut,madaNameOut,QuntOut,Price,unit,BpriceL1,BpriceL2,note'
+    MasterIn   = 'IdIn,InvoiceNo,fromname,note,InvoiceDate,timeS,InType,strUserName'
+    subIN      = 'id,IdIn,madaNameIn,QuntIn,Price,unit,expireDate'
+    bayeeCode  = 'id,bayeeCode,MB,CMobile,Cadress,Ctype,Group,Mandob,RegDate,Cdate'
+    shiraCode  = 'ID,shiraCode,MB,CMobile,Cadress,RegDate,Cdate'
+    mablakIn   = 'idS,dataS,mostandNO,nameFrom,classS,mablak,note,timeS,strUserName'
+    mablakOut  = 'idS,dataS,mostandNO,nameto,classS,mablak,note,timeS,strUserName'
+    quodCodeIn = 'quodCode'
+    quodCodeOut = 'quodCode'
+    # names only: passwords never leave this computer
+    tblUsers   = 'UserName'
+}
+$script:DataCache = $null
+
+function Add-JsonValue([Text.StringBuilder]$sb, $v) {
+    if ($null -eq $v -or $v -is [DBNull]) { [void]$sb.Append('null'); return }
+    if ($v -is [string]) {
+        $t = $v
+        if ($t -match '[\\"\x00-\x1f  ]') {
+            $t = [regex]::Replace($t, '[\\"\x00-\x1f  ]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
+        }
+        [void]$sb.Append('"').Append($t).Append('"')
+        return
+    }
+    if ($v -is [datetime]) { [void]$sb.Append('"').Append($v.ToString('yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture)).Append('"'); return }
+    if ($v -is [bool]) { [void]$sb.Append($(if ($v) { 'true' } else { 'false' })); return }
+    if ($v -is [IFormattable]) { [void]$sb.Append($v.ToString($null, [Globalization.CultureInfo]::InvariantCulture)); return }
+    Add-JsonValue $sb ([string]$v)
+}
+
+function Export-Data {
+    $p = Get-DbPath
+    Need ($p -ne '') 'ما محدد ملف البيانات'
+    $fi = Get-Item -LiteralPath $p
+    $key = "$($fi.Length)|$($fi.LastWriteTimeUtc.Ticks)"
+    # at most 20 seconds old: حساباتي may have saved without the file's time changing yet
+    if ($script:DataCache -and $script:DataCache.key -eq $key -and $script:DataCache.path -eq $p -and
+        ((Get-Date) - $script:DataCache.at).TotalSeconds -lt 20) { return , $script:DataCache.bytes }
+    $json = Use-Database -ReadOnly { param($db)
+        $have = @{}
+        foreach ($td in $db.TableDefs) {
+            $n = [string]$td.Name
+            if ($DataTables.Contains($n)) { $have[$n] = @(foreach ($f in $td.Fields) { [string]$f.Name }) }
+        }
+        $sb = New-Object Text.StringBuilder 1048576
+        [void]$sb.Append('{"ok":true,"tables":{')
+        $firstTable = $true
+        foreach ($t in $DataTables.Keys) {
+            if (-not $have.ContainsKey($t)) { continue }
+            $cols = @($DataTables[$t].Split(',') | Where-Object { $have[$t] -contains $_ })
+            if (-not $cols.Count) { continue }
+            if (-not $firstTable) { [void]$sb.Append(',') }
+            $firstTable = $false
+            [void]$sb.Append('"').Append($t).Append('":{"cols":[')
+            [void]$sb.Append((($cols | ForEach-Object { '"' + $_ + '"' }) -join ','))
+            [void]$sb.Append('],"rows":[')
+            $rs = $db.OpenRecordset('SELECT ' + (($cols | ForEach-Object { "[$_]" }) -join ',') + " FROM [$t]", $dbOpenSnapshot)
+            try {
+                $firstRow = $true
+                while (-not $rs.EOF) {
+                    $a = $rs.GetRows(5000)
+                    $nc = $a.GetLength(0)
+                    $nr = $a.GetLength(1)
+                    for ($r = 0; $r -lt $nr; $r++) {
+                        if (-not $firstRow) { [void]$sb.Append(',') }
+                        $firstRow = $false
+                        [void]$sb.Append('[')
+                        for ($c = 0; $c -lt $nc; $c++) {
+                            if ($c) { [void]$sb.Append(',') }
+                            Add-JsonValue $sb $a[$c, $r]
+                        }
+                        [void]$sb.Append(']')
+                    }
+                    if ($nr -eq 0) { break }
+                }
+            } finally { $rs.Close() }
+            [void]$sb.Append(']}')
+        }
+        [void]$sb.Append('}}')
+        return $sb.ToString()
+    }
+    $bytes = [Text.Encoding]::UTF8.GetBytes($json)
+    $script:DataCache = @{ key = $key; path = $p; bytes = $bytes; at = Get-Date }
+    # the comma keeps it one byte[] (not 250,000 separate bytes)
+    return , $bytes
+}
+
+# Big answers go out gzip-compressed when the browser accepts it.
+function Send-Compressed($ctx, [byte[]]$bytes, [string]$type) {
+    $req = $ctx.Request
+    if ([string]$req.Headers['Accept-Encoding'] -notmatch 'gzip') { return Send $ctx 200 $bytes $type }
+    $ms = New-Object IO.MemoryStream
+    $gz = New-Object IO.Compression.GZipStream($ms, [IO.Compression.CompressionLevel]::Fastest, $true)
+    $gz.Write($bytes, 0, $bytes.Length)
+    $gz.Close()
+    $res = $ctx.Response
+    $res.Headers['Content-Encoding'] = 'gzip'
+    Send $ctx 200 $ms.ToArray() $type
+}
+
+# ---------------------------------------------------------------- other devices
+# On the main computer (where the data file is), a manager can let other
+# devices connect: the helper then listens on the network as well. Windows
+# allows that only after a one-time approval (UAC): a URL reservation for
+# this user and a firewall rule for the port.
+function Enable-RemoteAccess {
+    $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $cmd = "netsh http delete urlacl url=http://+:$Port/ | Out-Null; " +
+        "netsh http add urlacl url=http://+:$Port/ sddl=D:(A;;GX;;;$sid); " +
+        "netsh advfirewall firewall delete rule name='Lawhat Al-Mahal' | Out-Null; " +
+        "netsh advfirewall firewall add rule name='Lawhat Al-Mahal' dir=in action=allow protocol=TCP localport=$Port"
+    try {
+        $p = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -Wait -PassThru `
+            -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $cmd)
+    } catch {
+        throw 'ويندوز ما وافق. لازم توافق على رسالة "هل تسمح لهذا التطبيق…" (تحتاج حساب مدير ويندوز).'
+    }
+    Need ($p.ExitCode -eq 0) "ما انفتح الاتصال (رمز $($p.ExitCode))"
+}
+
+# The addresses other devices can use to reach this computer.
+function Get-MyAddresses {
+    $out = New-Object System.Collections.Generic.List[object]
+    $out.Add(@{ kind = 'name'; value = $env:COMPUTERNAME })
+    foreach ($ni in [Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
+        if ($ni.OperationalStatus -ne 'Up' -or $ni.NetworkInterfaceType -eq 'Loopback') { continue }
+        foreach ($a in $ni.GetIPProperties().UnicastAddresses) {
+            if ($a.Address.AddressFamily -eq 'InterNetwork' -and -not $a.Address.ToString().StartsWith('169.254.')) {
+                $out.Add(@{ kind = 'ip'; value = $a.Address.ToString(); via = [string]$ni.Description })
+            }
+        }
+    }
+    return , $out.ToArray()
+}
+
+# A second device: check that the main computer's program answers, and
+# remember it, so this device opens it from now on.
+function Connect-Remote([string]$target) {
+    $t = $target.Trim() -replace '^https?://', '' -replace '/.*$', '' -replace '^\\\\', ''
+    Need ($t -ne '') 'اكتب اسم الحاسبة الرئيسية أو رقم الـ IP مالها'
+    if ($t -notmatch ':\d+$') { $t = "${t}:$Port" }
+    $url = "http://$t/"
+    try {
+        $wc = New-Object Net.WebClient
+        $wc.Proxy = $null
+        $wc.Encoding = [Text.Encoding]::UTF8
+        $j = $wc.DownloadString($url + 'api/ping') | ConvertFrom-Json
+    } catch {
+        throw "ما ردّت الحاسبة $t. تأكد إنها شغّالة وبيها البرنامج مفتوح، وإن المدير فعّل (السماح للأجهزة الثانية بالاتصال) بإعداداتها، وإن الـ VPN أو الشبكة توصل بينكم."
+    }
+    Need ($j.ok -and $j.configured) "الحاسبة $t ردّت، بس ما محدد عليها ملف البيانات."
+    $script:Config.remoteUrl = $url
+    Save-Config
+    Write-LawhaLog "linked to main computer $url"
+    return @{ url = $url; version = [string]$j.version; shopName = [string]$j.shopName }
+}
+
 # ---------------------------------------------------------------- empty rows
 # Versions before 1.1.1 wrote rows whose values all ended up empty on some
 # Access installs. These rules match only rows with every key value empty,
@@ -1124,7 +1355,8 @@ $BrokenRules = @(
 )
 
 function Get-BrokenRows([switch]$Clean) {
-    if ($Clean) { Backup-Database }
+    # deleting: today's copy must be finished first
+    if ($Clean) { Start-Backup; Wait-Backup 600 }
     $body = { param($db)
         $out = @()
         foreach ($r in $BrokenRules) {
@@ -1558,14 +1790,40 @@ function Set-Database([string]$file) {
 
 $script:Stop = $false
 
+# Refuse requests not addressed to this computer (DNS rebinding): localhost,
+# and, when other devices may connect, this computer's name or an IP.
+function Test-HostAllowed($req) {
+    $h = [string]$req.Headers['Host']
+    if ($h -eq "localhost:$Port" -or $h -eq "127.0.0.1:$Port") { return $true }
+    if (-not $script:Config.allowRemote) { return $false }
+    if ($h -notmatch "^(.+):$Port$") { return $false }
+    $name = $Matches[1].Trim('[', ']')
+    $ip = $null
+    if ([Net.IPAddress]::TryParse($name, [ref]$ip)) { return $true }
+    $mine = @($env:COMPUTERNAME, [Net.Dns]::GetHostName()) | Where-Object { $_ }
+    return [bool]($mine | Where-Object { $name -ieq $_ -or $name -like "$_.*" })
+}
+
+# A request from another device (not this computer itself). LAWHA_FAKEREMOTE
+# lets the tests pretend, with the test engine only.
+function Test-RemoteRequest($req) {
+    if ($env:LAWHA_FAKEDAO -and $env:LAWHA_FAKEREMOTE -and $req.Headers['X-Test-Remote'] -eq '1') { return $true }
+    return -not $req.IsLocal
+}
+
+# What only someone sitting at this computer may do.
+$LocalOnly = @('/api/choose-file', '/api/candidates', '/api/browse', '/api/shutdown', '/api/open-backups',
+    '/api/remote', '/api/remote-access', '/api/fulltest', '/api/fulltest-file', '/api/selftest', '/api/speedtest')
+
 function Handle($ctx) {
     $req = $ctx.Request
-    # Refuse anything not addressed to this machine (DNS rebinding).
-    $hostHeader = [string]$req.Headers['Host']
-    if ($hostHeader -ne "localhost:$Port" -and $hostHeader -ne "127.0.0.1:$Port") {
+    if (-not (Test-HostAllowed $req)) {
         return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden host' }
     }
     $path = $req.Url.AbsolutePath
+    if ((Test-RemoteRequest $req) -and $LocalOnly -contains $path) {
+        return Send-Json $ctx 200 @{ ok = $false; error = 'هاي تنسوى من الحاسبة الرئيسية نفسها، مو من جهاز ثاني.' }
+    }
     if ($path -eq '/') {
         return Send $ctx 200 ([IO.File]::ReadAllBytes($AppFile)) 'text/html; charset=utf-8'
     }
@@ -1573,7 +1831,8 @@ function Handle($ctx) {
         $p = Get-DbPath
         return Send-Json $ctx 200 @{
             ok = $true; version = $Version; configured = ($p -ne '')
-            file = $(if ($p) { [IO.Path]::GetFileName($p) } else { '' }); path = $p; local = (Test-DbLocal $p)
+            file = $(if ($p) { [IO.Path]::GetFileName($p) } else { '' }); path = $(if (Test-RemoteRequest $req) { '' } else { $p }); local = (Test-DbLocal $p)
+            remoteUrl = $(if (Test-RemoteRequest $req) { '' } else { $script:Config.remoteUrl }); allowRemote = [bool]$script:Config.allowRemote
             shopName = $script:Config.shopName; test = [bool]$env:LAWHA_FAKEDAO
         }
     }
@@ -1618,6 +1877,16 @@ function Handle($ctx) {
                 if (-not $file) { return Send-Json $ctx 200 @{ ok = $false; error = 'ما اخترت ملف' } }
                 Set-Database $file
                 return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($file); path = $script:Config.dbPath }
+            }
+            '/api/remote' {
+                $b = Read-Body $req
+                if (-not [string]$b.target) {
+                    $script:Config.remoteUrl = ''
+                    Save-Config
+                    Write-LawhaLog 'unlinked from the main computer'
+                    return Send-Json $ctx 200 @{ ok = $true; url = '' }
+                }
+                return Send-Json $ctx 200 (@{ ok = $true } + (Connect-Remote ([string]$b.target)))
             }
             '/api/shutdown' {
                 $script:Stop = $true
@@ -1743,6 +2012,27 @@ function Handle($ctx) {
                 } finally { $fs.Close() }
                 return
             }
+            '/api/data' {
+                return Send-Compressed $ctx (Export-Data) 'application/json; charset=utf-8'
+            }
+            '/api/remote-access' {
+                Need $s.admin 'تحتاج صلاحية مدير'
+                $b = Read-Body $req
+                if ($b.enable) {
+                    if (-not $env:LAWHA_FAKEDAO) { Enable-RemoteAccess }
+                    $script:Config.allowRemote = $true
+                } else {
+                    $script:Config.allowRemote = $false
+                }
+                Save-Config
+                $script:RestartListener = $true
+                Write-LawhaLog "$($s.user)  other devices $(if ($b.enable) { 'allowed' } else { 'not allowed' })"
+                return Send-Json $ctx 200 @{ ok = $true; allowRemote = [bool]$script:Config.allowRemote; addresses = (Get-MyAddresses); port = $Port }
+            }
+            '/api/addresses' {
+                Need $s.admin 'تحتاج صلاحية مدير'
+                return Send-Json $ctx 200 @{ ok = $true; allowRemote = [bool]$script:Config.allowRemote; listening = $script:ListenMode; addresses = (Get-MyAddresses); port = $Port }
+            }
             '/api/broken' {
                 Need $s.admin 'تحتاج صلاحية مدير'
                 $b = Read-Body $req
@@ -1769,10 +2059,36 @@ function Handle($ctx) {
 # Dot-sourcing (tests) loads the functions without starting the server.
 if ($MyInvocation.InvocationName -eq '.') { return }
 
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$Port/")
+# Listens on this computer only, or on the network too when other devices
+# may connect. Without Windows' approval for the network the start is
+# refused (access denied); then this computer alone, and Settings says so.
+function Start-Listener {
+    $script:ListenMode = 'local'
+    if ($script:Config.allowRemote) {
+        $l = New-Object System.Net.HttpListener
+        $l.Prefixes.Add("http://+:$Port/")
+        try {
+            $l.Start()
+            $script:ListenMode = 'network'
+            return $l
+        } catch {
+            $code = $_.Exception.InnerException.ErrorCode
+            if (-not $code) { $code = $_.Exception.ErrorCode }
+            Write-LawhaLog "network listening refused ($code): $($_.Exception.Message)"
+            try { $l.Close() } catch { }
+            if ($code -ne 5) { throw }
+            $script:ListenMode = 'network-refused'
+        }
+    }
+    $l = New-Object System.Net.HttpListener
+    $l.Prefixes.Add("http://localhost:$Port/")
+    $l.Start()
+    return $l
+}
+$script:RestartListener = $false
+
 try {
-    $listener.Start()
+    $listener = Start-Listener
 } catch {
     # Already running: just open the page.
     if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
@@ -1793,13 +2109,21 @@ try {
             # Let an idle Access instance go after two minutes.
             if ($script:AccessApp -and ((Get-Date) - $script:LastUse).TotalSeconds -gt 120) { Close-Engine }
             # don't hold the data file open while nobody is saving
-            if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt 20) { Close-Db }
+            if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt $DbIdleSeconds) { Close-Db }
+            # today's backup, on the side
+            Start-Backup
         }
         $ctx = $listener.EndGetContext($async)
         try {
             Handle $ctx
         } catch {
             try { Send-Json $ctx 500 @{ ok = $false; error = $_.Exception.Message } } catch { }
+        }
+        if ($script:RestartListener) {
+            $script:RestartListener = $false
+            try { $listener.Close() } catch { }
+            $listener = Start-Listener
+            Write-LawhaLog "listening: $($script:ListenMode)"
         }
     }
 } finally {

@@ -278,9 +278,22 @@ try { Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 
 Assert ($null -eq $script:Db) 'a refused save closes it (next one opens fresh)'
 Assert (@((Rows 'bayeeCode') | Where-Object { $_['bayeeCode'] -like 'فتح-*' }).Count -eq 2) 'nothing half-saved by the refused one'
 Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-3'; user = 'x' }) | Out-Null
-$script:DbLastUse = (Get-Date).AddSeconds(-30)
-if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt 20) { Close-Db }
-Assert ($null -eq $script:Db) 'closed after 20 idle seconds'
+$script:DbLastUse = (Get-Date).AddSeconds(-($DbIdleSeconds + 1))
+if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt $DbIdleSeconds) { Close-Db }
+Assert ($null -eq $script:Db) "closed after $($DbIdleSeconds / 60) idle minutes"
+
+Write-Host "`n== data for other devices"
+$bytes = Export-Data
+$exp = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
+Assert ($exp.ok -and $exp.tables.MasterOut.rows.Count -eq (Rows 'MasterOut').Count) "all invoices exported ($($exp.tables.MasterOut.rows.Count)), $([math]::Round($bytes.Length / 1024)) KB"
+Assert ($null -eq $exp.tables.tblUsers.cols.Where({ $_ -match 'PWD' })[0] -and @($exp.tables.tblUsers.cols) -join ',' -eq 'UserName') 'user names only, never passwords'
+Assert ([object]::ReferenceEquals($bytes, (Export-Data))) 'second request served from the cache'
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'تصدير-1'; user = 'x' }) | Out-Null
+$exp2 = [Text.Encoding]::UTF8.GetString((Export-Data)) | ConvertFrom-Json
+$ci = [array]::IndexOf(@($exp2.tables.bayeeCode.cols), 'bayeeCode')
+Assert (@($exp2.tables.bayeeCode.rows | Where-Object { $_[$ci] -eq 'تصدير-1' }).Count -eq 1) 'a save shows in the next export'
+[Text.Encoding]::UTF8.GetString((Export-Data)) | Set-Content -LiteralPath (Join-Path $tmp 'data-export.json') -Encoding UTF8
+Get-FakeFileTables $script:Engine (Get-DbPath) | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'data-tables.json') -Encoding UTF8
 
 Write-Host "`n== empty rows"
 $b0 = @(Get-BrokenRows)
@@ -317,6 +330,7 @@ Assert ($null -eq $script:DbOverride) 'real file in use again'
 Write-Host "   (JSON for the app check: $tmp)"
 
 Write-Host "`n== backup"
+Wait-Backup 60
 $backups = @(Get-ChildItem (Join-Path $tmp 'backups-lawha') -Filter '*.accdb')
 Assert ($backups.Count -eq 1 -and $backups[0].Length -eq (Get-Item $dbCopy).Length) "one daily backup: $($backups[0].Name)"
 

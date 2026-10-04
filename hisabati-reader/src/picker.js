@@ -9,8 +9,20 @@ export function databasePicker(ctx, host, onDone, { auto = false } = {}) {
   const size = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
   const folderOf = (p) => p.replace(/[\\/][^\\/]*$/, '');
 
+  const remote = !['localhost', '127.0.0.1'].includes(location.hostname);
   host.innerHTML = `
     <div class="picker">
+      ${remote ? '' : `<div class="pk-remote">
+        <h3 style="margin-top:0">الملف على حاسبة ثانية (شبكة أو VPN)؟</h3>
+        <p class="muted pk-hint">الأسرع: اتصل بالبرنامج على الحاسبة الرئيسية بدل فتح الملف من بعيد. الحفظ يصير هناك، وتوصل هنا بيانات قليلة مضغوطة.
+          (لازم المدير يفعّل بإعدادات الحاسبة الرئيسية: <b>السماح للأجهزة الثانية بالاتصال</b>.)</p>
+        <div class="row" style="display:flex;gap:8px;margin-top:8px">
+          <input id="pkRemote" dir="ltr" placeholder="اسم الحاسبة الرئيسية أو IP، مثل SHOP-PC أو 10.8.0.1" style="flex:1">
+          <button class="btn primary" id="pkRemoteGo">اتصل</button>
+        </div>
+        <p class="notice error" id="pkRemoteErr" hidden></p>
+      </div>
+      <h3>أو اختار ملف البيانات</h3>`}
       <button class="btn primary big block" id="pkNative">${icon('file')} اختار الملف من نافذة ويندوز</button>
       <p class="muted pk-hint" id="pkNativeHint">تنفتح نافذة ويندوز العادية. إذا الملف على حاسبة ثانية، دوس <b>Network</b> (الشبكة) بالجانب مالها.</p>
       <h3>أو من الملفات اللي لكيتها</h3>
@@ -153,5 +165,27 @@ export function databasePicker(ctx, host, onDone, { auto = false } = {}) {
     }
   }
   q('#pkNative').onclick = nativeWindow;
+  async function connectRemote() {
+    const target = q('#pkRemote').value.trim();
+    const err = q('#pkRemoteErr');
+    err.hidden = true;
+    if (!target) return;
+    const btn = q('#pkRemoteGo');
+    btn.disabled = true;
+    btn.textContent = 'جاري الاتصال…';
+    try {
+      const j = await api('/api/remote', { method: 'POST', body: { target } });
+      location.href = j.url;
+    } catch (e) {
+      err.textContent = e.message;
+      err.hidden = false;
+      btn.disabled = false;
+      btn.textContent = 'اتصل';
+    }
+  }
+  if (q('#pkRemoteGo')) {
+    q('#pkRemoteGo').onclick = connectRemote;
+    q('#pkRemote').onkeydown = (e) => e.key === 'Enter' && connectRemote();
+  }
   if (auto) nativeWindow();
 }

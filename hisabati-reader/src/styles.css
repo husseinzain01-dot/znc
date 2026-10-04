@@ -391,3 +391,9 @@ table.lines th { cursor: default; }
 .login-file code { word-break: break-all; font-size: 12px; }
 .login-file .notice { margin: 0; font-size: 13px; }
 .login-file .btn { justify-self: start; }
+
+/* ---------------- other devices ---------------- */
+.settings.remote .local-only { display: none; }
+.addr-list { margin: 6px 0 10px; padding-inline-start: 20px; display: grid; gap: 4px; }
+.addr-list code { font-size: 14px; }
+.pk-remote { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); margin-bottom: 6px; }

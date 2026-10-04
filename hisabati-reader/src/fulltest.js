@@ -138,15 +138,18 @@ export function verifyClean(P0, P2, e) {
   return steps;
 }
 
-// The helper's test engine keeps the copy in memory and sends its tables
-// as JSON; this gives them the shape mdb-reader has, for load.js.
+// Tables sent as JSON by the helper (the main computer's data for another
+// device, or the test engine's copy) in the shape mdb-reader has, for
+// load.js. Rows come as objects, or as arrays with the column names once.
 export function readerFromTables(tables) {
   const iso = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/;
+  const rowsOf = (t) =>
+    t.cols ? (t.rows || []).map((a) => Object.fromEntries(t.cols.map((c, i) => [c, a[i]]))) : t.rows || [];
   return {
     getTableNames: () => Object.keys(tables),
     getTable: (name) => ({
       getData: ({ columns } = {}) =>
-        (tables[name].rows || []).map((r) => {
+        rowsOf(tables[name]).map((r) => {
           const o = {};
           for (const k of columns || Object.keys(r)) o[k] = typeof r[k] === 'string' && iso.test(r[k]) ? new Date(r[k] + 'Z') : r[k];
           return o;

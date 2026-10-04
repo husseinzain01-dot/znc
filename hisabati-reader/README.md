@@ -20,6 +20,15 @@
 - أول تشغيل يطلب ملف البيانات مرة وحدة؛ ينحفظ بـ `%APPDATA%\LawhatAlMahal\config.json` ويبقى حتى بعد التحديث أو إعادة التنصيب.
 - يحتاج Microsoft Access أو Access Runtime على نفس الجهاز (الكتابة تصير بمحرك Access نفسه).
 
+## جهاز ثاني (شبكة أو VPN)
+
+فتح ملف Access من جهاز ثاني عبر الشبكة بطيء جداً (خصوصاً عبر VPN). بدله:
+
+- الحاسبة الرئيسية (اللي بيها الملف): الإعدادات ← "الأجهزة الثانية" ← "اسمح…". مرة وحدة بموافقة ويندوز (UAC): `netsh http add urlacl` لهذا المستخدم + قاعدة firewall للمنفذ 8765. بعدها المساعد يستقبل من الشبكة (`http://+:8765/`).
+- الجهاز الثاني: "تغيير ملف البيانات" ← "الملف على حاسبة ثانية؟" ← اسم الحاسبة أو IP. ينحفظ بـ `remoteUrl` والمشغّل يفتح الحاسبة الرئيسية مباشرة.
+- الجهاز الثاني يقرا `/api/data`: الجداول اللي يحتاجها البرنامج بس، مقروءة بـ DAO على الحاسبة الرئيسية، JSON مضغوط (~40 KB بدل 15 MB). الحفظ يصير على الحاسبة الرئيسية.
+- الحماية: الطلبات من جهاز ثاني لازم تكون لاسم هالحاسبة أو IP (مو أي اسم: DNS rebinding)، وما تكدر تختار ملف أو تتصفح الفولدرات أو تسوي الفحوصات أو تطفي البرنامج؛ ما يوصلها مكان الملف ولا كلمات السر.
+
 ## شلون يشتغل
 
 ```
@@ -43,8 +52,9 @@ npm install
 npm run build                                     # release/hisabati-reader.html
 node test/calc.test.mjs Units2026.accdb           # التقارير على ملف حقيقي
 node test/numeric.test.mjs Units2026.accdb        # قارئ الأسعار السريع يطلع نفس القيم بالضبط
+node test/data-export.test.mjs <مجلد الفحص المؤقت>  # بيانات الجهاز الثاني (/api/data) تطلع نفس التقارير
 node server/test/export-tables.mjs Units2026.accdb tables.json
-pwsh server/test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb   # كل عمليات الحفظ (173 فحص)
+pwsh server/test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb   # كل عمليات الحفظ (181 فحص)
 KEEP_TMP=1 pwsh server/test/run-ops.ps1 ... && node test/fulltest.test.mjs <مجلد الفحص المؤقت>   # نص الفحص الشامل مال البرنامج
 installer/build.sh                                # dist/LawhatAlMahal-Setup-<version>.exe (يحتاج makensis)
 ```

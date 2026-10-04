@@ -65,17 +65,26 @@ export const PRESETS = [
 export function setupSettings(ctx) {
   const { $, esc, api, state, toast, icon, onAfter, readServer, guarded, setupScreen, openModal, closeModal, parseData, localDay } = ctx;
 
+  const remote = () => !['localhost', '127.0.0.1'].includes(location.hostname);
+
   function view() {
     onAfter(load);
-    return `<div class="settings">
-      <div class="card">
+    return `<div class="settings${remote() ? ' remote' : ''}">
+      ${remote() ? `<p class="notice info">هذا جهاز متصل بالحاسبة الرئيسية. فحص النظام والفحص الشامل وملف البيانات والأجهزة الثانية تنسوى من الحاسبة الرئيسية نفسها.</p>` : ''}
+      <div class="card local-only">
+        <h3>الأجهزة الثانية (شبكة أو VPN)</h3>
+        <p class="muted">إذا أكو جهاز ثاني يشتغل على نفس البيانات من بعيد، خلّيه يتصل بالبرنامج على هذي الحاسبة بدل ما يفتح الملف عبر الشبكة:
+          الحفظ يصير هنا بسرعة، ويروحله بس بيانات قليلة مضغوطة. أول مرة ويندوز يطلب موافقة (حساب مدير ويندوز) حتى يفتح المنفذ ${8765}.</p>
+        <div id="rmStatus"><span class="muted">جاري التحميل…</span></div>
+      </div>
+      <div class="card local-only">
         <h3>فحص النظام</h3>
         <p class="muted">يجرّب كل عمليات الحفظ (زبون، بيع، تعديل، قبض، دفع، شراء، مادة، مسح) على ملف البيانات الحقيقي داخل معاملة وحدة،
           وبعدين يلغيها كلها، فالملف يرجع مثل ما جان بالضبط. سوّيه أول مرة تنصّب البرنامج، وكل ما تغيّر الحاسبة أو الملف.</p>
         <button class="btn primary" id="stRun">${icon('check')} شغّل الفحص</button>
         <div id="stResult"></div>
       </div>
-      <div class="card">
+      <div class="card local-only">
         <h3>الفحص الشامل (قبل التسليم)</h3>
         <p class="muted">ياخذ <b>نسخة</b> من ملف البيانات، ويسوّي عليها بمحرك Access الحقيقي كل العمليات وحدة وحدة ويحفظها:
           مورد وزبون ومادة، قائمة شراء وتعديلها، بيع نقدي، بيع آجل وتعديله، قبض ودفع ومصروف وتعديلها، تغيير اسم زبون، وصلاحيات الكاشير.
@@ -100,7 +109,7 @@ export function setupSettings(ctx) {
         <div id="setUsers" class="perm-users"><span class="muted">جاري التحميل…</span></div>
         <button class="btn primary" id="setUsersSave">${icon('save')} حفظ الصلاحيات</button>
       </div>
-      <div class="card">
+      <div class="card local-only">
         <h3>ملف البيانات</h3>
         <p class="muted">الملف اللي يقرا ويكتب عليه البرنامج. محفوظ، وما ينطلب منك مرة ثانية.</p>
         <p><code id="setPath" dir="ltr">…</code></p>
@@ -125,7 +134,46 @@ export function setupSettings(ctx) {
     </div>`;
   }
 
+  async function remoteCard() {
+    const box = $('#rmStatus');
+    const draw = (j) => {
+      const addr = (j.addresses || []).map((a) => `<li><code dir="ltr">${esc(a.value)}</code>${a.via ? ` <small class="muted">${esc(a.via)}</small>` : ''}</li>`).join('');
+      box.innerHTML = j.allowRemote
+        ? `${j.listening === 'network-refused'
+            ? '<p class="notice error">مفعّل، بس ويندوز ما سمح للبرنامج يستقبل من الشبكة. دوس "فعّل" مرة ثانية ووافق على رسالة ويندوز.</p>'
+            : '<p class="notice good">✔ الأجهزة الثانية تكدر تتصل بهذي الحاسبة.</p>'}
+           <p>على الجهاز الثاني: افتح البرنامج ← <b>تغيير ملف البيانات</b> ← <b>الاتصال بالحاسبة الرئيسية</b>، واكتب واحد من هذني:</p>
+           <ul class="addr-list">${addr}</ul>
+           <p class="muted" style="font-size:13px">إذا الجهاز الثاني يجي من VPN، استخدم عنوان الـ VPN (اللي يمّه اسم الـ VPN).</p>
+           <div class="row"><button class="btn" id="rmOn">${icon('check')} فعّل مرة ثانية</button><button class="btn danger" id="rmOff">أوقف الاتصال من الأجهزة الثانية</button></div>`
+        : `<p class="muted">مو مفعّل: بس هذي الحاسبة تستخدم البرنامج.</p>
+           <button class="btn primary" id="rmOn">${icon('check')} اسمح للأجهزة الثانية بالاتصال</button>`;
+      $('#rmOn').onclick = () => setRemote(true);
+      if ($('#rmOff')) $('#rmOff').onclick = () => setRemote(false);
+    };
+    const setRemote = async (enable) => {
+      box.insertAdjacentHTML('afterbegin', `<p class="muted" id="rmWait">${enable ? 'وافق على رسالة ويندوز اللي تطلع (هل تسمح لهذا التطبيق…)' : 'جاري الإيقاف…'}</p>`);
+      try {
+        const j = await api('/api/remote-access', { method: 'POST', body: { enable } });
+        // the program restarts its listening right after answering
+        await new Promise((r) => setTimeout(r, 1200));
+        const k = await api('/api/addresses').catch(() => j);
+        draw({ ...j, ...k });
+        toast(enable ? 'انفتح الاتصال للأجهزة الثانية ✔' : 'انقفل الاتصال من الأجهزة الثانية');
+      } catch (e) {
+        $('#rmWait')?.remove();
+        toast(e.message, true);
+      }
+    };
+    try {
+      draw(await api('/api/addresses'));
+    } catch (e) {
+      box.innerHTML = `<p class="notice error">${esc(e.message)}</p>`;
+    }
+  }
+
   async function load() {
+    if (!remote()) remoteCard();
     $('#stRun').onclick = run;
     $('#ftRun').onclick = fullTest;
     $('#ftPrint').onclick = printFullTest;

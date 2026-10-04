@@ -253,9 +253,20 @@ async function api(path, { method = 'GET', body } = {}) {
   return j;
 }
 
+// This page comes from the main computer's program over the network (a
+// second device), not from this computer's own.
+const isRemote = () => !['localhost', '127.0.0.1'].includes(location.hostname);
+
 async function readServer({ quiet = false } = {}) {
   for (let i = 0; i < 2; i++) {
     try {
+      // a second device gets compact data, not the whole 15 MB file
+      if (isRemote()) {
+        const j = await api('/api/data');
+        const out = await showData(C.prepare(loadDatabase(readerFromTables(j.tables))), location.hostname, { quiet });
+        refreshMe();
+        return out;
+      }
       const r = await api('/api/file');
       const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
       // the helper's test engine sends its in-memory tables instead of a file
@@ -342,6 +353,7 @@ async function loginScreen(error = '', chosen = '') {
   }
   const last = chosen || store.get('lawha-last-user');
   const info = (await detectServer()) || {};
+  const params = new URLSearchParams(location.search);
   screen(`<h1>${esc(state.shopName || 'لوحة المحل')}</h1>
     <p class="muted">سجّل دخول بنفس اسمك وكلمة السر مال حساباتي</p>
     <form id="loginForm" autocomplete="off">
@@ -354,7 +366,21 @@ async function loginScreen(error = '', chosen = '') {
       ${error ? `<p class="notice error" style="margin:0">${esc(error)}</p>` : ''}
       <button class="btn primary big block" type="submit" id="lGo">دخول</button>
     </form>
-    ${info.path ? `<div class="login-file">
+    ${isRemote() ? `<div class="login-file">
+      <small class="muted">متصل بالحاسبة الرئيسية</small>
+      <code dir="ltr">${esc(location.host)}</code>
+      <a class="btn small" href="http://localhost:8765/?unlink=1">${icon('file')} فك الربط والرجوع لهذا الجهاز</a>
+    </div>` : ''}
+    ${!isRemote() && info.remoteUrl ? `<div class="login-file">
+      ${params.has('remote-down') ? `<p class="notice error">الحاسبة الرئيسية (<span dir="ltr">${esc(info.remoteUrl)}</span>) ما ردّت. تأكد إنها شغّالة وبيها البرنامج مفتوح، وإن الـ VPN أو الشبكة شغّالة.</p>` : ''}
+      <small class="muted">هذا الجهاز مربوط بالحاسبة الرئيسية</small>
+      <code dir="ltr">${esc(info.remoteUrl)}</code>
+      <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn small primary" href="${esc(info.remoteUrl)}">افتح الحاسبة الرئيسية</a>
+        <button type="button" class="btn small" id="lUnlink">فك الربط</button>
+      </div>
+    </div>` : ''}
+    ${info.path && !info.remoteUrl ? `<div class="login-file">
       <small class="muted">ملف البيانات</small>
       <code dir="ltr">${esc(info.path)}</code>
       ${info.local ? `<p class="notice warn">هذا الملف موجود جوّه فولدر البرنامج على هذا الجهاز، يعني الأغلب <b>نسخة</b> انتقلت ويه البرنامج. إذا الملف الأصلي على حاسبة ثانية، غيّره واختاره من <b>الشبكة</b>، وإلا هذا الجهاز يشتغل على نسخة لحاله وبيعه ما يطلع بالحاسبة الثانية.</p>` : ''}
@@ -364,6 +390,7 @@ async function loginScreen(error = '', chosen = '') {
   $('#lPass').focus();
   // the data file is this computer's connection: anyone may set it here
   if ($('#lChange')) $('#lChange').onclick = () => chooseFileScreen();
+  if ($('#lUnlink')) $('#lUnlink').onclick = () => unlinkRemote();
   $('#loginForm').onsubmit = async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button');
@@ -403,6 +430,18 @@ async function refreshMe() {
   } catch {
     /* the next refresh tries again */
   }
+}
+
+// Stop opening the main computer: this device uses its own data file again.
+async function unlinkRemote() {
+  try {
+    await api('/api/remote', { method: 'POST', body: { target: '' } });
+    toast('انفك الربط ✔');
+  } catch (e) {
+    toast(e.message, true);
+  }
+  history.replaceState(null, '', '/');
+  loginScreen();
 }
 
 // Choosing another data file from the login screen (no sign-in needed).
@@ -1335,6 +1374,7 @@ function init() {
     state.shopName = ping.shopName || '';
     document.title = state.shopName || 'لوحة المحل';
     setAuto(auto);
+    if (!isRemote() && new URLSearchParams(location.search).has('unlink')) return unlinkRemote();
     if (!ping.configured) return setupScreen();
     if (state.token) {
       try {

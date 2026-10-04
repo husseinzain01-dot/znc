@@ -20,6 +20,10 @@ function Fail([string]$msg) {
     exit 1
 }
 
+# Straight to the program, never through a VPN or proxy set on Windows
+# (one that doesn't skip local addresses would make the program look stopped).
+[Net.WebRequest]::DefaultWebProxy = $null
+
 function Get-Helper {
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri ($Url + 'api/ping') -TimeoutSec 2
@@ -98,6 +102,22 @@ try {
         Log 'helper already running'
     }
 
+    # Linked to the main computer (a second device): open that, if it answers.
+    $open = $Url
+    try {
+        $cfg = Get-Content -LiteralPath (Join-Path $env:APPDATA 'LawhatAlMahal\config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $remote = [string]$cfg.remoteUrl
+    } catch { $remote = '' }
+    if ($remote) {
+        try {
+            $r = Invoke-WebRequest -UseBasicParsing -Uri ($remote + 'api/ping') -TimeoutSec 5
+            if ($r.StatusCode -eq 200) { $open = $remote; Log "opening the main computer $remote" }
+        } catch {
+            Log "main computer $remote not answering: $($_.Exception.Message)"
+            $open = $Url + '?remote-down=1'
+        }
+    }
+
     # Its own window, without browser bars: Edge (always on Windows 10/11),
     # else Chrome, else the default browser.
     function Under([string]$base, [string]$rel) { if ($base) { Join-Path $base $rel } }
@@ -113,10 +133,10 @@ try {
     $browser = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
     if ($browser) {
         Log "opening $browser"
-        Start-Process -FilePath $browser -ArgumentList @("--app=$Url", '--start-maximized')
+        Start-Process -FilePath $browser -ArgumentList @("--app=$open", '--start-maximized')
     } else {
         Log 'opening default browser'
-        Start-Process $Url
+        Start-Process $open
     }
 } catch {
     Fail ('ما اشتغل البرنامج: ' + $_.Exception.Message)

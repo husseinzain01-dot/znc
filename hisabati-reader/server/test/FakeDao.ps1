@@ -267,7 +267,10 @@ function Select-FakeRows($state, [string]$sql) {
 
 function New-FakeDb($state, [bool]$readOnly) {
     $db = [pscustomobject]@{ State = $state; ReadOnly = $readOnly; Closed = $false }
-    $db | Add-Member ScriptProperty TableDefs { @($this.State.tables.Keys | ForEach-Object { [pscustomobject]@{ Name = $_ } }) }
+    $db | Add-Member ScriptProperty TableDefs {
+        $st = $this.State
+        @($st.tables.Keys | ForEach-Object { [pscustomobject]@{ Name = $_; Fields = @($st.tables[$_].columns | ForEach-Object { [pscustomobject]@{ Name = $_.name } }) } })
+    }
     $db | Add-Member ScriptMethod Close { $this.Closed = $true }
     $db | Add-Member ScriptMethod OpenRecordset {
         param([string]$source, $type, $options)
@@ -375,6 +378,19 @@ function New-FakeRecordset($db, $table, $rows, $cols, [bool]$snapshot, [bool]$ta
     $rs | Add-Member ScriptProperty EOF { $this.Pos -ge $this.Rows.Count }
     $rs | Add-Member ScriptMethod MoveNext { if ($this.Pos -ge $this.Rows.Count) { throw 'FakeDao: No current record' }; $this.Pos++ }
     $rs | Add-Member ScriptMethod Close { $this.Closed = $true }
+    # like DAO: the rest of the rows as [field, row], Null as DBNull
+    $rs | Add-Member ScriptMethod GetRows {
+        param($n)
+        $cols = @(if ($this.Cols.Count) { $this.Cols | ForEach-Object { (Get-FakeColumn $this.Table $_).name } } else { $this.Table.columns | ForEach-Object { $_.name } })
+        $left = [math]::Min([int]$n, $this.Rows.Count - $this.Pos)
+        $a = New-Object 'object[,]' $cols.Count, $left
+        for ($r = 0; $r -lt $left; $r++) {
+            $row = $this.Rows[$this.Pos + $r]
+            for ($c = 0; $c -lt $cols.Count; $c++) { $v = $row[$cols[$c]]; $a[$c, $r] = if ($null -eq $v) { [DBNull]::Value } else { $v } }
+        }
+        $this.Pos += $left
+        return , $a
+    }
     $rs | Add-Member ScriptMethod AddNew {
         if ($this.Snapshot -or $this.Db.ReadOnly) { throw 'FakeDao: Operation is not supported for this type of object (AddNew)' }
         $p = @{}
