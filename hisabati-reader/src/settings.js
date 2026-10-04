@@ -49,7 +49,7 @@ const IMPLIED_BY = {
   stock: ['item_manage'],
   cash: ['payment', 'voucher_edit'],
 };
-const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : v ? [String(v)] : []).map(String);
+const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : typeof v === 'string' ? v.split(/[\s,]+/) : []).map(String).filter(Boolean);
 
 export const PRESETS = [
   ['cashier', 'كاشير نقدي — فاتورة البيع بس', ['pos', 'sale_cash', 'print']],
@@ -179,7 +179,7 @@ export function setupSettings(ctx) {
     }
     host.innerHTML = users
       .map((n, k) => {
-        const have = new Set(perms[n] ? asList(perms[n]) : def);
+        const have = new Set(perms[n] != null ? asList(perms[n]) : def);
         const same = (list) => {
           const a = new Set(list.filter((x) => x !== 'pos'));
           const b = [...have].filter((x) => x !== 'pos');
@@ -261,7 +261,7 @@ export function setupSettings(ctx) {
     if (empty.length && !confirm(`${empty.join('، ')} ما راح يشوف أي شاشة. تحفظ هيچ؟`)) return;
     const admins = boxes.filter((b) => b.querySelector('[data-admin]').checked).map((b) => b.dataset.user);
     const perms = {};
-    for (const b of boxes) perms[b.dataset.user] = [...b.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
+    for (const b of boxes) perms[b.dataset.user] = [...b.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm).join(',');
     try {
       await api('/api/settings', { method: 'POST', body: { admins, perms } });
       toast(admins.length ? 'انحفظ ✔ المدراء: ' + admins.join('، ') : 'انحفظ ✔ (ما أكو مدير، فالكل مدراء)');

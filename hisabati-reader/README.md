@@ -40,7 +40,7 @@ npm install
 npm run build                                     # release/hisabati-reader.html
 node test/calc.test.mjs Units2026.accdb           # التقارير على ملف حقيقي
 node server/test/export-tables.mjs Units2026.accdb tables.json
-pwsh server/test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb   # كل عمليات الحفظ (103 فحص)
+pwsh server/test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb   # كل عمليات الحفظ (116 فحص)
 installer/build.sh                                # dist/LawhatAlMahal-Setup-<version>.exe (يحتاج makensis)
 ```
 

@@ -20,17 +20,32 @@ function Fail([string]$msg) {
     exit 1
 }
 
-function Test-Helper {
+function Get-Helper {
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri ($Url + 'api/ping') -TimeoutSec 2
-        return $r.StatusCode -eq 200
-    } catch { return $false }
+        if ($r.StatusCode -ne 200) { return $null }
+        try { return ($r.Content | ConvertFrom-Json) } catch { return [pscustomobject]@{ version = '' } }
+    } catch { return $null }
 }
+function Test-Helper { return $null -ne (Get-Helper) }
 
 try {
     Log "launch from $Here (PowerShell $($PSVersionTable.PSVersion), $([IntPtr]::Size * 8)-bit)"
     $server = Join-Path $Here 'server.ps1'
     if (-not (Test-Path -LiteralPath $server)) { Fail "ملف server.ps1 مو موجود يم البرنامج: $Here" }
+
+    # A helper from before an update may still be running hidden: replace it,
+    # or the old code keeps answering.
+    $want = ''
+    $m = Select-String -LiteralPath $server -Pattern "^\`$Version = '([^']+)'" | Select-Object -First 1
+    if ($m) { $want = $m.Matches[0].Groups[1].Value }
+    $running = Get-Helper
+    if ($running -and $want -and [string]$running.version -ne $want) {
+        Log "helper $($running.version) running, installed ${want}: restarting it"
+        try { Invoke-WebRequest -UseBasicParsing -Method POST -Headers @{ 'X-Lawha' = '1' } -Uri ($Url + 'api/shutdown') -TimeoutSec 3 | Out-Null } catch { }
+        $deadline = (Get-Date).AddSeconds(10)
+        while ((Test-Helper) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 300 }
+    }
 
     if (-not (Test-Helper)) {
         $env:LAWHA_HIDDEN = '1'

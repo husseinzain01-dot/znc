@@ -341,9 +341,9 @@ async function loginScreen(error = '', chosen = '') {
   };
 }
 
-// A list from the helper, also in the {"value": [...]} shape older Windows
-// PowerShell versions sometimes send.
-const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : v ? [String(v)] : []).map(String);
+// The helper sends permissions as text ("pos,sale_cash,print"); older
+// versions sent a list, sometimes as {"value": [...]}.
+const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : typeof v === 'string' ? v.split(/[\s,]+/) : []).map(String).filter(Boolean);
 
 function setMe(me) {
   state.admin = !!me.admin;

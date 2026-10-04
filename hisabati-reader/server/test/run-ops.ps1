@@ -232,6 +232,37 @@ $js = @{ perms = [string[]](Get-Perms 'كاشير1'); one = [string[]]@('pos') }
 Assert ($js -match '"perms":\["' -and $js -match '"one":\["pos"\]') "permissions go out as a JSON list: $js"
 $script:Config.perms = @{ 'كاشير1' = [string[]]@('pos', 'bogus', 'print') }
 Assert ((([string[]](Get-Perms 'كاشير1')) -join ',') -eq 'pos,print') 'unknown permission names are dropped'
+# every shape an older version or Windows PowerShell 5.1 may have saved
+$shapes = @(
+    @('"pos,sale_credit,print"', 'pos,sale_credit,print'),
+    @('["pos","sale_credit"]', 'pos,sale_credit'),
+    @('{"value":["sale_credit","receipt"],"Count":2}', 'sale_credit,receipt'),
+    @('[{"value":"print"}]', 'print'),
+    @('[]', ''),
+    @('""', ''),
+    @('"@{value=System.Object[]; Count=3}"', $null),
+    @('["bogus"]', $null)
+)
+foreach ($sh in $shapes) {
+    $got = ConvertTo-PermText ($sh[0] | ConvertFrom-Json)
+    Assert ($got -ceq $sh[1]) "saved as $($sh[0]) -> [$got]"
+}
+$oldCfg = $ConfigFile
+$oldConfig = $script:Config
+$script:ConfigFile = Join-Path $tmp 'config-test.json'
+Set-Content $script:ConfigFile -Encoding UTF8 -Value '{"dbPath":"x","admins":["نور"],"perms":{"كاشير1":{"value":["sale_credit"],"Count":1},"كاشير 2":"@{value=System.Object[]; Count=3}","ض":[]}}'
+$script:Config = Read-Config
+Assert ((Get-PermText 'كاشير1') -eq 'sale_credit,pos') "old 5.1 save read back: $(Get-PermText 'كاشير1')"
+Assert ((Get-PermText 'كاشير 2') -eq 'pos,sale_cash,print') 'unreadable old save falls back to the default'
+Assert ((Get-PermText 'ض') -eq '') 'an empty list stays empty'
+Save-Config
+$saved = Get-Content $script:ConfigFile -Raw -Encoding UTF8
+Assert ($saved -match '"كاشير1":\s*"sale_credit"' -and $saved -notmatch '"value"') "saved as text: $($saved -replace '\s+', ' ')"
+$script:Config = Read-Config
+Assert ((Get-PermText 'كاشير1') -eq 'sale_credit,pos') 'text save reads back'
+$script:ConfigFile = $oldCfg
+$script:Config = $oldConfig
+$script:Config.perms = @{}
 $admin = @{ user = 'نور'; admin = $true; perms = (Get-Perms 'نور') }
 Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL1; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
 $script:Config.perms = @{}

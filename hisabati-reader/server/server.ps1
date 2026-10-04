@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.2'
+$Version = '1.1.3'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -60,6 +60,40 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $AppFile = Join-Path $Here 'lawha.html'
 if (-not (Test-Path $AppFile)) { $AppFile = Join-Path (Join-Path (Split-Path $Here -Parent) 'release') 'hisabati-reader.html' }
 
+# ---------------------------------------------------------------- permission lists
+$AllPerms = @(
+    'pos', 'home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks',
+    'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'sale_edit', 'sale_delete',
+    'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit',
+    'customer_add', 'customer_edit', 'supplier_manage', 'item_manage'
+)
+
+# Permissions are kept and sent as one text, "pos,sale_cash,print": Windows
+# PowerShell 5.1 can save or send a list as {"value": [...], "Count": n} or
+# lose it, a text it leaves alone. Reads any shape an older version saved.
+# $null: something was there but no permission in it (left unset).
+function ConvertTo-PermText($v) {
+    $texts = New-Object System.Collections.Generic.List[string]
+    $walk = {
+        param($x)
+        if ($null -eq $x -or $x -is [DBNull]) { return }
+        if ($x -is [string]) { $texts.Add($x); return }
+        if ($x -is [System.Collections.IDictionary]) { foreach ($k in @($x.Keys)) { & $walk $x[$k] }; return }
+        if ($x -is [System.Collections.IEnumerable]) { foreach ($i in $x) { & $walk $i }; return }
+        if ($x -is [System.Management.Automation.PSCustomObject]) { foreach ($q in $x.PSObject.Properties) { & $walk $q.Value }; return }
+        $texts.Add([string]$x)
+    }
+    & $walk $v
+    $found = New-Object System.Collections.Generic.List[string]
+    foreach ($t in $texts) {
+        foreach ($m in [regex]::Matches($t, '[a-z_]+')) {
+            if ($AllPerms -contains $m.Value -and -not $found.Contains($m.Value)) { $found.Add($m.Value) }
+        }
+    }
+    if ($found.Count -eq 0 -and (@($texts | Where-Object { $_ -match '\S' }).Count -gt 0)) { return $null }
+    return ($found.ToArray() -join ',')
+}
+
 function Read-Config {
     $c = @{ dbPath = ''; shopName = ''; admins = @(); perms = @{} }
     if (Test-Path $ConfigFile) {
@@ -70,9 +104,8 @@ function Read-Config {
             if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
             if ($j.perms) {
                 foreach ($p in $j.perms.PSObject.Properties) {
-                    $v = $p.Value
-                    if ($v -and $v.PSObject.Properties['value']) { $v = $v.value }
-                    $c.perms[$p.Name] = [string[]]@($v | ForEach-Object { [string]$_ } | Where-Object { $_ })
+                    $t = ConvertTo-PermText $p.Value
+                    if ($null -ne $t) { $c.perms[$p.Name] = $t }
                 }
             }
         } catch { }
@@ -81,7 +114,10 @@ function Read-Config {
 }
 
 function Save-Config {
-    $script:Config | ConvertTo-Json -Depth 4 | Set-Content $ConfigFile -Encoding UTF8
+    $script:Config.admins = [string[]]@($script:Config.admins)
+    $json = $script:Config | ConvertTo-Json -Depth 4
+    $json = [regex]::Replace($json, '\{\s*"value":\s*(\[[^\[\]{}]*\]),\s*"Count":\s*\d+\s*\}', '$1')
+    $json | Set-Content $ConfigFile -Encoding UTF8
 }
 
 $script:Config = Read-Config
@@ -619,12 +655,6 @@ $Ops = @{
 # Managers can do everything. Everyone else gets the permissions a manager
 # ticked for them in Settings; with nothing set, a user can only make cash
 # sales and print them.
-$AllPerms = @(
-    'pos', 'home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks',
-    'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'sale_edit', 'sale_delete',
-    'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit',
-    'customer_add', 'customer_edit', 'supplier_manage', 'item_manage'
-)
 $DefaultPerms = @('pos', 'sale_cash', 'print')
 
 # A screen comes with the work done on it: whoever may sell gets the sale
@@ -640,17 +670,24 @@ $ImpliedBy = [ordered]@{
     cash      = @('payment', 'voucher_edit')
 }
 
-# Always a plain string[]: Windows PowerShell 5.1 turns a wrapped array into
-# {"value": [...], "Count": n} in JSON, which the app would not read.
-function Get-Perms([string]$user) {
-    if (Test-Admin $user) { return , ([string[]]$AllPerms) }
-    $list = if ($script:Config.perms.ContainsKey($user)) { @($script:Config.perms[$user]) } else { $DefaultPerms }
+# What a user may do, as text ("pos,sale_cash,print"), with the screens their
+# actions need.
+function Get-PermText([string]$user) {
+    if (Test-Admin $user) { return ($AllPerms -join ',') }
+    $t = $null
+    if ($script:Config.perms.ContainsKey($user)) { $t = ConvertTo-PermText $script:Config.perms[$user] }
+    if ($null -eq $t) { $t = $DefaultPerms -join ',' }
     $set = New-Object System.Collections.Generic.List[string]
-    foreach ($p in $list) { if ($p -and $AllPerms -contains [string]$p -and -not $set.Contains([string]$p)) { $set.Add([string]$p) } }
+    foreach ($p in ($t -split ',')) { if ($p -and -not $set.Contains($p)) { $set.Add($p) } }
     foreach ($screen in $ImpliedBy.Keys) {
         if (-not $set.Contains($screen) -and @($ImpliedBy[$screen] | Where-Object { $set.Contains($_) }).Count) { $set.Add($screen) }
     }
-    return , ([string[]]$set.ToArray())
+    return ($set.ToArray() -join ',')
+}
+
+# The same as a list, for checks on the helper.
+function Get-Perms([string]$user) {
+    return , [string[]]@((Get-PermText $user) -split ',' | Where-Object { $_ })
 }
 
 $PermNames = @{
@@ -1103,10 +1140,10 @@ function Handle($ctx) {
                     return Send-Json $ctx 200 @{ ok = $false; error = 'كلمة السر غلط' }
                 }
                 $t = New-Token
-                $perms = [string[]](Get-Perms $user)
-                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = $perms }
-                Write-LawhaLog "login $user ($(if (Test-Admin $user) { 'manager' } else { $perms -join ',' }))"
-                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = $perms }
+                $permText = Get-PermText $user
+                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = [string[]](Get-Perms $user) }
+                Write-LawhaLog "login $user ($(if (Test-Admin $user) { 'manager' } else { $permText }))"
+                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = $permText }
             }
             # Choosing the data file: open to anyone before it is set, then managers only.
             { $_ -in '/api/choose-file', '/api/candidates', '/api/browse' } {
@@ -1137,7 +1174,7 @@ function Handle($ctx) {
 
         switch ($path) {
             '/api/me' {
-                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin; perms = [string[]]$s.perms }
+                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin; perms = (Get-PermText $s.user) }
             }
             '/api/logout' {
                 $script:Sessions.Remove([string]$req.Headers['X-Token'])
@@ -1188,16 +1225,18 @@ function Handle($ctx) {
                     if ($null -ne $b.perms) {
                         $perms = @{}
                         foreach ($p in $b.perms.PSObject.Properties) {
-                            $perms[$p.Name] = [string[]]@($p.Value | ForEach-Object { [string]$_ } | Where-Object { $AllPerms -contains $_ })
+                            $t = ConvertTo-PermText $p.Value
+                            $perms[$p.Name] = if ($null -eq $t) { '' } else { $t }
                         }
                         $script:Config.perms = $perms
+                        Write-LawhaLog "$($s.user)  permissions: $(($perms.Keys | ForEach-Object { "$_=[$($perms[$_])]" }) -join ' ')"
                     }
                     Save-Config
                     Write-LawhaLog "$($s.user)  settings saved"
                 }
                 return Send-Json $ctx 200 @{
                     ok = $true; shopName = $script:Config.shopName; admins = @($script:Config.admins)
-                    perms = $script:Config.perms; allPerms = [string[]]$AllPerms; defaultPerms = [string[]]$DefaultPerms
+                    perms = $script:Config.perms; allPerms = ($AllPerms -join ','); defaultPerms = ($DefaultPerms -join ',')
                     dbPath = (Get-DbPath); dataDir = $DataDir; version = $Version; engine = $script:EngineName
                 }
             }
