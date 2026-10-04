@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '1.1.1'
+$Version = '1.1.2'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
 $Hidden = $env:LAWHA_HIDDEN -eq '1'
@@ -69,7 +69,11 @@ function Read-Config {
             if ($j.shopName) { $c.shopName = [string]$j.shopName }
             if ($j.admins) { $c.admins = @($j.admins | ForEach-Object { [string]$_ }) }
             if ($j.perms) {
-                foreach ($p in $j.perms.PSObject.Properties) { $c.perms[$p.Name] = @($p.Value | ForEach-Object { [string]$_ }) }
+                foreach ($p in $j.perms.PSObject.Properties) {
+                    $v = $p.Value
+                    if ($v -and $v.PSObject.Properties['value']) { $v = $v.value }
+                    $c.perms[$p.Name] = [string[]]@($v | ForEach-Object { [string]$_ } | Where-Object { $_ })
+                }
             }
         } catch { }
     }
@@ -623,10 +627,30 @@ $AllPerms = @(
 )
 $DefaultPerms = @('pos', 'sale_cash', 'print')
 
+# A screen comes with the work done on it: whoever may sell gets the sale
+# screen, whoever may edit sales gets the sales list, and so on, so a manager
+# ticking only the actions still gives a working set.
+$ImpliedBy = [ordered]@{
+    pos       = @('sale_cash', 'sale_credit')
+    sales     = @('sale_edit', 'sale_delete')
+    purchases = @('purchase', 'purchase_edit')
+    customers = @('customer_add', 'customer_edit', 'receipt')
+    suppliers = @('supplier_manage')
+    stock     = @('item_manage')
+    cash      = @('payment', 'voucher_edit')
+}
+
+# Always a plain string[]: Windows PowerShell 5.1 turns a wrapped array into
+# {"value": [...], "Count": n} in JSON, which the app would not read.
 function Get-Perms([string]$user) {
-    if (Test-Admin $user) { return , $AllPerms }
-    if ($script:Config.perms.ContainsKey($user)) { return , @($script:Config.perms[$user]) }
-    return , $DefaultPerms
+    if (Test-Admin $user) { return , ([string[]]$AllPerms) }
+    $list = if ($script:Config.perms.ContainsKey($user)) { @($script:Config.perms[$user]) } else { $DefaultPerms }
+    $set = New-Object System.Collections.Generic.List[string]
+    foreach ($p in $list) { if ($p -and $AllPerms -contains [string]$p -and -not $set.Contains([string]$p)) { $set.Add([string]$p) } }
+    foreach ($screen in $ImpliedBy.Keys) {
+        if (-not $set.Contains($screen) -and @($ImpliedBy[$screen] | Where-Object { $set.Contains($_) }).Count) { $set.Add($screen) }
+    }
+    return , ([string[]]$set.ToArray())
 }
 
 $PermNames = @{
@@ -759,7 +783,7 @@ function Get-Session($req) {
         $s = $script:Sessions[$t]
         # managers and permissions can change while someone is signed in
         $s.admin = Test-Admin $s.user
-        $s.perms = Get-Perms $s.user
+        $s.perms = [string[]](Get-Perms $s.user)
         return $s
     }
     return $null
@@ -930,6 +954,8 @@ function Send($ctx, [int]$status, [byte[]]$bytes, [string]$type) {
 
 function Send-Json($ctx, [int]$status, $obj) {
     $json = $obj | ConvertTo-Json -Depth 6 -Compress
+    # Windows PowerShell 5.1 writes some arrays as {"value":[...],"Count":n}
+    $json = [regex]::Replace($json, '\{"value":(\[[^\[\]{}]*\]),"Count":\d+\}', '$1')
     Send $ctx $status ([Text.Encoding]::UTF8.GetBytes($json)) 'application/json; charset=utf-8'
 }
 
@@ -1077,9 +1103,10 @@ function Handle($ctx) {
                     return Send-Json $ctx 200 @{ ok = $false; error = 'كلمة السر غلط' }
                 }
                 $t = New-Token
-                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = (Get-Perms $user) }
-                Write-LawhaLog "login $user"
-                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = (Get-Perms $user) }
+                $perms = [string[]](Get-Perms $user)
+                $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = $perms }
+                Write-LawhaLog "login $user ($(if (Test-Admin $user) { 'manager' } else { $perms -join ',' }))"
+                return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = $perms }
             }
             # Choosing the data file: open to anyone before it is set, then managers only.
             { $_ -in '/api/choose-file', '/api/candidates', '/api/browse' } {
@@ -1110,7 +1137,7 @@ function Handle($ctx) {
 
         switch ($path) {
             '/api/me' {
-                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin; perms = $s.perms }
+                return Send-Json $ctx 200 @{ ok = $true; user = $s.user; admin = $s.admin; perms = [string[]]$s.perms }
             }
             '/api/logout' {
                 $script:Sessions.Remove([string]$req.Headers['X-Token'])
@@ -1161,7 +1188,7 @@ function Handle($ctx) {
                     if ($null -ne $b.perms) {
                         $perms = @{}
                         foreach ($p in $b.perms.PSObject.Properties) {
-                            $perms[$p.Name] = @($p.Value | ForEach-Object { [string]$_ } | Where-Object { $AllPerms -contains $_ })
+                            $perms[$p.Name] = [string[]]@($p.Value | ForEach-Object { [string]$_ } | Where-Object { $AllPerms -contains $_ })
                         }
                         $script:Config.perms = $perms
                     }
@@ -1170,7 +1197,7 @@ function Handle($ctx) {
                 }
                 return Send-Json $ctx 200 @{
                     ok = $true; shopName = $script:Config.shopName; admins = @($script:Config.admins)
-                    perms = $script:Config.perms; allPerms = $AllPerms; defaultPerms = $DefaultPerms
+                    perms = $script:Config.perms; allPerms = [string[]]$AllPerms; defaultPerms = [string[]]$DefaultPerms
                     dbPath = (Get-DbPath); dataDir = $DataDir; version = $Version; engine = $script:EngineName
                 }
             }

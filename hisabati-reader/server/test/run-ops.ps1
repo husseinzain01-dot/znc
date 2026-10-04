@@ -225,6 +225,13 @@ $r3 = Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $
 Assert ((Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }, @{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 2; price = $egg.price }) } $editor).id -eq $r3.id) 'edit permission: change quantities, keeping the invoice prices and units'
 Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 1 }) } $editor } 'تغيير السعر' 'edit permission does not include a new price'
 Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }) } $editor } 'الآجل' 'edit permission cannot turn it into credit'
+$script:Config.perms = @{ 'كاشير1' = [string[]]@('sale_credit', 'receipt', 'sale_edit') }
+$imp = [string[]](Get-Perms 'كاشير1')
+Assert ($imp -is [string[]] -and $imp -contains 'pos' -and $imp -contains 'customers' -and $imp -contains 'sales' -and $imp -notcontains 'cash') "screens come with their actions: $($imp -join ',')"
+$js = @{ perms = [string[]](Get-Perms 'كاشير1'); one = [string[]]@('pos') } | ConvertTo-Json -Compress
+Assert ($js -match '"perms":\["' -and $js -match '"one":\["pos"\]') "permissions go out as a JSON list: $js"
+$script:Config.perms = @{ 'كاشير1' = [string[]]@('pos', 'bogus', 'print') }
+Assert ((([string[]](Get-Perms 'كاشير1')) -join ',') -eq 'pos,print') 'unknown permission names are dropped'
 $admin = @{ user = 'نور'; admin = $true; perms = (Get-Perms 'نور') }
 Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL1; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
 $script:Config.perms = @{}

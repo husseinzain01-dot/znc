@@ -250,7 +250,9 @@ async function readServer({ quiet = false } = {}) {
     try {
       const r = await api('/api/file');
       const name = decodeURIComponent(r.headers.get('X-File-Name') || 'Units2026.accdb');
-      return await readBuffer(await r.arrayBuffer(), name, { quiet });
+      const out = await readBuffer(await r.arrayBuffer(), name, { quiet });
+      refreshMe();
+      return out;
     } catch (e) {
       if (i === 1 || /سجّل دخول|مو شغّال/.test(e.message)) throw e;
       await sleep(800);
@@ -339,13 +341,36 @@ async function loginScreen(error = '', chosen = '') {
   };
 }
 
+// A list from the helper, also in the {"value": [...]} shape older Windows
+// PowerShell versions sometimes send.
+const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : v ? [String(v)] : []).map(String);
+
+function setMe(me) {
+  state.admin = !!me.admin;
+  state.perms = asList(me.perms);
+  $('#whoRole').textContent = me.admin ? 'مدير' : 'مستخدم';
+}
+
+// A manager may change someone's permissions while they are signed in: pick
+// that up with each refresh instead of waiting for the next sign-in.
+async function refreshMe() {
+  if (!state.server || !state.token) return;
+  try {
+    const me = await api('/api/me');
+    if (!!me.admin === state.admin && asList(me.perms).join() === state.perms.join()) return;
+    setMe(me);
+    buildNav();
+    render();
+  } catch {
+    /* the next refresh tries again */
+  }
+}
+
 async function signedIn(me) {
   state.user = me.user;
-  state.admin = !!me.admin;
-  state.perms = me.perms || [];
+  setMe(me);
   $('#who').hidden = false;
   $('#whoName').textContent = me.user;
-  $('#whoRole').textContent = me.admin ? 'مدير' : 'مستخدم';
   $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);
   buildNav();
   POS?.reset();
@@ -624,7 +649,7 @@ const canWrite = () => state.server;
 // Signed in: managers can do everything, everyone else what a manager ticked
 // for them in Settings. The server checks the same permissions on every save.
 const can = (perm) => state.server && (state.admin || state.perms.includes(perm));
-const canSell = () => can('pos') && (can('sale_cash') || can('sale_credit'));
+const canSell = () => can('sale_cash') || can('sale_credit');
 const ACT_PERM = {
   newSale: canSell,
   newPurchase: () => can('purchase'),
@@ -1148,7 +1173,10 @@ const views = {
   profit: viewProfit,
   checks: viewChecks,
   settings: () => settings().view(),
-  none: () => '<div class="card"><h3>ما عندك شاشات</h3><p class="muted">المدير ما أعطاك صلاحية على أي شاشة بعد. اطلب منه يأشّرلك من الإعدادات.</p></div>',
+  none: () => `<div class="card"><h3>ما عندك شاشات</h3>
+    <p class="muted">المستخدم <b>${esc(state.user)}</b> ما عنده بيع ولا أي شاشة. اطلب من المدير يأشّرلك من الإعدادات ← المستخدمين والصلاحيات، ويدوس "حفظ الصلاحيات".
+      الشاشة تتحدّث وحدها بعد الحفظ.</p>
+    <p class="muted" style="font-size:12px">الصلاحيات اللي وصلت: <code dir="ltr">${esc(state.perms.join(', ') || '—')}</code></p></div>`,
 };
 const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
 

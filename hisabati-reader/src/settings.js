@@ -8,7 +8,6 @@ import { databasePicker } from './picker.js';
 // Same ids as $AllPerms in server.ps1, which checks them on every save.
 const PERM_GROUPS = [
   ['الشاشات اللي يشوفها', [
-    ['pos', 'بيع سريع'],
     ['home', 'الرئيسية (ملخص اليوم)'],
     ['sales', 'المبيعات (كل القوائم)'],
     ['purchases', 'المشتريات'],
@@ -20,7 +19,7 @@ const PERM_GROUPS = [
     ['checks', 'ملاحظات البيانات'],
   ]],
   ['البيع', [
-    ['sale_cash', 'بيع نقدي'],
+    ['sale_cash', 'بيع نقدي (شاشة البيع السريع)'],
     ['sale_credit', 'بيع آجل (على زبون)'],
     ['sale_wholesale', 'بيع جملة (بالوحدة الكبيرة)'],
     ['edit_price', 'تغيير السعر بالقائمة'],
@@ -40,6 +39,17 @@ const PERM_GROUPS = [
     ['item_manage', 'المواد والأسعار (إضافة وتعديل)'],
   ]],
 ];
+
+// Same as $ImpliedBy in server.ps1: a screen comes with the work done on it.
+const IMPLIED_BY = {
+  sales: ['sale_edit', 'sale_delete'],
+  purchases: ['purchase', 'purchase_edit'],
+  customers: ['customer_add', 'customer_edit', 'receipt'],
+  suppliers: ['supplier_manage'],
+  stock: ['item_manage'],
+  cash: ['payment', 'voucher_edit'],
+};
+const asList = (v) => (Array.isArray(v) ? v : Array.isArray(v?.value) ? v.value : v ? [String(v)] : []).map(String);
 
 export const PRESETS = [
   ['cashier', 'كاشير نقدي — فاتورة البيع بس', ['pos', 'sale_cash', 'print']],
@@ -159,9 +169,9 @@ export function setupSettings(ctx) {
 
   // One card per user: manager switch, a template, and the ticks.
   function drawUsers(users, s) {
-    const admins = new Set(s.admins || []);
+    const admins = new Set(asList(s.admins));
     const perms = s.perms || {};
-    const def = s.defaultPerms || ['pos', 'sale_cash', 'print'];
+    const def = s.defaultPerms ? asList(s.defaultPerms) : ['pos', 'sale_cash', 'print'];
     const host = $('#setUsers');
     if (!users.length) {
       host.innerHTML = '<span class="muted">ماكو مستخدمين بحساباتي</span>';
@@ -169,8 +179,14 @@ export function setupSettings(ctx) {
     }
     host.innerHTML = users
       .map((n, k) => {
-        const have = new Set(perms[n] || def);
-        return `<details class="perm-user" data-user="${esc(n)}"${k === 0 ? ' open' : ''}>
+        const have = new Set(perms[n] ? asList(perms[n]) : def);
+        const same = (list) => {
+          const a = new Set(list.filter((x) => x !== 'pos'));
+          const b = [...have].filter((x) => x !== 'pos');
+          return a.size === b.length && b.every((x) => a.has(x));
+        };
+        const preset = admins.has(n) ? '' : PRESETS.find(([, , list]) => same(list))?.[0] || '';
+        return `<details class="perm-user" data-user="${esc(n)}"${preset ? ` data-preset="${preset}"` : ''}${k === 0 ? ' open' : ''}>
           <summary><b>${esc(n)}</b><span class="perm-sum"></span></summary>
           <div class="perm-body">
             <div class="row" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -193,20 +209,42 @@ export function setupSettings(ctx) {
       if (!box) return;
       if (e.target.matches('[data-preset]') && e.target.value) {
         const p = new Set(PRESETS.find(([id]) => id === e.target.value)[2]);
-        box.querySelectorAll('[data-perm]').forEach((c) => (c.checked = p.has(c.dataset.perm)));
+        box.querySelectorAll('[data-perm]').forEach((c) => {
+          delete c.dataset.implied;
+          c.checked = p.has(c.dataset.perm);
+        });
+        box.dataset.preset = e.target.value;
         e.target.value = '';
+      } else if (e.target.matches('[data-perm]')) {
+        delete box.dataset.preset;
       }
       refreshUser(box);
     };
   }
 
-  // The summary line, and the ticks greyed out for a manager.
+  // The summary line, screens that come with a ticked action (ticked and
+  // locked), and everything greyed out for a manager.
   function refreshUser(box) {
     const admin = box.querySelector('[data-admin]').checked;
-    const ticked = [...box.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
     box.querySelector('.perm-groups').classList.toggle('off', admin);
-    box.querySelectorAll('[data-perm]').forEach((c) => (c.disabled = admin));
-    const preset = PRESETS.find(([, , p]) => p.length === ticked.length && p.every((x) => ticked.includes(x)));
+    const own = (c) => c.checked && !c.dataset.implied;
+    const actions = new Set([...box.querySelectorAll('[data-perm]')].filter(own).map((c) => c.dataset.perm));
+    box.querySelectorAll('[data-perm]').forEach((c) => {
+      const why = (IMPLIED_BY[c.dataset.perm] || []).filter((a) => actions.has(a));
+      if (why.length && !admin) {
+        if (!c.checked || c.dataset.implied) c.dataset.implied = '1';
+        c.checked = true;
+        c.disabled = true;
+        c.parentElement.title = 'تنطي تلقائياً لأن عنده صلاحية تحتاج هاي الشاشة';
+      } else {
+        if (c.dataset.implied) c.checked = false;
+        delete c.dataset.implied;
+        c.disabled = admin;
+        c.parentElement.title = '';
+      }
+    });
+    const ticked = [...box.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
+    const preset = PRESETS.find(([id]) => id === box.dataset.preset);
     const sells = [ticked.includes('sale_cash') && 'نقدي', ticked.includes('sale_credit') && 'آجل', ticked.includes('sale_wholesale') && 'جملة'].filter(Boolean);
     box.querySelector('.perm-sum').textContent = admin
       ? 'مدير'
@@ -214,11 +252,13 @@ export function setupSettings(ctx) {
         ? preset[1]
         : ticked.length
           ? `${sells.length ? 'بيع ' + sells.join(' و') + ' — ' : ''}${ticked.length} صلاحية`
-          : 'ما يكدر يسوّي شي';
+          : '⚠ ما يشوف أي شاشة';
   }
 
   async function saveUsers() {
     const boxes = [...document.querySelectorAll('#setUsers .perm-user')];
+    const empty = boxes.filter((b) => !b.querySelector('[data-admin]').checked && !b.querySelector('[data-perm]:checked')).map((b) => b.dataset.user);
+    if (empty.length && !confirm(`${empty.join('، ')} ما راح يشوف أي شاشة. تحفظ هيچ؟`)) return;
     const admins = boxes.filter((b) => b.querySelector('[data-admin]').checked).map((b) => b.dataset.user);
     const perms = {};
     for (const b of boxes) perms[b.dataset.user] = [...b.querySelectorAll('[data-perm]:checked')].map((c) => c.dataset.perm);
