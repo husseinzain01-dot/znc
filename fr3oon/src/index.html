@@ -6,6 +6,11 @@
 <meta name="color-scheme" content="light dark">
 <title>Fr3oon</title>
 <link rel="icon" href="/*FAVICON*/">
+<script>
+  // the chosen theme before anything is drawn (no white flash in dark mode)
+  try { var t = localStorage.getItem('fr3oon-theme') || 'auto';
+    document.documentElement.dataset.theme = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch (e) {}
+</script>
 <style>/*FONTS*/</style>
 <style>/*STYLES*/</style>
 </head>
@@ -25,6 +30,7 @@
     <div class="side-brand">
       <div class="brand-mark" aria-hidden="true">/*LOGO*/</div>
       <div class="side-brand-text">
+        <span class="wordmark">FR3OON</span>
         <b id="shopTitle">Fr3oon</b>
         <small id="fileStatus"></small>
       </div>
@@ -39,6 +45,7 @@
       </div>
       <div class="sync">
         <button class="btn ghost small" id="btnReload"></button>
+        <div class="theme-switch" id="themeSwitch" role="group" aria-label="المظهر"></div>
         <label class="check small" id="autoWrap"><input type="checkbox" id="auto"> تحديث تلقائي</label>
       </div>
     </div>

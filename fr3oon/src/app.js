@@ -880,8 +880,15 @@ function rowAction(btn) {
   if (act === 'del' && canDelInv(kind)) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `الفاتورة رقم ${id} (${fmt(inv.total)} دينار)`);
 }
 
-const kpi = (label, value, hint = '', accent = false) =>
-  `<div class="card kpi${accent ? ' accent' : ''}"><div class="label">${esc(label)}</div><div class="value">${money(value)}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+// Each tile wears the icon of what it counts.
+const KPI_ICONS = [
+  [/الموردين/, 'suppliers'], [/المشتريات/, 'purchases'], [/العملاء/, 'customers'], [/المخزون/, 'stock'], [/الربح|الصافي$/, 'profit'],
+  [/الصندوق|الوارد/, 'cash'], [/الصادر|المصاريف|التكلفة/, 'out'], [/آجل/, 'receipt'], [/نقدي/, 'cash'], [/المبيعات|المجموع/, 'sales'],
+];
+const kpi = (label, value, hint = '', accent = false) => {
+  const ico = KPI_ICONS.find(([re]) => re.test(label))?.[1];
+  return `<div class="card kpi${accent ? ' accent' : ''}"><div class="label">${ico ? `<span class="k-ico">${icon(ico)}</span>` : ''}${esc(label)}</div><div class="value">${money(value)}</div>${hint ? `<div class="hint">${hint}</div>` : ''}</div>`;
+};
 
 function viewHome() {
   const P = state.P;
@@ -1379,8 +1386,28 @@ function render() {
 
 // ---------- wiring ----------
 
+// Light, dark, or as Windows is set; remembered on this computer. The page
+// head already applied it before drawing (index.html).
+const THEMES = [['light', 'sun', 'فاتح'], ['dark', 'moon', 'داكن'], ['auto', 'monitor', 'تلقائي']];
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(choice = store.get('fr3oon-theme') || 'auto') {
+  const dark = choice === 'dark' || (choice === 'auto' && darkQuery.matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $$('#themeSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.theme === choice));
+}
+
 function init() {
-  $('#btnReload').innerHTML = `${icon('refresh')} تحديث`;
+  $('#themeSwitch').innerHTML = THEMES.map(([id, ic, label]) => `<button type="button" data-theme="${id}" title="المظهر: ${label}" aria-label="المظهر: ${label}">${icon(ic)}</button>`).join('');
+  $('#themeSwitch').onclick = (e) => {
+    const b = e.target.closest('button[data-theme]');
+    if (!b) return;
+    store.set('fr3oon-theme', b.dataset.theme);
+    applyTheme(b.dataset.theme);
+  };
+  darkQuery.addEventListener?.('change', () => applyTheme());
+  applyTheme();
+  $('#btnReload').innerHTML = icon('refresh');
+  $('#btnReload').title = 'تحديث البيانات الآن';
   $('#btnReload').onclick = reload;
   $('#btnLogout').innerHTML = icon('logout', 'flip');
   $('#btnLogout').onclick = async () => {
