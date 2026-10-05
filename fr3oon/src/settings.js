@@ -6,6 +6,7 @@
 import { verifyRun, verifyClean, readerFromTables } from './fulltest.js';
 import { loadDatabase } from './load.js';
 import * as C from './calc.js';
+import { printReceipt, receiptPreviewHtml, receiptOptions, sampleInvoice } from './receipt.js';
 
 const APP = 'Fr3oon';
 
@@ -21,6 +22,8 @@ const PERM_GROUPS = [
     ['cash', 'الصندوق'],
     ['profit', 'الأرباح'],
     ['checks', 'ملاحظات البيانات'],
+    ['analytics', 'التحليلات'],
+    ['reports', 'التقارير المتقدمة'],
   ]],
   ['البيع', [
     ['sale_cash', 'البيع النقدي (شاشة البيع السريع)'],
@@ -42,6 +45,10 @@ const PERM_GROUPS = [
     ['supplier_manage', 'إضافة الموردين وتعديلهم'],
     ['item_manage', 'الأصناف والأسعار (إضافة وتعديل)'],
   ]],
+  ['المخزون', [
+    ['stock_count', 'الجرد (عدّ المخزون وتصحيح الفروق)'],
+    ['labels', 'طباعة ملصقات الباركود'],
+  ]],
 ];
 
 // Same as $ImpliedBy in server.ps1: a screen comes with the work done on it.
@@ -59,12 +66,12 @@ export const PRESETS = [
   ['cashier', 'كاشير نقدي — فاتورة البيع فقط', ['pos', 'sale_cash', 'print']],
   ['cashier2', 'كاشير نقدي وآجل', ['pos', 'sale_cash', 'sale_credit', 'print', 'customers', 'receipt', 'customer_add']],
   ['wholesale', 'بائع جملة', ['pos', 'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'customers', 'stock', 'receipt', 'customer_add']],
-  ['accountant', 'محاسب', ['home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks', 'print',
+  ['accountant', 'محاسب', ['home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks', 'reports', 'analytics', 'print',
     'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit', 'customer_add', 'customer_edit', 'supplier_manage']],
 ];
 
 const SECTIONS = [
-  ['shop', 'المحل'], ['users', 'المستخدمون'], ['backup', 'النسخ الاحتياطي'], ['updates', 'التحديثات'],
+  ['shop', 'المحل'], ['receipt', 'الإيصال'], ['users', 'المستخدمون'], ['backup', 'النسخ الاحتياطي'], ['updates', 'التحديثات'],
   ['license', 'الترخيص'], ['devices', 'الأجهزة الأخرى'], ['database', 'قاعدة البيانات'], ['checks', 'الفحص'],
 ];
 
@@ -88,6 +95,35 @@ export function setupSettings(ctx) {
         <h3>المحل</h3>
         <p class="muted">يظهر اسم المحل في أعلى البرنامج وعلى الإيصالات المطبوعة.</p>
         <div class="row"><input id="setShop" maxlength="60" style="flex:1;min-width:220px" class="search"><button class="btn primary" id="setShopSave">حفظ</button></div>
+      </div>
+
+      <div class="card" id="set-receipt">
+        <h3>الإيصال</h3>
+        <p class="muted">ما يُطبع على إيصال البيع من جميع الأجهزة: مقاس ورق الطابعة الحرارية، وعنوان المحل وهاتفه، وعبارة الختام.</p>
+        <div class="rc-grid">
+          <div class="rc-form">
+            <div class="field"><span>عرض ورق الطابعة</span>
+              <div class="seg" id="rcWidth"><button type="button" data-w="80">80 مم</button><button type="button" data-w="58">58 مم</button></div></div>
+            <div class="form-grid">
+              <label class="field wide"><span>العنوان</span><input id="rcAddress" maxlength="120" placeholder="المدينة، الشارع، أقرب معلم"></label>
+              <label class="field"><span>الهاتف</span><input id="rcPhone" maxlength="40" inputmode="tel" dir="ltr"></label>
+              <label class="field wide"><span>عبارة الختام</span><textarea id="rcFooter" maxlength="200" rows="2" placeholder="شكراً لزيارتكم"></textarea></label>
+            </div>
+            <div class="rc-checks">
+              <label class="check"><input type="checkbox" id="rcLogo"> الشعار في أعلى الإيصال</label>
+              <label class="check"><input type="checkbox" id="rcBarcode"> رقم الفاتورة باركوداً في آخر الإيصال</label>
+            </div>
+            <div class="row">
+              <button class="btn primary" id="rcSave">${icon('save')} حفظ</button>
+              <button class="btn" id="rcTest">${icon('print')} طباعة إيصال تجريبي</button>
+            </div>
+            <p class="muted rc-hint">لفتح درج النقود تلقائياً مع كل إيصال: فعّل خيار فتح الدرج (Cash Drawer) في إعدادات طابعة الإيصالات في Windows، ثم اختر هذه الطابعة عند الطباعة أول مرة.</p>
+          </div>
+          <div class="rc-preview">
+            <span class="rc-preview-label">معاينة</span>
+            <iframe id="rcPreview" title="معاينة الإيصال" tabindex="-1"></iframe>
+          </div>
+        </div>
       </div>
 
       <div class="card" id="set-users">
@@ -183,9 +219,14 @@ export function setupSettings(ctx) {
   async function load() {
     $('#setShopSave').onclick = saveShop;
     $('#nuSave').onclick = addUser;
+    bindReceipt();
     try {
       const s = await api('/api/settings');
       $('#setShop').value = s.shopName || '';
+      if (s.receipt) {
+        state.receipt = s.receipt;
+        fillReceipt(s.receipt);
+      }
       $('#setAbout').innerHTML = `${APP} — الإصدار <span dir="ltr">${esc(s.version)}</span> — محرّك قاعدة البيانات: ${esc(s.engine || 'يعمل عند أول استخدام')}${s.dataDir ? `<br>الإعدادات والسجل: <code dir="ltr">${esc(s.dataDir)}</code>` : ''}`;
       if (!remote()) {
         $('#setPath').textContent = s.dbPath || '—';
@@ -258,10 +299,79 @@ export function setupSettings(ctx) {
       state.shopName = j.shopName;
       document.title = `${j.shopName} — ${APP}`;
       $('#shopTitle').textContent = j.shopName || APP;
+      drawReceipt();
       toast('تم الحفظ ✔');
     } catch (e) {
       toast(e.message, true);
     }
+  }
+
+  // ------------------------------------------------------------ receipt
+  // The shop's receipt settings (in the database, for every device), with a
+  // live preview of a sample invoice.
+  let rcWidth = '80';
+  const receiptForm = () => ({
+    width: rcWidth,
+    address: $('#rcAddress').value.trim(),
+    phone: $('#rcPhone').value.trim(),
+    footer: $('#rcFooter').value.trim(),
+    barcode: $('#rcBarcode').checked ? '1' : '0',
+    logo: $('#rcLogo').checked ? '1' : '0',
+  });
+
+  function fillReceipt(r) {
+    const o = receiptOptions(r);
+    rcWidth = o.width;
+    $('#rcAddress').value = o.address;
+    $('#rcPhone').value = o.phone;
+    $('#rcFooter').value = String(r?.footer || '').trim();
+    $('#rcBarcode').checked = o.barcode;
+    $('#rcLogo').checked = o.logo;
+    drawReceipt();
+  }
+
+  function drawReceipt() {
+    const host = $('#rcPreview');
+    if (!host) return;
+    $('#rcWidth').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.w === rcWidth));
+    host.style.width = rcWidth + 'mm';
+    host.srcdoc = receiptPreviewHtml({ shopName: state.shopName, receipt: receiptForm(), user: state.user });
+  }
+
+  function bindReceipt() {
+    const host = $('#rcPreview');
+    host.onload = () => {
+      const d = host.contentDocument?.documentElement;
+      if (d) host.style.height = d.scrollHeight + 'px';
+    };
+    $('#rcWidth').onclick = (e) => {
+      const b = e.target.closest('[data-w]');
+      if (!b) return;
+      rcWidth = b.dataset.w;
+      drawReceipt();
+    };
+    for (const id of ['rcAddress', 'rcPhone', 'rcFooter']) $('#' + id).oninput = drawReceipt;
+    for (const id of ['rcBarcode', 'rcLogo']) $('#' + id).onchange = drawReceipt;
+    $('#rcSave').onclick = async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      try {
+        const receipt = receiptForm();
+        const j = await api('/api/settings', { method: 'POST', body: { receipt } });
+        state.receipt = j.receipt || receipt;
+        toast('حُفظت إعدادات الإيصال ✔');
+      } catch (err) {
+        toast(err.message, true);
+      } finally {
+        b.disabled = false;
+      }
+    };
+    $('#rcTest').onclick = () => {
+      const inv = sampleInvoice(state.user);
+      const w = printReceipt(inv, { shopName: state.shopName, receipt: receiptForm(), balance: inv.total - inv.paid + 15000 });
+      if (!w) toast('منع المتصفح فتح نافذة الطباعة', true);
+    };
+    fillReceipt(state.receipt || {});
   }
 
   // ------------------------------------------------------------ users

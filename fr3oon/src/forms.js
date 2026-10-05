@@ -3,6 +3,7 @@
 // to the local helper (server.ps1), which saves it into the حساباتي file.
 
 import * as C from './calc.js';
+import { printReceipt } from './receipt.js';
 
 export function setupForms(ctx) {
   const { $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, can } = ctx;
@@ -388,41 +389,13 @@ export function setupForms(ctx) {
 
   // opts.balance: the customer's balance after this invoice, when the data
   // on screen does not include it yet (printing straight after saving).
+  // The receipt itself (80 or 58 mm thermal paper) is drawn by receipt.js.
   function printSale(inv, opts = {}) {
     if (!inv) return;
     const credit = inv.type === C.CREDIT;
     const bal = !credit ? null : opts.balance != null ? opts.balance : C.customerBalances(P()).find((b) => b.name === inv.customer)?.balance;
-    const shop = state.shopName || 'Fr3oon';
-    const rows = inv.lines
-      .map((l) => `<tr><td>${esc(l.item)}<br><small>${fmt(l.qty)} ${esc(l.unit)} × ${fmt(l.price)}</small></td><td class="n">${fmt(l.qty * l.price)}</td></tr>`)
-      .join('');
-    const w = window.open('', '_blank', 'width=420,height=640');
-    if (!w) {
-      toast('منع المتصفح فتح نافذة الطباعة', true);
-      return;
-    }
-    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>فاتورة ${inv.id}</title>
-      <style>
-        @page { size: 80mm auto; margin: 3mm; }
-        body { font: 13px/1.4 Tahoma, "Segoe UI", sans-serif; width: 72mm; margin: 0 auto; color: #000; }
-        h1 { font-size: 17px; text-align: center; margin: 4px 0; }
-        .c { text-align: center; } table { width: 100%; border-collapse: collapse; }
-        td { padding: 3px 0; border-bottom: 1px dashed #999; vertical-align: top; }
-        .n { text-align: left; direction: ltr; white-space: nowrap; } small { color: #333; }
-        .tot td { border: 0; font-weight: bold; font-size: 15px; }
-      </style></head><body>
-      <h1>${esc(shop)}</h1>
-      <div class="c">فاتورة ${credit ? 'آجلة' : 'نقدية'} رقم ${inv.id}<br>${inv.date} ${esc(String(inv.time || '').slice(11, 16))}</div>
-      ${credit ? `<div>العميل: <b>${esc(inv.customer)}</b></div>` : ''}
-      <table>${rows}
-        <tr class="tot"><td>المجموع</td><td class="n">${fmt(inv.total)}</td></tr>
-        ${inv.paid ? `<tr class="tot"><td>المدفوع</td><td class="n">${fmt(inv.paid)}</td></tr>` : ''}
-        ${bal != null ? `<tr class="tot"><td>رصيدك الإجمالي</td><td class="n">${fmt(bal)}</td></tr>` : ''}
-      </table>
-      <p class="c">الكاشير: ${esc(inv.user)} — شكراً لزيارتكم</p>
-      <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };<\/script>
-      </body></html>`);
-    w.document.close();
+    const w = printReceipt(inv, { shopName: state.shopName, receipt: state.receipt, balance: bal ?? null });
+    if (!w) toast('منع المتصفح فتح نافذة الطباعة', true);
   }
 
   return { invoiceEditor, voucherEditor, personEditor, itemEditor, printSale, confirmDelete };
