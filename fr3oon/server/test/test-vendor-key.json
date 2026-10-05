@@ -1,0 +1,8 @@
+{
+  "note": "TEST KEY ONLY: accepted only in test mode (LAWHA_FAKEDAO + LAWHA_TESTKEY), never by a real installation.",
+  "kty": "EC",
+  "crv": "P-256",
+  "x": "ljKXRe-MHtcQtBC24iUftOvRKM7ozki9N-Ub1HYAjPo",
+  "y": "Vma1EX83Qdy9IhWQQoRYpyp3Aq9gcerSURDvZ0y9t10",
+  "d": "zEDH3-_vP8x_7Y3TD7af8ofF8SDxhasL2Q-134KmKb0"
+}
