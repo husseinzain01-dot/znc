@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node test/fulltest.test.mjs && node test/data-export.test.mjs"
+    "test": "pwsh server/test/run-ops.ps1"
   },
   "dependencies": {},
   "devDependencies": {

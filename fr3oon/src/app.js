@@ -621,7 +621,7 @@ const tables = new Map();
 let tableSeq = 0;
 
 // columns: {key, label, num, money, get(row), html(row), total}
-function table(rows, columns, { onClick, empty = 'ماكو بيانات', sort, name = 'تقرير' } = {}) {
+function table(rows, columns, { onClick, empty = 'لا توجد بيانات', sort, name = 'تقرير' } = {}) {
   const id = 't' + ++tableSeq;
   tables.set(id, { rows, columns, onClick, empty, sort: sort || null, name });
   return `<div class="table-wrap" id="${id}">${tableInner(id)}</div>`;
@@ -748,7 +748,7 @@ document.addEventListener('click', (e) => {
 
 function barChart(points, { height = 240 } = {}) {
   // points: [[label, value]], single series, columns from one baseline.
-  if (!points.length) return '<p class="empty">ماكو مبيعات بهاي الفترة</p>';
+  if (!points.length) return '<p class="empty">لا توجد مبيعات في هذه الفترة</p>';
   const W = 900, H = height, padL = 70, padR = 12, padT = 12, padB = 26;
   const max = Math.max(...points.map((p) => p[1]), 1);
   const step = niceStep(max / 4);
@@ -841,7 +841,7 @@ document.addEventListener('click', (e) => {
   if (!b || !canWrite()) return;
   const f = forms();
   const a = b.dataset.act;
-  if (!ACT_PERM[a]?.()) return toast('ما عندك صلاحية. اطلبها من المدير.', true);
+  if (!ACT_PERM[a]?.()) return toast('ليست لديك صلاحية لذلك. اطلبها من المدير.', true);
   if (a === 'newSale') return go('pos');
   if (a === 'newPurchase') f.invoiceEditor('purchase');
   if (a === 'newReceipt') f.voucherEditor('receipt', null, { name: b.dataset.name });
@@ -861,9 +861,9 @@ const invoiceActions = (kind) =>
   canWrite() && ((kind === 'sale' && can('print')) || canEditInv(kind) || canDelInv(kind))
     ? [{
         key: 'act', label: '', get: () => '', csv: () => '',
-        html: (r) => `<span class="row-acts">${kind === 'sale' && can('print') ? `<button class="btn small" data-row-act="print" data-kind="sale" data-id="${r.id}" title="طباعة وصل">${icon('print')}</button>` : ''}${canEditInv(kind)
+        html: (r) => `<span class="row-acts">${kind === 'sale' && can('print') ? `<button class="btn small" data-row-act="print" data-kind="sale" data-id="${r.id}" title="طباعة الفاتورة">${icon('print')}</button>` : ''}${canEditInv(kind)
           ? `<button class="btn small" data-row-act="edit" data-kind="${kind}" data-id="${r.id}">${icon('edit')} تعديل</button>` : ''}${canDelInv(kind)
-          ? `<button class="btn small danger" data-row-act="del" data-kind="${kind}" data-id="${r.id}">${icon('trash')} مسح</button>`
+          ? `<button class="btn small danger" data-row-act="del" data-kind="${kind}" data-id="${r.id}">${icon('trash')} حذف</button>`
           : ''}</span>`,
       }]
     : [];
@@ -872,12 +872,12 @@ function rowAction(btn) {
   const id = Number(btn.dataset.id);
   const kind = btn.dataset.kind;
   const inv = kind === 'sale' ? state.P.saleById.get(id) : state.P.purchases.find((p) => p.id === id);
-  if (!inv) return toast('القائمة مو موجودة، سوّي تحديث', true);
+  if (!inv) return toast('الفاتورة غير موجودة، حدّث البيانات', true);
   const f = forms();
   const act = btn.dataset.rowAct;
   if (act === 'print' && can('print')) f.printSale(inv);
   if (act === 'edit' && canEditInv(kind)) f.invoiceEditor(kind, inv);
-  if (act === 'del' && canDelInv(kind)) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `القائمة رقم ${id} (${fmt(inv.total)} دينار)`);
+  if (act === 'del' && canDelInv(kind)) f.confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', id, `الفاتورة رقم ${id} (${fmt(inv.total)} دينار)`);
 }
 
 const kpi = (label, value, hint = '', accent = false) =>
@@ -905,44 +905,44 @@ function viewHome() {
 
   let hint = '';
   if (!s.count && P.lastDate && state.preset === 'today') {
-    hint = `<p class="notice">ماكو مبيعات اليوم بالملف. آخر يوم بيه مبيعات: <b>${P.lastDate}</b>
+    hint = `<p class="notice">لا توجد مبيعات مسجّلة اليوم. آخر يوم فيه مبيعات: <b>${P.lastDate}</b>
       <button class="btn small" id="goLast">اعرضه</button></p>`;
   }
 
   const topItems = s.byItem.slice(0, 8);
   const maxItem = topItems[0]?.total || 1;
-  return `${actionBar([['newSale', '+ قائمة بيع'], ['newPurchase', '+ قائمة شراء'], ['newReceipt', '+ وصل قبض'], ['newPayment', '+ وصل دفع / مصروف']])}${hint}
+  return `${actionBar([['newSale', '+ فاتورة بيع'], ['newPurchase', '+ فاتورة شراء'], ['newReceipt', '+ سند قبض'], ['newPayment', '+ سند صرف / مصروف']])}${hint}
   <div class="grid kpis">
-    ${kpi('المبيعات', s.total, `${s.count} قائمة — ${periodLabel()}`, true)}
+    ${kpi('المبيعات', s.total, `${s.count} فاتورة — ${periodLabel()}`, true)}
     ${kpi('نقدي', s.cash)}
     ${kpi('آجل', s.credit)}
-    ${kpi('ربح المواد', pr.gross, `بعد المصاريف: ${fmt(pr.net)}`)}
-    ${kpi('صافي الصندوق', box.net, `داخل ${fmt(box.totalIn)} — طالع ${fmt(box.totalOut)}`)}
-    ${kpi('تسديدات الزبائن', box.receipts)}
+    ${kpi('إجمالي الربح', pr.gross, `الصافي بعد المصاريف: ${fmt(pr.net)}`)}
+    ${kpi('صافي الصندوق', box.net, `الوارد ${fmt(box.totalIn)} — الصادر ${fmt(box.totalOut)}`)}
+    ${kpi('تسديدات العملاء', box.receipts)}
   </div>
   <div class="grid kpis" style="margin-top:14px">
-    ${kpi('ديون على الزبائن (الكل)', owed, 'المجموع لحد هسه')}
-    ${kpi('ديون للموردين (الكل)', supp, 'المجموع لحد هسه')}
-    ${kpi('قيمة المخزن بسعر الشراء', stockValue)}
+    ${kpi('ديون على العملاء (الكل)', owed, 'المجموع حتى الآن')}
+    ${kpi('ديون للموردين (الكل)', supp, 'المجموع حتى الآن')}
+    ${kpi('قيمة المخزون بسعر الشراء', stockValue)}
   </div>
   <div class="card" style="margin-top:14px">
     <h3>المبيعات حسب اليوم (${start} إلى ${end})</h3>
     ${barChart(pts)}
   </div>
   <div class="grid two" style="margin-top:14px">
-    <div class="card"><h3>أكثر المواد مبيعاً</h3>
+    <div class="card"><h3>الأصناف الأكثر مبيعاً</h3>
       ${table(topItems, [
-        { key: 'item', label: 'المادة' },
+        { key: 'item', label: 'الصنف' },
         { key: 'qty', label: 'الكمية', num: true },
         { key: 'total', label: 'المبلغ', money: true },
         { key: 'bar', label: '', html: (r) => `<div class="meter"><span style="width:${(r.total / maxItem) * 100}%"></span></div>` },
-      ], { empty: 'ماكو مبيعات' })}
+      ], { empty: 'لا توجد مبيعات' })}
     </div>
     <div class="card"><h3>المبيعات حسب الكاشير</h3>
       ${table(s.byUser.map(([u, t]) => ({ u, t })), [
         { key: 'u', label: 'الكاشير' },
         { key: 't', label: 'المبلغ', money: true, total: true },
-      ], { empty: 'ماكو مبيعات' })}
+      ], { empty: 'لا توجد مبيعات' })}
     </div>
   </div>`;
 }
@@ -950,9 +950,9 @@ function viewHome() {
 function invoiceModal(inv, kind = 'sale') {
   const lines = inv.lines.map((l) => ({ ...l, total: l.qty * l.price }));
   const who = kind === 'sale' ? inv.customer : inv.supplier;
-  openModal(`<h2>${kind === 'sale' ? 'قائمة بيع' : 'قائمة شراء'} رقم ${inv.id}</h2>
+  openModal(`<h2>${kind === 'sale' ? 'فاتورة بيع' : 'فاتورة شراء'} رقم ${inv.id}</h2>
     <div class="statement-head">
-      <span>${kind === 'sale' ? 'الزبون' : 'المورد'}: <b>${esc(noName(who))}</b></span>
+      <span>${kind === 'sale' ? 'العميل' : 'المورد'}: <b>${esc(noName(who))}</b></span>
       <span>النوع: <b>${esc(inv.type)}</b></span>
       <span>التاريخ: <b>${inv.date}</b></span>
       <span>الوقت: <b>${esc(inv.time.slice(11, 16))}</b></span>
@@ -960,46 +960,46 @@ function invoiceModal(inv, kind = 'sale') {
       ${inv.paid ? `<span>المدفوع: <b>${fmt(inv.paid)}</b></span>` : ''}
       ${inv.note ? `<span>ملاحظة: <b>${esc(inv.note)}</b></span>` : ''}
     </div>
-    ${section('المواد', table(lines, [
-      { key: 'item', label: 'المادة' },
+    ${section('الأصناف', table(lines, [
+      { key: 'item', label: 'الصنف' },
       { key: 'qty', label: 'الكمية', num: true },
       { key: 'unit', label: 'الوحدة' },
       { key: 'price', label: 'السعر', money: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
-    ], { name: `قائمة ${inv.id}` }), { search: false })}
+    ], { name: `فاتورة ${inv.id}` }), { search: false })}
     ${canWrite() ? `<div class="form-actions no-print">
-      ${kind === 'sale' && can('print') ? `<button class="btn" id="invPrint">${icon('print')} طباعة وصل</button>` : ''}
+      ${kind === 'sale' && can('print') ? `<button class="btn" id="invPrint">${icon('print')} طباعة الفاتورة</button>` : ''}
       ${canEditInv(kind) ? `<button class="btn primary" id="invEdit">${icon('edit')} تعديل</button>` : ''}
-      ${canDelInv(kind) ? `<button class="btn danger" id="invDel">${icon('trash')} مسح القائمة</button>` : ''}
+      ${canDelInv(kind) ? `<button class="btn danger" id="invDel">${icon('trash')} حذف الفاتورة</button>` : ''}
     </div>` : ''}`);
   if ($('#invPrint')) $('#invPrint').onclick = () => forms().printSale(inv);
   if ($('#invEdit')) $('#invEdit').onclick = () => forms().invoiceEditor(kind, inv);
-  if ($('#invDel')) $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `القائمة رقم ${inv.id}`);
+  if ($('#invDel')) $('#invDel').onclick = () => forms().confirmDelete(kind === 'sale' ? 'deleteSale' : 'deletePurchase', inv.id, `الفاتورة رقم ${inv.id}`);
 }
 
 function viewSales() {
   const P = state.P;
   const s = C.salesSummary(P, state.filter);
   const rows = s.list.map((x) => ({ ...x, n: x.lines.length, who: x.type === C.CREDIT ? noName(x.customer) : 'نقدي' }));
-  return `${actionBar([['newSale', '+ قائمة بيع']])}<div class="grid kpis">
-      ${kpi('المجموع', s.total, `${s.count} قائمة`)}${kpi('نقدي', s.cash)}${kpi('آجل', s.credit)}
+  return `${actionBar([['newSale', '+ فاتورة بيع']])}<div class="grid kpis">
+      ${kpi('المجموع', s.total, `${s.count} فاتورة`)}${kpi('نقدي', s.cash)}${kpi('آجل', s.credit)}
     </div>
-    ${section('القوائم', table(rows, [
+    ${section('الفواتير', table(rows, [
       { key: 'id', label: 'رقم', num: true },
       { key: 'date', label: 'التاريخ' },
       { key: 'tm', label: 'الوقت', get: (r) => r.time.slice(11, 16) },
       { key: 'type', label: 'النوع' },
-      { key: 'who', label: 'الزبون' },
+      { key: 'who', label: 'العميل' },
       { key: 'user', label: 'الكاشير' },
-      { key: 'n', label: 'عدد المواد', num: true },
+      { key: 'n', label: 'عدد الأصناف', num: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
       ...invoiceActions('sale'),
     ], { onClick: (r) => invoiceModal(r), sort: { key: 'id', dir: -1 }, name: 'المبيعات' }))}
-    ${section('المبيعات حسب المادة', table(s.byItem, [
-      { key: 'item', label: 'المادة' },
+    ${section('المبيعات حسب الصنف', table(s.byItem, [
+      { key: 'item', label: 'الصنف' },
       { key: 'qty', label: 'الكمية', num: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
-    ], { name: 'المبيعات حسب المادة' }))}`;
+    ], { name: 'المبيعات حسب الصنف' }))}`;
 }
 
 function waLink(mobile, text) {
@@ -1014,20 +1014,20 @@ function statementModal(kind, name) {
   const draw = () => {
     const st = kind === 'customer' ? C.customerStatement(P, name, range) : C.supplierStatement(P, name, range);
     const person = (kind === 'customer' ? P.customers : P.suppliers).find((c) => c.name === name);
-    const text = `كشف حساب: ${noName(name)}\nالرصيد لحد ${range.to || P.lastDate}: ${fmt(st.closing)} دينار`;
+    const text = `كشف حساب: ${noName(name)}\nالرصيد حتى ${range.to || P.lastDate}: ${fmt(st.closing)} دينار`;
     const wa = waLink(person?.mobile, text);
     openModal(`<h2>كشف حساب — ${esc(noName(name))}</h2>
       <div class="statement-head">
-        ${person?.mobile ? `<span>الموبايل: <b class="num">${esc(person.mobile)}</b></span>` : ''}
+        ${person?.mobile ? `<span>الهاتف: <b class="num">${esc(person.mobile)}</b></span>` : ''}
         ${person?.address ? `<span>العنوان: <b>${esc(person.address)}</b></span>` : ''}
         <span>الرصيد: <b>${money(st.closing)}</b></span>
       </div>
       <div class="filters no-print" style="padding:0 0 8px">
         <label>من <input type="date" id="stFrom" value="${range.from}"></label>
         <label>إلى <input type="date" id="stTo" value="${range.to}"></label>
-        ${wa ? `<a class="btn small" href="${wa}" target="_blank" rel="noopener">إرسال الرصيد على واتساب</a>` : ''}
+        ${wa ? `<a class="btn small" href="${wa}" target="_blank" rel="noopener">إرسال الرصيد عبر واتساب</a>` : ''}
         ${person && can(kind === 'customer' ? 'customer_edit' : 'supplier_manage') ? `<button class="btn small" id="stEdit">${icon('edit')} تعديل البيانات</button>` : ''}
-        ${person && can(kind === 'customer' ? 'receipt' : 'payment') ? `<button class="btn small primary" id="stPay">${kind === 'customer' ? '+ وصل قبض' : '+ وصل دفع'}</button>` : ''}
+        ${person && can(kind === 'customer' ? 'receipt' : 'payment') ? `<button class="btn small primary" id="stPay">${kind === 'customer' ? '+ سند قبض' : '+ سند صرف'}</button>` : ''}
       </div>
       ${section('الحركات', table(st.rows, [
         { key: 'date', label: 'التاريخ' },
@@ -1063,43 +1063,43 @@ function viewPeople(kind) {
   const owed = list.filter((x) => x.balance > 0).reduce((a, x) => a + x.balance, 0);
   const rows = list.map((x) => ({ ...x, shown: noName(x.name), mobile: x.info?.mobile || '', type: x.info?.type || '' }));
   const cols = [
-    { key: 'shown', label: kind === 'customer' ? 'الزبون' : 'المورد' },
+    { key: 'shown', label: kind === 'customer' ? 'العميل' : 'المورد' },
     ...(kind === 'customer' ? [{ key: 'type', label: 'النوع' }] : []),
-    { key: 'mobile', label: 'الموبايل', html: (r) => `<span class="num">${esc(r.mobile)}</span>` },
+    { key: 'mobile', label: 'الهاتف', html: (r) => `<span class="num">${esc(r.mobile)}</span>` },
     { key: 'opening', label: 'رصيد افتتاحي', money: true, total: true },
-    { key: 'debit', label: kind === 'customer' ? 'مبيعات آجل' : 'مشتريات آجل', money: true, total: true },
+    { key: 'debit', label: kind === 'customer' ? 'مبيعات آجلة' : 'مشتريات آجلة', money: true, total: true },
     { key: 'credit', label: 'تسديدات', money: true, total: true },
     { key: 'balance', label: 'الرصيد', money: true, total: true },
     { key: 'last', label: 'آخر حركة' },
   ];
-  return `${actionBar(kind === 'customer' ? [['newCustomer', '+ زبون جديد'], ['newReceipt', '+ وصل قبض']] : [['newSupplier', '+ مورد جديد'], ['newPayment', '+ وصل دفع']])}
+  return `${actionBar(kind === 'customer' ? [['newCustomer', '+ عميل جديد'], ['newReceipt', '+ سند قبض']] : [['newSupplier', '+ مورد جديد'], ['newPayment', '+ سند صرف']])}
     <div class="grid kpis">
-      ${kpi(kind === 'customer' ? 'مجموع الديون على الزبائن' : 'مجموع ديون الموردين', owed, `${list.filter((x) => x.balance > 0).length} ${kind === 'customer' ? 'زبون' : 'مورد'} عليهم رصيد`)}
+      ${kpi(kind === 'customer' ? 'مجموع الديون على العملاء' : 'مجموع ديون الموردين', owed, `عدد ${kind === 'customer' ? 'العملاء' : 'الموردين'} الذين لديهم رصيد: ${list.filter((x) => x.balance > 0).length}`)}
     </div>
-    <p class="muted">دوس على أي اسم حتى يطلعلك كشف الحساب.</p>
-    ${section(kind === 'customer' ? 'أرصدة الزبائن' : 'أرصدة الموردين', table(rows, cols, {
+    <p class="muted">اضغط على أي اسم لعرض كشف الحساب.</p>
+    ${section(kind === 'customer' ? 'أرصدة العملاء' : 'أرصدة الموردين', table(rows, cols, {
       onClick: (r) => statementModal(kind, r.name),
-      name: kind === 'customer' ? 'أرصدة الزبائن' : 'أرصدة الموردين',
+      name: kind === 'customer' ? 'أرصدة العملاء' : 'أرصدة الموردين',
     }))}`;
 }
 
 function viewStock() {
   const P = state.P;
   const st = C.stock(P);
-  const pill = (s) => `<span class="pill ${s === 'نافد' || s === 'بالسالب' ? 'bad' : s === 'قليل' ? 'warn' : 'good'}">${s}</span>`;
+  const pill = (s) => `<span class="pill ${s === 'نافد' || s === 'سالب' ? 'bad' : s === 'قليل' ? 'warn' : 'good'}">${s}</span>`;
   const classes = [...new Set(st.map((x) => x.cls))].sort();
-  return `${actionBar([['newItem', '+ مادة جديدة']])}<div class="grid kpis">
-      ${kpi('قيمة المخزن بسعر الشراء', st.reduce((a, x) => a + Math.max(0, x.value), 0))}
-      <div class="card kpi"><div class="label">مواد نافدة</div><div class="value num">${st.filter((x) => x.status === 'نافد').length}</div></div>
-      <div class="card kpi"><div class="label">مواد رصيدها بالسالب</div><div class="value num">${st.filter((x) => x.status === 'بالسالب').length}</div><div class="hint">مبيوع أكثر من المشترى — تأكد من قوائم الشراء</div></div>
-      <div class="card kpi"><div class="label">مواد قليلة</div><div class="value num">${st.filter((x) => x.status === 'قليل').length}</div></div>
+  return `${actionBar([['newItem', '+ صنف جديد']])}<div class="grid kpis">
+      ${kpi('قيمة المخزون بسعر الشراء', st.reduce((a, x) => a + Math.max(0, x.value), 0))}
+      <div class="card kpi"><div class="label">أصناف نافدة</div><div class="value num">${st.filter((x) => x.status === 'نافد').length}</div></div>
+      <div class="card kpi"><div class="label">أصناف رصيدها سالب</div><div class="value num">${st.filter((x) => x.status === 'سالب').length}</div><div class="hint">الكمية المبيعة أكثر من المشتراة — تحقّق من فواتير الشراء</div></div>
+      <div class="card kpi"><div class="label">أصناف قليلة الرصيد</div><div class="value num">${st.filter((x) => x.status === 'قليل').length}</div></div>
     </div>
-    <p class="muted">الرصيد محسوب مثل حساباتي: الرصيد الافتتاحي + المشتريات − المبيعات، والقطع الزايدة تنحسب كراتين.
-      الأصناف: ${classes.map(esc).join('، ')}</p>
-    ${section('رصيد المواد', table(st, [
+    <p class="muted">يُحسب الرصيد هكذا: الرصيد الافتتاحي + المشتريات − المبيعات، وتُحوَّل القطع الزائدة إلى كراتين.
+      الفئات: ${classes.map(esc).join('، ')}</p>
+    ${section('رصيد الأصناف', table(st, [
       { key: 'code', label: 'الرمز' },
-      { key: 'cls', label: 'الصنف' },
-      { key: 'name', label: 'المادة' },
+      { key: 'cls', label: 'الفئة' },
+      { key: 'name', label: 'الصنف' },
       { key: 'k', label: 'الرصيد (وحدة كبيرة)', html: (r) => `<span class="num">${fmt(r.k)}</span> ${esc(r.unitL1)}` , get: (r) => r.k },
       { key: 's', label: 'الرصيد (وحدة صغيرة)', html: (r) => `<span class="num">${fmt(r.s)}</span> ${esc(r.unitL2)}`, get: (r) => r.s },
       { key: 'fill', label: 'التعبئة', num: true },
@@ -1108,8 +1108,8 @@ function viewStock() {
       { key: 'buyL1', label: 'سعر الشراء (كبيرة)', money: true },
       { key: 'value', label: 'القيمة', money: true, total: true },
       { key: 'status', label: 'الحالة', html: (r) => pill(r.status), get: (r) => r.status },
-    ], { sort: { key: 'name', dir: 1 }, name: 'المخزن', onClick: can('item_manage') ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
-    ${can('item_manage') ? '<p class="muted">دوس على أي مادة حتى تعدّل أسعارها.</p>' : ''}`;
+    ], { sort: { key: 'name', dir: 1 }, name: 'المخزون', onClick: can('item_manage') ? (r) => forms().itemEditor(P.items.find((i) => i.id === r.id)) : null }))}
+    ${can('item_manage') ? '<p class="muted">اضغط على أي صنف لتعديل أسعاره.</p>' : ''}`;
 }
 
 function viewCash() {
@@ -1117,24 +1117,24 @@ function viewCash() {
   const b = C.cashBox(P, state.filter);
   const line = (label, v, sign) => ({ label, v: sign * v });
   const rows = [
-    line('مبيعات نقدي', b.cashSales, 1),
-    line('مدفوع مع القوائم', b.paidWithInvoices, 1),
-    line('تسديدات من الزبائن', b.receipts, 1),
-    line('مشتريات نقدي', b.cashPurchases, -1),
-    line('مدفوعات (تسديد موردين ومصاريف)', b.payments, -1),
+    line('مبيعات نقدية', b.cashSales, 1),
+    line('المدفوع مع الفواتير', b.paidWithInvoices, 1),
+    line('تسديدات العملاء', b.receipts, 1),
+    line('مشتريات نقدية', b.cashPurchases, -1),
+    line('المدفوعات (تسديد للموردين ومصاريف)', b.payments, -1),
   ];
-  return `${actionBar([['newReceipt', '+ وصل قبض'], ['newPayment', '+ وصل دفع / مصروف']])}<div class="grid kpis">
-      ${kpi('الداخل', b.totalIn)}${kpi('الطالع', b.totalOut)}${kpi('الصافي', b.net, periodLabel())}
+  return `${actionBar([['newReceipt', '+ سند قبض'], ['newPayment', '+ سند صرف / مصروف']])}<div class="grid kpis">
+      ${kpi('الوارد', b.totalIn)}${kpi('الصادر', b.totalOut)}${kpi('الصافي', b.net, periodLabel())}
     </div>
     ${section('حركة الصندوق', table(rows, [
       { key: 'label', label: 'البند' },
       { key: 'v', label: 'المبلغ', money: true, total: true },
     ], { name: 'الصندوق' }), { search: false })}
     <div class="grid two">
-      <div>${section('مبيعات نقدي حسب الكاشير', table(b.byUser.map(([u, t]) => ({ u, t })), [
+      <div>${section('المبيعات النقدية حسب الكاشير', table(b.byUser.map(([u, t]) => ({ u, t })), [
         { key: 'u', label: 'الكاشير' },
         { key: 't', label: 'المبلغ', money: true, total: true },
-      ], { name: 'نقدي حسب الكاشير' }), { search: false })}</div>
+      ], { name: 'المبيعات النقدية حسب الكاشير' }), { search: false })}</div>
       <div>${section('المدفوعات حسب النوع', table(b.paymentsByClass.map(([c, t]) => ({ c, t })), [
         { key: 'c', label: 'النوع' },
         { key: 't', label: 'المبلغ', money: true, total: true },
@@ -1142,7 +1142,7 @@ function viewCash() {
     </div>
     ${section('المقبوضات', table(b.receiptList, [
       { key: 'date', label: 'التاريخ' },
-      { key: 'no', label: 'رقم الوصل' },
+      { key: 'no', label: 'رقم السند' },
       { key: 'name', label: 'من' },
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
@@ -1150,7 +1150,7 @@ function viewCash() {
     ], { name: 'المقبوضات', sort: { key: 'date', dir: -1 }, onClick: can('voucher_edit') ? (r) => forms().voucherEditor('receipt', r) : null }))}
     ${section('المدفوعات', table(b.paymentList, [
       { key: 'date', label: 'التاريخ' },
-      { key: 'no', label: 'رقم الوصل' },
+      { key: 'no', label: 'رقم السند' },
       { key: 'name', label: 'إلى' },
       { key: 'cls', label: 'النوع' },
       { key: 'note', label: 'ملاحظة' },
@@ -1165,19 +1165,19 @@ function viewPurchases() {
   const sum = (arr) => arr.reduce((a, p) => a + p.total, 0);
   const bySupplier = new Map();
   for (const p of list) bySupplier.set(p.supplier, (bySupplier.get(p.supplier) || 0) + p.total);
-  return `${actionBar([['newPurchase', '+ قائمة شراء']])}<div class="grid kpis">
-      ${kpi('المشتريات', sum(list), `${list.length} قائمة — ${periodLabel()}`)}
+  return `${actionBar([['newPurchase', '+ فاتورة شراء']])}<div class="grid kpis">
+      ${kpi('المشتريات', sum(list), `${list.length} فاتورة — ${periodLabel()}`)}
       ${kpi('نقدي', sum(list.filter((p) => p.type === C.CASH)))}
       ${kpi('آجل', sum(list.filter((p) => p.type === C.CREDIT)))}
     </div>
-    ${section('قوائم الشراء', table(list.map((p) => ({ ...p, n: p.lines.length })), [
+    ${section('فواتير الشراء', table(list.map((p) => ({ ...p, n: p.lines.length })), [
       { key: 'id', label: 'رقم', num: true },
-      { key: 'no', label: 'رقم قائمة المورد' },
+      { key: 'no', label: 'رقم فاتورة المورد' },
       { key: 'date', label: 'التاريخ' },
       { key: 'type', label: 'النوع' },
       { key: 'supplier', label: 'المورد' },
       { key: 'user', label: 'المستخدم' },
-      { key: 'n', label: 'عدد المواد', num: true },
+      { key: 'n', label: 'عدد الأصناف', num: true },
       { key: 'total', label: 'المبلغ', money: true, total: true },
       ...invoiceActions('purchase'),
     ], { onClick: (r) => invoiceModal(r, 'purchase'), sort: { key: 'id', dir: -1 }, name: 'المشتريات' }))}
@@ -1191,16 +1191,16 @@ function viewProfit() {
   const P = state.P;
   const pr = C.profit(P, state.filter);
   return `<div class="grid kpis">
-      ${kpi('المبيعات', pr.revenue)}${kpi('الكلفة', pr.cost)}${kpi('ربح المواد', pr.gross)}
+      ${kpi('المبيعات', pr.revenue)}${kpi('التكلفة', pr.cost)}${kpi('إجمالي الربح', pr.gross)}
       ${kpi('المصاريف', pr.expenseTotal)}${kpi('الصافي', pr.net, periodLabel())}
     </div>
-    <p class="muted">الكلفة = سعر الشراء المسجل ويه كل سطر بيع (أو سعر الشراء الحالي للمادة إذا ما مسجل).
-      ${pr.unknown ? `مبيعات بمبلغ ${fmt(pr.unknown)} ما انحسب ربحها لأن المادة أو الوحدة مو موجودة بقائمة المواد.` : ''}</p>
-    ${section('الربح حسب المادة', table(pr.items, [
-      { key: 'item', label: 'المادة' },
+    <p class="muted">التكلفة = سعر الشراء المسجّل مع كل سطر بيع (أو سعر الشراء الحالي للصنف إن لم يكن مسجّلاً).
+      ${pr.unknown ? `لم يُحسب ربح مبيعات بمبلغ ${fmt(pr.unknown)} لأن الصنف أو الوحدة غير موجودين في قائمة الأصناف.` : ''}</p>
+    ${section('الربح حسب الصنف', table(pr.items, [
+      { key: 'item', label: 'الصنف' },
       { key: 'qty', label: 'الكمية', num: true },
       { key: 'revenue', label: 'المبيعات', money: true, total: true },
-      { key: 'cost', label: 'الكلفة', money: true, total: true },
+      { key: 'cost', label: 'التكلفة', money: true, total: true },
       { key: 'profit', label: 'الربح', money: true, total: true },
       { key: 'margin', label: 'نسبة الربح', html: (r) => pct(r.margin), get: (r) => r.margin },
     ], { name: 'الأرباح' }))}
@@ -1218,12 +1218,12 @@ function viewChecks() {
   const out = [];
   const add = (kind, what, ref, open) => out.push({ kind, what, ref, open });
   for (const s of P.sales) {
-    if (s.date > today) add('تاريخ بالمستقبل', `قائمة بيع رقم ${s.id} تاريخها ${s.date} (انكتبت ${s.time.slice(0, 10)})`, s.id, () => invoiceModal(s));
-    if (s.type === C.CREDIT && !s.customer) add('آجل بدون زبون', `قائمة بيع آجل رقم ${s.id} بمبلغ ${fmt(s.total)} بدون اسم زبون`, s.id, () => invoiceModal(s));
-    if (!s.lines.length) add('قائمة فارغة', `قائمة بيع رقم ${s.id} (${s.date}) ما بيها مواد`, s.id, () => invoiceModal(s));
+    if (s.date > today) add('تاريخ في المستقبل', `فاتورة بيع رقم ${s.id} تاريخها ${s.date} (أُدخلت في ${s.time.slice(0, 10)})`, s.id, () => invoiceModal(s));
+    if (s.type === C.CREDIT && !s.customer) add('آجل بدون عميل', `فاتورة بيع آجل رقم ${s.id} بمبلغ ${fmt(s.total)} بدون اسم عميل`, s.id, () => invoiceModal(s));
+    if (!s.lines.length) add('فاتورة فارغة', `فاتورة بيع رقم ${s.id} (${s.date}) لا تحتوي على أصناف`, s.id, () => invoiceModal(s));
   }
   for (const p of P.purchases) {
-    if (p.date > today) add('تاريخ بالمستقبل', `قائمة شراء رقم ${p.id} تاريخها ${p.date} (انكتبت ${p.time.slice(0, 10)})`, p.id, () => invoiceModal(p, 'purchase'));
+    if (p.date > today) add('تاريخ في المستقبل', `فاتورة شراء رقم ${p.id} تاريخها ${p.date} (أُدخلت في ${p.time.slice(0, 10)})`, p.id, () => invoiceModal(p, 'purchase'));
   }
   const seen = new Set();
   for (const l of P.saleLines) {
@@ -1231,22 +1231,22 @@ function viewChecks() {
     const key = l.item + '|' + l.unit;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (!it) add('مادة مو موجودة', `"${l.item}" مبيوعة بس مو موجودة بقائمة المواد (ما تنحسب بالمخزن)`, '', null);
-    else if (l.unit !== it.unitL1 && l.unit !== it.unitL2) add('وحدة غلط', `"${l.item}" مبيوعة بوحدة "${l.unit || 'فارغة'}" والمادة وحداتها ${it.unitL1}/${it.unitL2}`, '', null);
+    if (!it) add('صنف غير موجود', `"${l.item}" مُباع لكنه غير موجود في قائمة الأصناف (لا يُحتسب في المخزون)`, '', null);
+    else if (l.unit !== it.unitL1 && l.unit !== it.unitL2) add('وحدة خاطئة', `"${l.item}" مُباع بوحدة "${l.unit || 'فارغة'}" بينما وحدات الصنف هي ${it.unitL1}/${it.unitL2}`, '', null);
   }
   for (const it of P.items) {
-    if (!it.priceL1 && !it.priceL2) add('سعر صفر', `المادة "${it.name}" ما عندها سعر بيع`, '', null);
-    if (it.unitL1 && it.unitL1 === it.unitL2) add('وحدتين بنفس الاسم', `المادة "${it.name}" وحدتها الكبيرة والصغيرة "${it.unitL1}" — رصيدها بحساباتي ينحسب مرتين`, '', null);
+    if (!it.priceL1 && !it.priceL2) add('سعر البيع صفر', `الصنف "${it.name}" ليس له سعر بيع`, '', null);
+    if (it.unitL1 && it.unitL1 === it.unitL2) add('وحدتان بالاسم نفسه', `الصنف "${it.name}" وحدتاه الكبيرة والصغيرة باسم واحد "${it.unitL1}" — قد يُحسب رصيده مرتين؛ عدّل وحدتيه`, '', null);
   }
   const known = new Set(P.customers.map((c) => c.name));
   for (const n of new Set(P.sales.filter((s) => s.type === C.CREDIT && s.customer).map((s) => s.customer))) {
-    if (!known.has(n)) add('زبون مو معرّف', `"${n}" عنده قوائم آجل بس مو موجود بقائمة الزبائن`, '', null);
+    if (!known.has(n)) add('عميل غير مسجّل', `"${n}" لديه فواتير آجلة لكنه غير موجود في قائمة العملاء`, '', null);
   }
-  return `<p class="muted">أشياء لكيتها بالبيانات تستاهل تشوفها وتصلّحها بحساباتي. هذا البرنامج ما يغيّر شي بالملف.</p>
+  return `<p class="muted">أمور وُجدت في البيانات تستحق المراجعة والتصحيح. هذه الصفحة للاطلاع فقط ولا تغيّر شيئاً في البيانات.</p>
     ${section(`ملاحظات (${out.length})`, table(out, [
       { key: 'kind', label: 'النوع' },
       { key: 'what', label: 'التفاصيل' },
-    ], { onClick: (r) => r.open?.(), empty: 'ما لكيت أي مشكلة', name: 'ملاحظات البيانات' }))}`;
+    ], { onClick: (r) => r.open?.(), empty: 'لم يُعثر على أي مشكلة', name: 'ملاحظات البيانات' }))}`;
 }
 
 // ---------- quick sale & settings pages (server mode) ----------
@@ -1272,30 +1272,30 @@ const NAV = [
   { id: 'sales', label: 'المبيعات' },
   { id: 'purchases', label: 'المشتريات' },
   { group: 'الحسابات' },
-  { id: 'customers', label: 'الزبائن' },
-  { id: 'suppliers', label: 'الموردين' },
+  { id: 'customers', label: 'العملاء' },
+  { id: 'suppliers', label: 'الموردون' },
   { id: 'cash', label: 'الصندوق' },
   { id: 'profit', label: 'الأرباح' },
-  { group: 'المخزن' },
-  { id: 'stock', label: 'المخزن والأسعار' },
+  { group: 'المخزون' },
+  { id: 'stock', label: 'المخزون والأسعار' },
   { id: 'checks', label: 'ملاحظات البيانات' },
   { group: 'النظام', server: true, admin: true },
   { id: 'settings', label: 'الإعدادات', server: true, admin: true },
 ];
 
 const TITLES = {
-  pos: ['بيع سريع', 'اختار المواد، وبعدين احفظ القائمة'],
+  pos: ['بيع سريع', 'اختر الأصناف، ثم احفظ الفاتورة'],
   home: ['الرئيسية', ''],
   sales: ['المبيعات', ''],
   purchases: ['المشتريات', ''],
-  customers: ['الزبائن', 'الأرصدة وكشوفات الحساب'],
-  suppliers: ['الموردين', 'الأرصدة وكشوفات الحساب'],
-  stock: ['المخزن والأسعار', 'رصيد كل مادة وأسعارها'],
+  customers: ['العملاء', 'الأرصدة وكشوفات الحساب'],
+  suppliers: ['الموردون', 'الأرصدة وكشوفات الحساب'],
+  stock: ['المخزون والأسعار', 'رصيد كل صنف وأسعاره'],
   cash: ['الصندوق', ''],
   profit: ['الأرباح', ''],
-  checks: ['ملاحظات البيانات', 'أشياء تستاهل تصلّحها بحساباتي'],
+  checks: ['ملاحظات البيانات', 'أمور في البيانات تستحق المراجعة'],
   settings: ['الإعدادات', ''],
-  none: ['أهلاً', ''],
+  none: ['أهلاً بك', ''],
 };
 
 // In read-only mode everything readable is open; signed in, each user sees
@@ -1343,10 +1343,10 @@ const views = {
   profit: viewProfit,
   checks: viewChecks,
   settings: () => settings().view(),
-  none: () => `<div class="card"><h3>ما عندك شاشات</h3>
-    <p class="muted">المستخدم <b>${esc(state.user)}</b> ما عنده بيع ولا أي شاشة. اطلب من المدير يأشّرلك من الإعدادات ← المستخدمين والصلاحيات، ويدوس "حفظ الصلاحيات".
-      الشاشة تتحدّث وحدها بعد الحفظ.</p>
-    <p class="muted" style="font-size:12px">الصلاحيات اللي وصلت: <code dir="ltr">${esc(state.perms.join(', ') || '—')}</code></p></div>`,
+  none: () => `<div class="card"><h3>لا توجد شاشات متاحة لك</h3>
+    <p class="muted">ليس لدى المستخدم <b>${esc(state.user)}</b> صلاحية البيع ولا أي شاشة أخرى. اطلب من المدير تحديد صلاحياتك من الإعدادات ← المستخدمون والصلاحيات، ثم الضغط على «حفظ».
+      تتحدّث الشاشة تلقائياً بعد الحفظ.</p>
+    <p class="muted" style="font-size:12px">الصلاحيات المستلمة: <code dir="ltr">${esc(state.perms.join(', ') || '—')}</code></p></div>`,
 };
 const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
 
@@ -1366,7 +1366,7 @@ function render() {
   $('#pageActions').innerHTML = pendingActions
     .map(([id, label]) => `<button class="btn primary" data-act="${id}">${esc(label)}</button>`)
     .join('');
-  $('#shopTitle').textContent = state.shopName || 'لوحة المحل';
+  $('#shopTitle').textContent = state.shopName || APP;
   for (const fn of afterRender) fn();
   $('#goLast')?.addEventListener('click', () => {
     state.preset = '';

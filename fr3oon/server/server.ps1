@@ -179,7 +179,7 @@ function Get-Engine {
         $script:EngineName = 'Access.Application ' + $script:AccessApp.Version
         return $script:Engine
     } catch {
-        throw 'ما لكيت Microsoft Access على هذا الجهاز. الحفظ يحتاج Access أو Access Runtime.'
+        throw 'لم يُعثر على Microsoft Access على هذا الجهاز. يتطلّب الحفظ تثبيت Access أو Access Runtime.'
     }
 }
 
@@ -223,7 +223,7 @@ function Open-Db([string]$path) {
     try {
         $script:Db = $ws.OpenDatabase($path, $false, $false)
     } catch {
-        throw "ما كدرت أفتح ملف البيانات. إذا حساباتي فاتحه بشكل حصري سدّه وجرّب مرة ثانية. ($($_.Exception.Message))"
+        throw "تعذّر فتح قاعدة البيانات. إذا كان برنامج آخر يفتحها فتحاً حصرياً فأغلقه وأعد المحاولة. ($($_.Exception.Message))"
     }
     $script:DbOpenPath = $path
     return $script:Db
@@ -231,7 +231,7 @@ function Open-Db([string]$path) {
 
 function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) {
     $path = Get-DbPath
-    Need ($path -ne '') 'ما محدد ملف البيانات. اختاره من الإعدادات.'
+    Need ($path -ne '') 'لم تُحدَّد قاعدة البيانات. اخترها من الإعدادات.'
     $engine = Get-Engine
     $ws = $engine.Workspaces.Item(0)
     $script:DbLastUse = Get-Date
@@ -240,7 +240,7 @@ function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) 
     } catch {
         # a file that can only be read (read-only share) still opens for reading
         if (-not $ReadOnly) { throw }
-        try { $db = $ws.OpenDatabase($path, $false, $true) } catch { throw "ما كدرت أفتح ملف البيانات. ($($_.Exception.Message))" }
+        try { $db = $ws.OpenDatabase($path, $false, $true) } catch { throw "تعذّر فتح قاعدة البيانات. ($($_.Exception.Message))" }
         try { return (& $body $db) } finally { try { $db.Close() } catch { } }
     }
     try {
@@ -420,7 +420,7 @@ function Get-Shop {
                 $perm = $rs.Fields.Item('Perms').Value
                 $users[$n] = @{
                     name = $n; admin = [bool]$rs.Fields.Item('IsAdmin').Value; active = [bool]$rs.Fields.Item('Active').Value
-                    perms = $(if ($perm -is [DBNull] -or $null -eq $perm) { $null } else { [string]$perm })
+                    perms = $(if ($perm -is [DBNull] -or $null -eq $perm) { $null } elseif ([string]$perm -eq '-') { '' } else { [string]$perm })
                 }
                 $rs.MoveNext()
             }
@@ -456,7 +456,9 @@ function Save-User($db, $u) {
     if ($old -and $old -ne $name) { Need ((Count $db "SELECT Count(*) FROM Users WHERE UserName=$(Q $name)") -eq 0) "يوجد مستخدم بالاسم: $name" }
     if (-not $old) { Need (-not $exists) "يوجد مستخدم بالاسم: $name" }
     $values = @{ UserName = $name; IsAdmin = [bool]$u.isAdmin; Active = ($null -eq $u.active -or [bool]$u.active) }
-    if ($null -ne $u.perms) { $t = ConvertTo-PermText $u.perms; $values.Perms = $(if ($null -eq $t) { '' } else { $t }) }
+    # '-' is "no permissions at all": Access may keep an empty text as Null,
+    # which would read back as "never set" (the defaults)
+    if ($null -ne $u.perms) { $t = ConvertTo-PermText $u.perms; $values.Perms = $(if (-not $t) { '-' } else { $t }) }
     if ([string]$u.password) {
         Need (([string]$u.password).Length -ge 4) 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'
         $values.Salt = New-Salt
@@ -590,7 +592,10 @@ function Restore-Backup([string]$name) {
     Wait-Backup 600
     Close-Db
     $script:BackupJob = $null
-    $safety = Join-Path (Get-BackupDir) ('fr3oon-' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '-before-restore.accdb')
+    # never the name of an existing copy (above all, the one being restored)
+    $stamp = 'fr3oon-' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '-before-restore'
+    $safety = Join-Path (Get-BackupDir) ($stamp + '.accdb')
+    for ($i = 2; Test-Path -LiteralPath $safety; $i++) { $safety = Join-Path (Get-BackupDir) ($stamp + "-$i.accdb") }
     Copy-Item -LiteralPath $db -Destination $safety -Force
     Copy-Item -LiteralPath $src -Destination $db -Force
     $script:ShopCache = $null
@@ -618,12 +623,12 @@ function Day([string]$iso) {
     if (-not $iso) { return (Get-Date).Date }
     try {
         return [datetime]::ParseExact($iso, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
-    } catch { throw "التاريخ غلط: $iso" }
+    } catch { throw "التاريخ غير صحيح: $iso" }
 }
 
 function Text([string]$s, [int]$max, [string]$label) {
     $s = if ($null -eq $s) { '' } else { $s.Trim() }
-    if ($s.Length -gt $max) { throw "$label طويل: الحد $max حرف" }
+    if ($s.Length -gt $max) { throw "$label طويل: الحد الأقصى لعدد الأحرف $max" }
     return $s
 }
 
@@ -632,7 +637,7 @@ function Num($v, [string]$label) {
     if ($v -is [double] -or $v -is [int] -or $v -is [long] -or $v -is [decimal]) { return [double]$v }
     $d = 0.0
     if (-not [double]::TryParse("$v".Replace(',', ''), [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$d)) {
-        throw "$label لازم يكون رقم"
+        throw "$label يجب أن يكون رقماً"
     }
     return $d
 }
@@ -664,13 +669,13 @@ function Add-Row($db, [string]$table, [hashtable]$values, [string]$idField) {
     $db.Execute($sql, $dbFailOnError)
     if (-not $idField) { return $null }
     $id = Get-Value $db 'SELECT @@IDENTITY'
-    Need ($null -ne $id -and [int]$id -gt 0) "الحفظ بجدول $table ما رجّع رقم السجل"
+    Need ($null -ne $id -and [int]$id -gt 0) "لم يُرجع الحفظ في الجدول $table رقم السجل"
     return [int]$id
 }
 
 function Edit-Row($db, [string]$table, [string]$idField, $id, [hashtable]$values) {
     $id = [int]$id
-    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE [$idField]=$id") -gt 0) 'السجل مو موجود (يمكن انمسح من حساباتي)'
+    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE [$idField]=$id") -gt 0) 'السجل غير موجود (ربما حُذف من جهاز آخر)'
     $sets = ($values.Keys | ForEach-Object { "[$_]=" + (L $values[$_]) }) -join ', '
     $db.Execute("UPDATE [$table] SET $sets WHERE [$idField]=$id", $dbFailOnError)
 }
@@ -712,7 +717,7 @@ function Get-MadaItem($db, [string]$name) {
 function Read-MadaItem($db, [string]$name) {
     $rs = $db.OpenRecordset("SELECT IDcode, BpriceL1, BpriceL2, UnitL1, UnitL2, Fill, price, priceSeeat FROM madaCode WHERE madaName=$(Q $name)", $dbOpenSnapshot)
     try {
-        Need (-not $rs.EOF) "المادة مو موجودة: $name"
+        Need (-not $rs.EOF) "الصنف غير موجود: $name"
         $o = @{}
         foreach ($f in 'IDcode', 'BpriceL1', 'BpriceL2', 'UnitL1', 'UnitL2', 'Fill', 'price', 'priceSeeat') {
             $v = $rs.Fields.Item($f).Value
@@ -737,16 +742,16 @@ function Next-VoucherNo($db, [string]$table) {
 
 function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
     $lines = @($lines | Where-Object { $null -ne $_ })
-    Need ($lines.Count -gt 0) 'القائمة ما بيها مواد'
+    Need ($lines.Count -gt 0) 'الفاتورة لا تحتوي على أصناف'
     foreach ($l in $lines) {
-        $name = Text $l.item 150 'اسم المادة'
+        $name = Text $l.item 150 'اسم الصنف'
         $it = Get-MadaItem $db $name
         $unit = Text $l.unit 10 'الوحدة'
-        Need ($unit -eq $it.UnitL1 -or $unit -eq $it.UnitL2) "وحدة غلط للمادة $name"
+        Need ($unit -eq $it.UnitL1 -or $unit -eq $it.UnitL2) "وحدة غير صحيحة للصنف $name"
         $qty = Num $l.qty 'الكمية'
-        Need ($qty -gt 0) "الكمية لازم أكثر من صفر ($name)"
+        Need ($qty -gt 0) "يجب أن تكون الكمية أكبر من صفر ($name)"
         $price = Num $l.price 'السعر'
-        Need ($price -ge 0) "السعر غلط ($name)"
+        Need ($price -ge 0) "السعر غير صحيح ($name)"
         $small = ($unit -eq $it.UnitL2 -and $it.UnitL1 -ne $it.UnitL2)
         if ($kind -eq 'sale') {
             Add-Row $db 'subOut' @{
@@ -768,16 +773,16 @@ function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
 
 function Op-SaveSale($db, $d) {
     $type = [string]$d.type
-    Need ($type -eq 'نقدي' -or $type -eq 'اجل') 'نوع القائمة غلط'
-    $customer = Text $d.customer 50 'اسم الزبون'
+    Need ($type -eq 'نقدي' -or $type -eq 'اجل') 'نوع الفاتورة غير صحيح'
+    $customer = Text $d.customer 50 'اسم العميل'
     if ($type -eq 'اجل') {
-        Need ($customer -ne '') 'القائمة الآجل تحتاج اسم زبون'
-        Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $customer)") -gt 0) "الزبون مو موجود: $customer"
+        Need ($customer -ne '') 'فاتورة البيع الآجل تتطلّب اسم العميل'
+        Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $customer)") -gt 0) "العميل غير موجود: $customer"
     } elseif (-not $customer) {
-        $customer = 'قائمة نقدي'
+        $customer = 'عميل نقدي'
     }
     $paid = Num $d.paid 'المدفوع'
-    Need ($paid -ge 0) 'المدفوع غلط'
+    Need ($paid -ge 0) 'المبلغ المدفوع غير صحيح'
     $values = @{
         TOname = $customer; OutDate = (Day $d.date); OutType = $type
         Paid = [int]$(if ($type -eq 'اجل') { $paid } else { 0 }); strUserName = (Text $d.user 45 'اسم المستخدم')
@@ -798,7 +803,7 @@ function Op-SaveSale($db, $d) {
 
 function Op-DeleteSale($db, $d) {
     $id = [int]$d.id
-    Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$id") -gt 0) 'القائمة مو موجودة'
+    Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$id") -gt 0) 'الفاتورة غير موجودة'
     $db.Execute("DELETE FROM subOut WHERE idOut=$id", $dbFailOnError)
     $db.Execute("DELETE FROM MasterOut WHERE idOut=$id", $dbFailOnError)
     return @{ id = $id }
@@ -822,14 +827,14 @@ function Update-BuyPrices($db, $lines) {
 
 function Op-SavePurchase($db, $d) {
     $type = [string]$d.type
-    Need ($type -eq 'نقدي' -or $type -eq 'اجل') 'نوع القائمة غلط'
+    Need ($type -eq 'نقدي' -or $type -eq 'اجل') 'نوع الفاتورة غير صحيح'
     $supplier = Text $d.supplier 50 'اسم المورد'
-    Need ($supplier -ne '') 'لازم تختار المورد'
-    Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $supplier)") -gt 0) "المورد مو موجود: $supplier"
+    Need ($supplier -ne '') 'اختر المورد'
+    Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $supplier)") -gt 0) "المورد غير موجود: $supplier"
     $no = $null
     if ("$($d.no)".Trim()) {
         $n = 0
-        Need ([int]::TryParse("$($d.no)".Trim(), [ref]$n)) 'رقم قائمة المورد لازم يكون رقم'
+        Need ([int]::TryParse("$($d.no)".Trim(), [ref]$n)) 'رقم فاتورة المورد يجب أن يكون رقماً'
         $no = $n
     }
     $values = @{
@@ -851,7 +856,7 @@ function Op-SavePurchase($db, $d) {
 
 function Op-DeletePurchase($db, $d) {
     $id = [int]$d.id
-    Need ((Count $db "SELECT Count(*) FROM MasterIn WHERE IdIn=$id") -gt 0) 'القائمة مو موجودة'
+    Need ((Count $db "SELECT Count(*) FROM MasterIn WHERE IdIn=$id") -gt 0) 'الفاتورة غير موجودة'
     $db.Execute("DELETE FROM subIN WHERE IdIn=$id", $dbFailOnError)
     $db.Execute("DELETE FROM MasterIn WHERE IdIn=$id", $dbFailOnError)
     return @{ id = $id }
@@ -859,11 +864,11 @@ function Op-DeletePurchase($db, $d) {
 
 function Save-Voucher($db, $d, [string]$table, [string]$nameField) {
     $amount = Num $d.amount 'المبلغ'
-    Need ($amount -gt 0) 'المبلغ لازم أكثر من صفر'
+    Need ($amount -gt 0) 'يجب أن يكون المبلغ أكبر من صفر'
     $cls = Text $d.cls 35 'النوع'
-    Need ($cls -ne '') 'لازم تختار النوع'
+    Need ($cls -ne '') 'اختر النوع'
     $name = Text $d.name 35 'الاسم'
-    if ($cls -eq 'تسديد') { Need ($name -ne '') 'التسديد يحتاج اسم' }
+    if ($cls -eq 'تسديد') { Need ($name -ne '') 'التسديد يتطلّب اسماً' }
     $values = @{
         dataS = (Day $d.date); classS = $cls; mablak = $amount
         note = (Text $d.note 255 'الملاحظة'); strUserName = (Text $d.user 45 'اسم المستخدم')
@@ -882,23 +887,23 @@ function Save-Voucher($db, $d, [string]$table, [string]$nameField) {
 
 function Op-SaveReceipt($db, $d) {
     if ($d.cls -eq 'تسديد') {
-        Need ("$($d.name)".Trim() -ne '') 'التسديد يحتاج اسم'
-        Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $d.name)") -gt 0) "الزبون مو موجود: $($d.name)"
+        Need ("$($d.name)".Trim() -ne '') 'التسديد يتطلّب اسماً'
+        Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $d.name)") -gt 0) "العميل غير موجود: $($d.name)"
     }
     return Save-Voucher $db $d 'mablakIn' 'nameFrom'
 }
 
 function Op-SavePayment($db, $d) {
     if ($d.cls -eq 'تسديد') {
-        Need ("$($d.name)".Trim() -ne '') 'التسديد يحتاج اسم'
-        Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $d.name)") -gt 0) "المورد مو موجود: $($d.name)"
+        Need ("$($d.name)".Trim() -ne '') 'التسديد يتطلّب اسماً'
+        Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $d.name)") -gt 0) "المورد غير موجود: $($d.name)"
     }
     return Save-Voucher $db $d 'mablakOut' 'nameto'
 }
 
 function Delete-Voucher($db, [string]$table, $d) {
     $id = [int]$d.id
-    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE idS=$id") -gt 0) 'الوصل مو موجود'
+    Need ((Count $db "SELECT Count(*) FROM [$table] WHERE idS=$id") -gt 0) 'السند غير موجود'
     $db.Execute("DELETE FROM [$table] WHERE idS=$id", $dbFailOnError)
     return @{ id = $id }
 }
@@ -928,17 +933,17 @@ function Uses($db, [string]$kind, [string]$name) {
 
 function Op-SaveCustomer($db, $d) {
     # receipts store the name in a 35-character field
-    $name = Text $d.name 35 'اسم الزبون'
-    Need ($name -ne '') 'لازم تكتب اسم الزبون'
+    $name = Text $d.name 35 'اسم العميل'
+    Need ($name -ne '') 'اكتب اسم العميل'
     $id = if ($d.id) { [int]$d.id } else { 0 }
-    Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $name) AND id<>$id") -eq 0) "أكو زبون بنفس الاسم: $name"
+    Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $name) AND id<>$id") -eq 0) "يوجد عميل آخر بنفس الاسم: $name"
     $values = @{
         bayeeCode = $name; MB = [int](Num $d.opening 'الرصيد الافتتاحي'); CMobile = (Text $d.mobile 12 'الموبايل')
         Cadress = (Text $d.address 255 'العنوان'); Ctype = (Text $d.type 30 'النوع')
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT bayeeCode FROM bayeeCode WHERE id=$id")
-        Need ($old -ne '') 'الزبون مو موجود'
+        Need ($old -ne '') 'العميل غير موجود'
         Edit-Row $db 'bayeeCode' 'id' $id $values
         Rename-Links $db 'customer' $old $name
     } else {
@@ -951,16 +956,16 @@ function Op-SaveCustomer($db, $d) {
 
 function Op-SaveSupplier($db, $d) {
     $name = Text $d.name 35 'اسم المورد'
-    Need ($name -ne '') 'لازم تكتب اسم المورد'
+    Need ($name -ne '') 'اكتب اسم المورد'
     $id = if ($d.id) { [int]$d.id } else { 0 }
-    Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $name) AND ID<>$id") -eq 0) "أكو مورد بنفس الاسم: $name"
+    Need ((Count $db "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $name) AND ID<>$id") -eq 0) "يوجد مورد آخر بنفس الاسم: $name"
     $values = @{
         shiraCode = $name; MB = (Num $d.opening 'الرصيد الافتتاحي'); CMobile = (Text $d.mobile 12 'الموبايل')
         Cadress = (Text $d.address 255 'العنوان')
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT shiraCode FROM shiraCode WHERE ID=$id")
-        Need ($old -ne '') 'المورد مو موجود'
+        Need ($old -ne '') 'المورد غير موجود'
         Edit-Row $db 'shiraCode' 'ID' $id $values
         Rename-Links $db 'supplier' $old $name
     } else {
@@ -972,20 +977,20 @@ function Op-SaveSupplier($db, $d) {
 }
 
 function Op-SaveItem($db, $d) {
-    $name = Text $d.name 150 'اسم المادة'
-    Need ($name -ne '') 'لازم تكتب اسم المادة'
+    $name = Text $d.name 150 'اسم الصنف'
+    Need ($name -ne '') 'اكتب اسم الصنف'
     # subOut.IDcode holds 15 characters
     $code = Text $d.code 15 'الرمز'
     $u1 = Text $d.unitL1 10 'الوحدة الكبيرة'
     $u2 = Text $d.unitL2 10 'الوحدة الصغيرة'
-    Need ($u1 -ne '') 'لازم تكتب الوحدة الكبيرة'
+    Need ($u1 -ne '') 'اكتب الوحدة الكبيرة'
     if (-not $u2) { $u2 = $u1 }
     $id = if ($d.id) { [int]$d.id } else { 0 }
-    Need ((Count $db "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $name) AND ID<>$id") -eq 0) "أكو مادة بنفس الاسم: $name"
-    if ($code) { Need ((Count $db "SELECT Count(*) FROM madaCode WHERE IDcode=$(Q $code) AND ID<>$id") -eq 0) "أكو مادة بنفس الرمز: $code" }
+    Need ((Count $db "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $name) AND ID<>$id") -eq 0) "يوجد صنف آخر بنفس الاسم: $name"
+    if ($code) { Need ((Count $db "SELECT Count(*) FROM madaCode WHERE IDcode=$(Q $code) AND ID<>$id") -eq 0) "يوجد صنف آخر بنفس الرمز: $code" }
     $price = [int](Num $d.priceL1 'سعر البيع')
     $values = @{
-        madaName = $name; IDcode = $code; MadaClass = (Text $d.cls 255 'الصنف')
+        madaName = $name; IDcode = $code; MadaClass = (Text $d.cls 255 'التصنيف')
         price = $price; priceSeeat = [int](Num $d.priceL2 'سعر البيع')
         Fill = [int](Num $d.fill 'التعبئة'); BpriceL1 = (Num $d.buyL1 'سعر الشراء'); BpriceL2 = (Num $d.buyL2 'سعر الشراء')
         UnitL1 = $u1; UnitL2 = $u2; harig = [int](Num $d.harig 'حد الطلب')
@@ -993,7 +998,7 @@ function Op-SaveItem($db, $d) {
     }
     if ($id) {
         $old = [string](Get-Value $db "SELECT madaName FROM madaCode WHERE ID=$id")
-        Need ($old -ne '') 'المادة مو موجودة'
+        Need ($old -ne '') 'الصنف غير موجود'
         Edit-Row $db 'madaCode' 'ID' $id $values
         Rename-Links $db 'item' $old $name
     } else {
@@ -1005,9 +1010,9 @@ function Op-SaveItem($db, $d) {
 function Delete-Named($db, [string]$kind, [string]$table, [string]$idField, [string]$nameField, $d) {
     $id = [int]$d.id
     $name = [string](Get-Value $db "SELECT [$nameField] FROM [$table] WHERE [$idField]=$id")
-    Need ($name -ne '') 'السجل مو موجود'
+    Need ($name -ne '') 'السجل غير موجود'
     $n = Uses $db $kind $name
-    Need ($n -eq 0) "ما يصير ينمسح: عنده $n حركة. امسح حركاته أول."
+    Need ($n -eq 0) "لا يمكن الحذف: توجد عليه $n حركة. احذف حركاته أولاً."
     $db.Execute("DELETE FROM [$table] WHERE [$idField]=$id", $dbFailOnError)
     return @{ id = $id }
 }
@@ -1067,15 +1072,15 @@ function Get-Perms([string]$user) {
 
 $PermNames = @{
     sale_cash = 'البيع النقدي'; sale_credit = 'البيع الآجل'; sale_wholesale = 'البيع بالجملة (الوحدة الكبيرة)'
-    edit_price = 'تغيير السعر'; sale_edit = 'تعديل قوائم البيع'; sale_delete = 'مسح قوائم البيع'
-    purchase = 'قوائم الشراء'; purchase_edit = 'تعديل ومسح قوائم الشراء'; receipt = 'وصل القبض'
-    payment = 'وصل الدفع والمصاريف'; voucher_edit = 'تعديل ومسح الوصولات'; customer_add = 'إضافة زبون'
-    customer_edit = 'تعديل ومسح الزبائن'; supplier_manage = 'الموردين'; item_manage = 'المواد والأسعار'
+    edit_price = 'تغيير السعر'; sale_edit = 'تعديل فواتير البيع'; sale_delete = 'حذف فواتير البيع'
+    purchase = 'فواتير الشراء'; purchase_edit = 'تعديل وحذف فواتير الشراء'; receipt = 'سند القبض'
+    payment = 'سند الصرف والمصاريف'; voucher_edit = 'تعديل وحذف السندات'; customer_add = 'إضافة عميل'
+    customer_edit = 'تعديل وحذف العملاء'; supplier_manage = 'إدارة الموردين'; item_manage = 'الأصناف والأسعار'
 }
 
 function Need-Perm($session, [string]$perm) {
     $name = if ($PermNames.ContainsKey($perm)) { $PermNames[$perm] } else { $perm }
-    Need ($session.admin -or ($session.perms -contains $perm)) "ما عندك صلاحية: $name. اطلبها من المدير."
+    Need ($session.admin -or ($session.perms -contains $perm)) "ليست لديك صلاحية: $name. اطلبها من المدير."
 }
 
 # Before running a write: may this user do it at all?
@@ -1098,7 +1103,7 @@ function Test-Allowed([string]$op, $data, $session) {
         'deleteCustomer' { Need-Perm $session 'customer_edit' }
         { $_ -in 'saveSupplier', 'deleteSupplier' } { Need-Perm $session 'supplier_manage' }
         { $_ -in 'saveItem', 'deleteItem' } { Need-Perm $session 'item_manage' }
-        default { Need $false 'هاي العملية تحتاج صلاحية مدير' }
+        default { Need $false 'هذه العملية تتطلّب صلاحية المدير' }
     }
 }
 
@@ -1132,12 +1137,12 @@ function Test-SaleLines($db, $data, $session) {
         if ($null -eq $list -or $list -is [DBNull]) { $list = 0 }
         $price = Num $l.price 'السعر'
         $ok = @(@([double]$list) + @($old[$k]) | Where-Object { $null -ne $_ -and [math]::Abs($price - $_) -le 0.001 }).Count -gt 0
-        Need $ok "ما عندك صلاحية: تغيير السعر ($($l.item)). اطلبها من المدير."
+        Need $ok "ليست لديك صلاحية: تغيير السعر ($($l.item)). اطلبها من المدير."
     }
 }
 
 function Invoke-Write([string]$op, $data, $session = $null) {
-    Need ($Ops.ContainsKey($op)) "عملية مو معروفة: $op"
+    Need ($Ops.ContainsKey($op)) "عملية غير معروفة: $op"
     Backup-Database
     $fn = $Ops[$op]
     $script:ItemCache = @{}
@@ -1264,7 +1269,13 @@ function Get-WebText([string]$url, [int]$ms = 8000) {
 function Get-UpdateInfo {
     $url = Get-UpdateUrl
     try { $j = (Get-WebText ($url + $(if ($url -match '^https?://') { '?t=' + [DateTime]::UtcNow.Ticks } else { '' }))) | ConvertFrom-Json }
-    catch { throw "تعذّر الاتصال بخادم التحديثات. تحقق من الإنترنت. ($($_.Exception.Message))" }
+    catch {
+        # nothing published yet: the feed URL answers 404
+        $e = $_.Exception
+        while ($e -and -not ($e -is [Net.WebException])) { $e = $e.InnerException }
+        if ($e -and $e.Response -and [int]$e.Response.StatusCode -eq 404) { throw 'لا توجد تحديثات منشورة بعد.' }
+        throw "تعذّر الاتصال بخادم التحديثات. تحقّق من اتصال الإنترنت. ($($_.Exception.Message))"
+    }
     Need ([string]$j.product -eq 'Fr3oon') 'ملف التحديثات غير صالح.'
     Need (Test-VendorSignature 'FR3OON-UPDATE' "$($j.version)`n$($j.url)`n$($j.sha256)" ([string]$j.sig)) 'ملف التحديثات غير موقّع من الناشر، لن يُستخدم.'
     $newer = ([version][string]$j.version) -gt ([version]$Version)
@@ -1330,7 +1341,7 @@ function Get-Session($req) {
 $script:FT = $null
 
 function Use-TestCopy([scriptblock]$body) {
-    Need ($script:FT -and (Test-Path -LiteralPath $script:FT.path)) 'ابدأ الفحص الشامل من جديد'
+    Need ($script:FT -and (Test-Path -LiteralPath $script:FT.path)) 'ابدأ الفحص الشامل من جديد.'
     $script:DbOverride = $script:FT.path
     try { return (& $body) } finally { $script:DbOverride = $null }
 }
@@ -1338,7 +1349,7 @@ function Use-TestCopy([scriptblock]$body) {
 function Start-FullTest {
     Stop-FullTest
     $src = Get-DbPath
-    Need ($src -ne '') 'ما محدد ملف البيانات'
+    Need ($src -ne '') 'لم تُحدَّد قاعدة البيانات'
     $dir = Join-Path ([IO.Path]::GetTempPath()) 'lawha-fulltest'
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     # copies left by a test that was cut off (closed window, power cut)
@@ -1397,81 +1408,81 @@ function Invoke-FullTestRun {
         $script:FT.user = 'فحص شامل'
         $today = Get-Date -Format 'yyyy-MM-dd'
         $mgr = @{ user = $script:FT.user; admin = $true; perms = [string[]]$AllPerms }
-        $cust = "$t زبون"; $cust2 = "$t زبون2"; $sup = "$t مورد"; $item = "$t مادة"
+        $cust = "$t عميل"; $cust2 = "$t عميل2"; $sup = "$t مورد"; $item = "$t صنف"
         $script:FT.names = @{ customer = $cust2; supplier = $sup; item = $item }
 
         & $step 'إضافة مورد' {
             $ids.sup = (Write-As $mgr 'saveSupplier' @{ name = $sup; mobile = '07800000000'; opening = 0 }).id
-            Need ((Read-One "SELECT shiraCode FROM shiraCode WHERE ID=$($ids.sup)") -eq $sup) 'المورد ما انحفظ'
+            Need ((Read-One "SELECT shiraCode FROM shiraCode WHERE ID=$($ids.sup)") -eq $sup) 'لم يُحفظ المورد'
             "رقم $($ids.sup)"
         }
-        & $step 'إضافة زبون' {
+        & $step 'إضافة عميل' {
             $ids.cust = (Write-As $mgr 'saveCustomer' @{ name = $cust; mobile = '07700000000'; opening = 1000; type = 'جملة' }).id
-            Need ((Read-One "SELECT bayeeCode FROM bayeeCode WHERE id=$($ids.cust)") -eq $cust) 'الزبون ما انحفظ'
+            Need ((Read-One "SELECT bayeeCode FROM bayeeCode WHERE id=$($ids.cust)") -eq $cust) 'لم يُحفظ العميل'
             "رقم $($ids.cust)"
         }
-        & $step 'تعديل الزبون (موبايل ورصيد افتتاحي)' {
+        & $step 'تعديل العميل (الموبايل والرصيد الافتتاحي)' {
             Write-As $mgr 'saveCustomer' @{ id = $ids.cust; name = $cust; mobile = '07711111111'; opening = 2000; type = 'جملة' } | Out-Null
-            Need ([string](Read-One "SELECT CMobile FROM bayeeCode WHERE id=$($ids.cust)") -eq '07711111111') 'الموبايل ما تغيّر'
-            Need ([double](Read-One "SELECT MB FROM bayeeCode WHERE id=$($ids.cust)") -eq 2000) 'الرصيد الافتتاحي ما تغيّر'
-            'تمام'
+            Need ([string](Read-One "SELECT CMobile FROM bayeeCode WHERE id=$($ids.cust)") -eq '07711111111') 'لم يتغيّر رقم الموبايل'
+            Need ([double](Read-One "SELECT MB FROM bayeeCode WHERE id=$($ids.cust)") -eq 2000) 'لم يتغيّر الرصيد الافتتاحي'
+            'تمّ بنجاح'
         }
-        & $step 'إضافة مادة (كارتون = 10 قطع)' {
-            $ids.item = (Write-As $mgr 'saveItem' @{ name = $item; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10
+        & $step 'إضافة صنف (الكرتونة = 10 قطع)' {
+            $ids.item = (Write-As $mgr 'saveItem' @{ name = $item; code = ''; cls = 'فحص'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 10
                     priceL1 = 10000; priceL2 = 1100; buyL1 = 8000; buyL2 = 800 }).id
-            Need ([double](Read-One "SELECT priceSeeat FROM madaCode WHERE ID=$($ids.item)") -eq 1100) 'سعر القطعة ما انحفظ'
+            Need ([double](Read-One "SELECT priceSeeat FROM madaCode WHERE ID=$($ids.item)") -eq 1100) 'لم يُحفظ سعر القطعة'
             "رقم $($ids.item)"
         }
-        & $step 'تعديل سعر المادة' {
-            Write-As $mgr 'saveItem' @{ id = $ids.item; name = $item; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10
+        & $step 'تعديل سعر الصنف' {
+            Write-As $mgr 'saveItem' @{ id = $ids.item; name = $item; code = ''; cls = 'فحص'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 10
                 priceL1 = 12000; priceL2 = 1100; buyL1 = 8000; buyL2 = 800 } | Out-Null
-            Need ([double](Read-One "SELECT price FROM madaCode WHERE ID=$($ids.item)") -eq 12000) 'السعر ما تغيّر'
-            '12,000 للكارتون'
+            Need ([double](Read-One "SELECT price FROM madaCode WHERE ID=$($ids.item)") -eq 12000) 'لم يتغيّر السعر'
+            '12,000 للكرتونة'
         }
-        & $step 'قائمة شراء آجل (5 كارتون × 8,000)' {
+        & $step 'فاتورة شراء آجلة (5 كرتونات × 8,000)' {
             $ids.pur = (Write-As $mgr 'savePurchase' @{ type = 'اجل'; supplier = $sup; date = $today; updatePrices = $true
-                    lines = @(@{ item = $item; unit = 'كارتون'; qty = 5; price = 8000 }) }).id
-            Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 1) 'سطر الشراء ما انحفظ'
-            Need ([string](Read-One "SELECT fromname FROM MasterIn WHERE IdIn=$($ids.pur)") -eq $sup) 'اسم المورد ما انحفظ'
+                    lines = @(@{ item = $item; unit = 'كرتونة'; qty = 5; price = 8000 }) }).id
+            Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 1) 'لم يُحفظ سطر الشراء'
+            Need ([string](Read-One "SELECT fromname FROM MasterIn WHERE IdIn=$($ids.pur)") -eq $sup) 'لم يُحفظ اسم المورد'
             "رقم $($ids.pur)"
         }
-        & $step 'تعديل قائمة الشراء (6 كارتون × 8,500) وتحديث سعر الشراء' {
+        & $step 'تعديل فاتورة الشراء (6 كرتونات × 8,500) وتحديث سعر الشراء' {
             Write-As $mgr 'savePurchase' @{ id = $ids.pur; type = 'اجل'; supplier = $sup; date = $today; updatePrices = $true
-                lines = @(@{ item = $item; unit = 'كارتون'; qty = 6; price = 8500 }) } | Out-Null
-            Need ([double](Read-One "SELECT QuntIn FROM subIN WHERE IdIn=$($ids.pur)") -eq 6) 'الكمية ما تغيّرت'
-            Need ([double](Read-One "SELECT BpriceL1 FROM madaCode WHERE ID=$($ids.item)") -eq 8500) 'سعر الشراء بالمادة ما تحدّث'
-            Need ([double](Read-One "SELECT BpriceL2 FROM madaCode WHERE ID=$($ids.item)") -eq 850) 'سعر شراء القطعة ما تحدّث'
-            'تمام'
+                lines = @(@{ item = $item; unit = 'كرتونة'; qty = 6; price = 8500 }) } | Out-Null
+            Need ([double](Read-One "SELECT QuntIn FROM subIN WHERE IdIn=$($ids.pur)") -eq 6) 'لم تتغيّر الكمية'
+            Need ([double](Read-One "SELECT BpriceL1 FROM madaCode WHERE ID=$($ids.item)") -eq 8500) 'لم يُحدَّث سعر الشراء في بطاقة الصنف'
+            Need ([double](Read-One "SELECT BpriceL2 FROM madaCode WHERE ID=$($ids.item)") -eq 850) 'لم يُحدَّث سعر شراء القطعة'
+            'تمّ بنجاح'
         }
         & $step 'بيع نقدي (3 قطع × 1,100)' {
             $ids.cash = (Write-As $mgr 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 3; price = 1100 }) }).id
-            Need ([string](Read-One "SELECT OutType FROM MasterOut WHERE idOut=$($ids.cash)") -eq 'نقدي') 'نوع القائمة ما انحفظ'
+            Need ([string](Read-One "SELECT OutType FROM MasterOut WHERE idOut=$($ids.cash)") -eq 'نقدي') 'لم يُحفظ نوع الفاتورة'
             "رقم $($ids.cash)"
         }
-        & $step 'بيع آجل (2 كارتون × 12,000، دفع 4,000)' {
+        & $step 'بيع آجل (كرتونتان × 12,000، المدفوع 4,000)' {
             $ids.credit = (Write-As $mgr 'saveSale' @{ type = 'اجل'; customer = $cust; paid = 4000; date = $today
-                    lines = @(@{ item = $item; unit = 'كارتون'; qty = 2; price = 12000 }) }).id
-            Need ([string](Read-One "SELECT TOname FROM MasterOut WHERE idOut=$($ids.credit)") -eq $cust) 'اسم الزبون ما انحفظ'
-            Need ([double](Read-One "SELECT Paid FROM MasterOut WHERE idOut=$($ids.credit)") -eq 4000) 'المدفوع ما انحفظ'
+                    lines = @(@{ item = $item; unit = 'كرتونة'; qty = 2; price = 12000 }) }).id
+            Need ([string](Read-One "SELECT TOname FROM MasterOut WHERE idOut=$($ids.credit)") -eq $cust) 'لم يُحفظ اسم العميل'
+            Need ([double](Read-One "SELECT Paid FROM MasterOut WHERE idOut=$($ids.credit)") -eq 4000) 'لم يُحفظ المبلغ المدفوع'
             "رقم $($ids.credit)"
         }
-        & $step 'تعديل البيع الآجل (كارتون + 5 قطع)' {
+        & $step 'تعديل البيع الآجل (كرتونة + 5 قطع)' {
             Write-As $mgr 'saveSale' @{ id = $ids.credit; type = 'اجل'; customer = $cust; paid = 4000; date = $today
-                lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 12000 }, @{ item = $item; unit = 'قطعة'; qty = 5; price = 1100 }) } | Out-Null
-            Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids.credit)") -eq 2) 'أسطر التعديل ما انحفظت'
-            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE idOut=$($ids.credit)") -eq 1) 'القائمة تكررت'
+                lines = @(@{ item = $item; unit = 'كرتونة'; qty = 1; price = 12000 }, @{ item = $item; unit = 'قطعة'; qty = 5; price = 1100 }) } | Out-Null
+            Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids.credit)") -eq 2) 'لم تُحفظ أسطر التعديل'
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE idOut=$($ids.credit)") -eq 1) 'تكرّرت الفاتورة'
             'المبلغ 17,500'
         }
-        & $step 'وصل قبض من الزبون (3,000)' {
+        & $step 'سند قبض من العميل (3,000)' {
             $ids.rec = (Write-As $mgr 'saveReceipt' @{ cls = 'تسديد'; name = $cust; amount = 3000; date = $today }).id
             "رقم $($ids.rec)"
         }
-        & $step 'تعديل وصل القبض (3,500)' {
+        & $step 'تعديل سند القبض (3,500)' {
             Write-As $mgr 'saveReceipt' @{ id = $ids.rec; cls = 'تسديد'; name = $cust; amount = 3500; date = $today } | Out-Null
-            Need ([double](Read-One "SELECT mablak FROM mablakIn WHERE idS=$($ids.rec)") -eq 3500) 'المبلغ ما تغيّر'
-            'تمام'
+            Need ([double](Read-One "SELECT mablak FROM mablakIn WHERE idS=$($ids.rec)") -eq 3500) 'لم يتغيّر المبلغ'
+            'تمّ بنجاح'
         }
-        & $step 'وصل دفع للمورد (20,000)' {
+        & $step 'سند صرف للمورد (20,000)' {
             $ids.pay = (Write-As $mgr 'savePayment' @{ cls = 'تسديد'; name = $sup; amount = 20000; date = $today }).id
             "رقم $($ids.pay)"
         }
@@ -1479,12 +1490,12 @@ function Invoke-FullTestRun {
             $ids.exp = (Write-As $mgr 'savePayment' @{ cls = 'مصاريف متفرقة'; name = ''; amount = 1500; note = $t; date = $today }).id
             "رقم $($ids.exp)"
         }
-        & $step 'تغيير اسم الزبون ينتقل لقوائمه ووصولاته' {
+        & $step 'تغيير اسم العميل ينتقل إلى فواتيره وسنداته' {
             Write-As $mgr 'saveCustomer' @{ id = $ids.cust; name = $cust2; mobile = '07711111111'; opening = 2000; type = 'جملة' } | Out-Null
-            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust2)") -eq 1) 'القائمة بقت بالاسم القديم'
-            Need ((Read-Count "SELECT Count(*) FROM mablakIn WHERE nameFrom=$(Q $cust2)") -eq 1) 'الوصل بقى بالاسم القديم'
-            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust)") -eq 0) 'بقى شي بالاسم القديم'
-            'تمام'
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust2)") -eq 1) 'ما زالت الفاتورة بالاسم القديم'
+            Need ((Read-Count "SELECT Count(*) FROM mablakIn WHERE nameFrom=$(Q $cust2)") -eq 1) 'ما زال السند بالاسم القديم'
+            Need ((Read-Count "SELECT Count(*) FROM MasterOut WHERE TOname=$(Q $cust)") -eq 0) 'ما زال هناك سجل بالاسم القديم'
+            'تمّ بنجاح'
         }
 
         # a cashier with the default permissions (cash sale and print)
@@ -1492,24 +1503,24 @@ function Invoke-FullTestRun {
         $refused = {
             param([string]$op, [hashtable]$d, [string]$expect)
             try { Write-As $cashier $op $d | Out-Null } catch {
-                Need ($_.Exception.Message -match $expect) "انرفض بس بسبب ثاني: $($_.Exception.Message)"
-                return 'انرفض ✔'
+                Need ($_.Exception.Message -match $expect) "رُفضت العملية لكن لسبب آخر: $($_.Exception.Message)"
+                return 'رُفضت ✔'
             }
-            throw 'انحفظ وهو ما لازم ينحفظ!'
+            throw 'حُفظت العملية مع أنه كان يجب رفضها!'
         }
-        & $step 'صلاحيات: الكاشير يبيع نقدي بالسعر' {
+        & $step 'الصلاحيات: الكاشير يبيع نقداً بالسعر المحدد' {
             $ids.cashier = (Write-As $cashier 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 1100 }) }).id
             "رقم $($ids.cashier)"
         }
-        & $step 'صلاحيات: الكاشير ما يبيع آجل' { & $refused 'saveSale' @{ type = 'اجل'; customer = $cust2; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 1100 }) } 'صلاحية' }
-        & $step 'صلاحيات: الكاشير ما يبيع جملة (كارتون)' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 12000 }) } 'الجملة' }
-        & $step 'صلاحيات: الكاشير ما يغيّر السعر' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 500 }) } 'السعر' }
-        & $step 'صلاحيات: الكاشير ما يمسح قائمة' { & $refused 'deleteSale' @{ id = $ids.cash } 'صلاحية' }
-        & $step 'صلاحيات: الكاشير ما يشتري' { & $refused 'savePurchase' @{ type = 'اجل'; supplier = $sup; date = $today; lines = @(@{ item = $item; unit = 'كارتون'; qty = 1; price = 8500 }) } 'صلاحية' }
-        & $step 'صلاحيات: الكاشير ما يغيّر المواد' { & $refused 'saveItem' @{ id = $ids.item; name = $item; unitL1 = 'كارتون' } 'صلاحية' }
-        & $step 'ما يصير تمسح مادة عليها حركة' {
-            try { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null } catch { return 'انرفض ✔' }
-            throw 'انمسحت المادة وعليها قوائم!'
+        & $step 'الصلاحيات: الكاشير لا يبيع بالآجل' { & $refused 'saveSale' @{ type = 'اجل'; customer = $cust2; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 1100 }) } 'صلاحية' }
+        & $step 'الصلاحيات: الكاشير لا يبيع بالجملة (كرتونة)' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'كرتونة'; qty = 1; price = 12000 }) } 'الجملة' }
+        & $step 'الصلاحيات: الكاشير لا يغيّر السعر' { & $refused 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = $item; unit = 'قطعة'; qty = 1; price = 500 }) } 'السعر' }
+        & $step 'الصلاحيات: الكاشير لا يحذف فاتورة' { & $refused 'deleteSale' @{ id = $ids.cash } 'صلاحية' }
+        & $step 'الصلاحيات: الكاشير لا يشتري' { & $refused 'savePurchase' @{ type = 'اجل'; supplier = $sup; date = $today; lines = @(@{ item = $item; unit = 'كرتونة'; qty = 1; price = 8500 }) } 'صلاحية' }
+        & $step 'الصلاحيات: الكاشير لا يعدّل الأصناف' { & $refused 'saveItem' @{ id = $ids.item; name = $item; unitL1 = 'كرتونة' } 'صلاحية' }
+        & $step 'لا يمكن حذف صنف عليه حركات' {
+            try { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null } catch { return 'رُفضت ✔' }
+            throw 'حُذف الصنف مع أن عليه فواتير!'
         }
     }
     # what the app should see when it reads the copy back
@@ -1529,22 +1540,22 @@ function Invoke-FullTestClean {
         $ids = $script:FT.ids
         $mgr = @{ user = $script:FT.user; admin = $true; perms = [string[]]$AllPerms }
         foreach ($k in 'cash', 'credit', 'cashier') {
-            if ($ids[$k]) { & $step "مسح قائمة البيع رقم $($ids[$k])" { Write-As $mgr 'deleteSale' @{ id = $ids[$k] } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids[$k])") -eq 0) 'بقت أسطر'; 'تمام' } }
+            if ($ids[$k]) { & $step "حذف فاتورة البيع رقم $($ids[$k])" { Write-As $mgr 'deleteSale' @{ id = $ids[$k] } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subOut WHERE idOut=$($ids[$k])") -eq 0) 'ما زالت هناك أسطر'; 'تمّ بنجاح' } }
         }
-        if ($ids.pur) { & $step 'مسح قائمة الشراء' { Write-As $mgr 'deletePurchase' @{ id = $ids.pur } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 0) 'بقت أسطر'; 'تمام' } }
-        if ($ids.rec) { & $step 'مسح وصل القبض' { Write-As $mgr 'deleteReceipt' @{ id = $ids.rec } | Out-Null; 'تمام' } }
-        foreach ($k in 'pay', 'exp') { if ($ids[$k]) { & $step "مسح وصل الدفع رقم $($ids[$k])" { Write-As $mgr 'deletePayment' @{ id = $ids[$k] } | Out-Null; 'تمام' } } }
-        if ($ids.item) { & $step 'مسح المادة' { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null; 'تمام' } }
-        if ($ids.cust) { & $step 'مسح الزبون' { Write-As $mgr 'deleteCustomer' @{ id = $ids.cust } | Out-Null; 'تمام' } }
-        if ($ids.sup) { & $step 'مسح المورد' { Write-As $mgr 'deleteSupplier' @{ id = $ids.sup } | Out-Null; 'تمام' } }
-        & $step 'ما بقى أي شي من الفحص' {
+        if ($ids.pur) { & $step 'حذف فاتورة الشراء' { Write-As $mgr 'deletePurchase' @{ id = $ids.pur } | Out-Null; Need ((Read-Count "SELECT Count(*) FROM subIN WHERE IdIn=$($ids.pur)") -eq 0) 'ما زالت هناك أسطر'; 'تمّ بنجاح' } }
+        if ($ids.rec) { & $step 'حذف سند القبض' { Write-As $mgr 'deleteReceipt' @{ id = $ids.rec } | Out-Null; 'تمّ بنجاح' } }
+        foreach ($k in 'pay', 'exp') { if ($ids[$k]) { & $step "حذف سند الصرف رقم $($ids[$k])" { Write-As $mgr 'deletePayment' @{ id = $ids[$k] } | Out-Null; 'تمّ بنجاح' } } }
+        if ($ids.item) { & $step 'حذف الصنف' { Write-As $mgr 'deleteItem' @{ id = $ids.item } | Out-Null; 'تمّ بنجاح' } }
+        if ($ids.cust) { & $step 'حذف العميل' { Write-As $mgr 'deleteCustomer' @{ id = $ids.cust } | Out-Null; 'تمّ بنجاح' } }
+        if ($ids.sup) { & $step 'حذف المورد' { Write-As $mgr 'deleteSupplier' @{ id = $ids.sup } | Out-Null; 'تمّ بنجاح' } }
+        & $step 'لم يبقَ أي أثر للفحص' {
             $n = $script:FT.names
-            $left = (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $n.customer)") + (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q ($script:FT.tag + ' زبون'))") +
+            $left = (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $n.customer)") + (Read-Count "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q ($script:FT.tag + ' عميل'))") +
                 (Read-Count "SELECT Count(*) FROM shiraCode WHERE shiraCode=$(Q $n.supplier)") +
                 (Read-Count "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $n.item)") + (Read-Count "SELECT Count(*) FROM MasterOut WHERE strUserName=$(Q $script:FT.user)") +
                 (Read-Count "SELECT Count(*) FROM mablakIn WHERE strUserName=$(Q $script:FT.user)") + (Read-Count "SELECT Count(*) FROM mablakOut WHERE strUserName=$(Q $script:FT.user)")
-            Need ($left -eq 0) "بقى $left سجل"
-            'تمام'
+            Need ($left -eq 0) "ما زال هناك $left سجل"
+            'تمّ بنجاح'
         }
     }
     return @{ steps = $S.list.ToArray() }
@@ -1622,7 +1633,7 @@ public static class LawhaJson {
 function Export-Data {
     if (-not ('LawhaJson' -as [type])) { Add-Type -TypeDefinition $JsonCode }
     $p = Get-DbPath
-    Need ($p -ne '') 'ما محدد ملف البيانات'
+    Need ($p -ne '') 'لم تُحدَّد قاعدة البيانات'
     $fi = Get-Item -LiteralPath $p
     $key = "$($fi.Length)|$($fi.LastWriteTimeUtc.Ticks)"
     # at most 20 seconds old: حساباتي may have saved without the file's time changing yet
@@ -1689,14 +1700,15 @@ function Enable-RemoteAccess {
     $cmd = "netsh http delete urlacl url=http://+:$Port/ | Out-Null; " +
         "netsh http add urlacl url=http://+:$Port/ sddl=D:(A;;GX;;;$sid); " +
         "netsh advfirewall firewall delete rule name='Lawhat Al-Mahal' | Out-Null; " +
-        "netsh advfirewall firewall add rule name='Lawhat Al-Mahal' dir=in action=allow protocol=TCP localport=$Port"
+        "netsh advfirewall firewall delete rule name='Fr3oon' | Out-Null; " +
+        "netsh advfirewall firewall add rule name='Fr3oon' dir=in action=allow protocol=TCP localport=$Port"
     try {
         $p = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -Verb RunAs -WindowStyle Hidden -Wait -PassThru `
             -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $cmd)
     } catch {
-        throw 'ويندوز ما وافق. لازم توافق على رسالة "هل تسمح لهذا التطبيق…" (تحتاج حساب مدير ويندوز).'
+        throw 'لم يوافق Windows. يجب الموافقة على رسالة "هل تسمح لهذا التطبيق…" (يتطلّب ذلك حساب مدير في Windows).'
     }
-    Need ($p.ExitCode -eq 0) "ما انفتح الاتصال (رمز $($p.ExitCode))"
+    Need ($p.ExitCode -eq 0) "تعذّر فتح الاتصال (الرمز $($p.ExitCode))"
 }
 
 # The addresses other devices can use to reach this computer.
@@ -1718,7 +1730,7 @@ function Get-MyAddresses {
 # remember it, so this device opens it from now on.
 function Connect-Remote([string]$target) {
     $t = $target.Trim() -replace '^https?://', '' -replace '/.*$', '' -replace '^\\\\', ''
-    Need ($t -ne '') 'اكتب اسم الحاسبة الرئيسية أو رقم الـ IP مالها'
+    Need ($t -ne '') 'اكتب اسم الجهاز الرئيسي أو عنوان IP الخاص به'
     if ($t -notmatch ':\d+$') { $t = "${t}:$Port" }
     $url = "http://$t/"
     try {
@@ -1727,7 +1739,7 @@ function Connect-Remote([string]$target) {
         $wc.Encoding = [Text.Encoding]::UTF8
         $j = $wc.DownloadString($url + 'api/ping') | ConvertFrom-Json
     } catch {
-        throw "ما ردّت الحاسبة $t. تأكد إنها شغّالة وبيها البرنامج مفتوح، وإن المدير فعّل (السماح للأجهزة الثانية بالاتصال) بإعداداتها، وإن الـ VPN أو الشبكة توصل بينكم."
+        throw "لم يستجب الجهاز $t. تأكّد من أنه يعمل وأن البرنامج مفتوح عليه، وأن المدير فعّل «السماح للأجهزة الأخرى بالاتصال» في إعداداته، وأن الشبكة أو الـ VPN تصل بين الجهازين."
     }
     Need ($j.ok -and [string]$j.product -eq 'Fr3oon') "الجهاز $t ردّ، لكنه لا يشغّل Fr3oon."
     Need $j.licensed "Fr3oon غير مفعّل على الجهاز $t."
@@ -1756,26 +1768,27 @@ function Invoke-SelfTest {
     }
     $today = Get-Date -Format 'yyyy-MM-dd'
 
-    if (-not (Step 'ملف البيانات محدد وموجود' { $p = Get-DbPath; Need ($p -ne '') 'ما محدد ملف البيانات'; $p })) { return , $steps.ToArray() }
+    if (-not (Step 'قاعدة البيانات محددة وموجودة' { $p = Get-DbPath; Need ($p -ne '') 'لم تُحدَّد قاعدة البيانات'; $p })) { return , $steps.ToArray() }
     if (-not (Step 'محرك Access' { [void](Get-Engine); $script:EngineName })) { return , $steps.ToArray() }
-    Step 'فولدر النسخ الاحتياطي' {
-        $dir = Join-Path (Split-Path (Get-DbPath) -Parent) 'backups-lawha'
-        New-Item -ItemType Directory -Force -Path $dir | Out-Null
-        $probe = Join-Path $dir 'lawha-write-test.tmp'
+    Step 'مجلد النسخ الاحتياطي' {
+        $dir = Get-BackupDir
+        Need ([string]$dir -ne '') 'لم يُحدَّد مجلد النسخ الاحتياطي'
+        try { New-Item -ItemType Directory -Force -Path $dir | Out-Null } catch { throw "تعذّر إنشاء مجلد النسخ الاحتياطي: $dir" }
+        $probe = Join-Path $dir 'fr3oon-write-test.tmp'
         Set-Content -LiteralPath $probe 'ok'
         Remove-Item -LiteralPath $probe -Force
         $dir
     } | Out-Null
 
-    $tag = 'فحص-لوحة-' + (Get-Random -Maximum 99999)
+    $tag = 'فحص-النظام-' + (Get-Random -Maximum 99999)
     $u = 'فحص النظام'
     $script:st = @{}
     try {
         Use-Database -Rollback { param($db)
-            Step 'إضافة مادة ومورد للفحص' {
-                Op-SaveItem $db @{ name = "$tag مادة"; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10; priceL1 = 10000; priceL2 = 1000; buyL1 = 9000; buyL2 = 900 } | Out-Null
+            Step 'إضافة صنف ومورد للفحص' {
+                Op-SaveItem $db @{ name = "$tag صنف"; code = ''; cls = 'فحص'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 10; priceL1 = 10000; priceL2 = 1000; buyL1 = 9000; buyL2 = 900 } | Out-Null
                 Op-SaveSupplier $db @{ name = "$tag مورد"; opening = 0 } | Out-Null
-                $script:st.item = "$tag مادة"
+                $script:st.item = "$tag صنف"
                 $script:st.supplier = "$tag مورد"
                 "$($script:st.item) / $($script:st.supplier)"
             } | Out-Null
@@ -1784,76 +1797,76 @@ function Invoke-SelfTest {
             $big = [string]$it.UnitL1
             $item = $script:st.item
 
-            Step 'إضافة زبون' {
+            Step 'إضافة عميل' {
                 $script:st.cust = (Op-SaveCustomer $db @{ name = $tag; mobile = '07700000000'; opening = 1000; type = 'جملة'; user = $u }).id
-                Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)") -eq 1) 'الزبون ما انضاف'
-                Need ([string](Get-Value $db "SELECT CMobile FROM bayeeCode WHERE id=$($script:st.cust)") -eq '07700000000') 'الموبايل ما انحفظ'
-                Need ([int](Get-Value $db "SELECT MB FROM bayeeCode WHERE id=$($script:st.cust)") -eq 1000) 'الرصيد الافتتاحي ما انحفظ'
+                Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)") -eq 1) 'لم يُضف العميل'
+                Need ([string](Get-Value $db "SELECT CMobile FROM bayeeCode WHERE id=$($script:st.cust)") -eq '07700000000') 'لم يُحفظ رقم الموبايل'
+                Need ([int](Get-Value $db "SELECT MB FROM bayeeCode WHERE id=$($script:st.cust)") -eq 1000) 'لم يُحفظ الرصيد الافتتاحي'
                 "رقم $($script:st.cust)"
             } | Out-Null
-            Step 'قائمة بيع آجل' {
+            Step 'فاتورة بيع آجلة' {
                 $script:st.sale = (Op-SaveSale $db @{ type = 'اجل'; customer = $tag; date = $today; paid = 500; user = $u
                         lines = @(@{ item = $item; unit = $small; qty = 2; price = 1500 }) }).id
-                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 1) 'سطر القائمة ما انضاف'
-                Need ([string](Get-Value $db "SELECT TOname FROM MasterOut WHERE idOut=$($script:st.sale)") -eq $tag) 'اسم الزبون ما انحفظ بالقائمة'
-                Need ([string](Get-Value $db "SELECT OutType FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 'اجل') 'نوع القائمة ما انحفظ'
-                Need ($null -ne (Get-Value $db "SELECT OutDate FROM MasterOut WHERE idOut=$($script:st.sale)")) 'تاريخ القائمة ما انحفظ'
-                Need ([int](Get-Value $db "SELECT Paid FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 500) 'المدفوع ما انحفظ'
-                Need ([double](Get-Value $db "SELECT QuntOut FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'الكمية ما انحفظت'
-                Need ([double](Get-Value $db "SELECT Price FROM subOut WHERE idOut=$($script:st.sale)") -eq 1500) 'السعر ما انحفظ'
+                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 1) 'لم يُضف سطر الفاتورة'
+                Need ([string](Get-Value $db "SELECT TOname FROM MasterOut WHERE idOut=$($script:st.sale)") -eq $tag) 'لم يُحفظ اسم العميل في الفاتورة'
+                Need ([string](Get-Value $db "SELECT OutType FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 'اجل') 'لم يُحفظ نوع الفاتورة'
+                Need ($null -ne (Get-Value $db "SELECT OutDate FROM MasterOut WHERE idOut=$($script:st.sale)")) 'لم يُحفظ تاريخ الفاتورة'
+                Need ([int](Get-Value $db "SELECT Paid FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 500) 'لم يُحفظ المبلغ المدفوع'
+                Need ([double](Get-Value $db "SELECT QuntOut FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'لم تُحفظ الكمية'
+                Need ([double](Get-Value $db "SELECT Price FROM subOut WHERE idOut=$($script:st.sale)") -eq 1500) 'لم يُحفظ السعر'
                 "رقم $($script:st.sale)"
             } | Out-Null
-            Step 'تعديل قائمة البيع' {
+            Step 'تعديل فاتورة البيع' {
                 Op-SaveSale $db @{ id = $script:st.sale; type = 'اجل'; customer = $tag; date = $today; paid = 0; user = $u
                     lines = @(@{ item = $item; unit = $small; qty = 3; price = 1500 }, @{ item = $item; unit = $big; qty = 1; price = 1000 }) } | Out-Null
-                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'التعديل ما انحفظ'
-                'تمام'
+                Need ((Count $db "SELECT Count(*) FROM subOut WHERE idOut=$($script:st.sale)") -eq 2) 'لم يُحفظ التعديل'
+                'تمّ بنجاح'
             } | Out-Null
-            Step 'قائمة بيع نقدي' {
+            Step 'فاتورة بيع نقدية' {
                 $script:st.cash = (Op-SaveSale $db @{ type = 'نقدي'; date = $today; user = $u; lines = @(@{ item = $item; unit = $small; qty = 1; price = 1000 }) }).id
                 "رقم $($script:st.cash)"
             } | Out-Null
-            Step 'وصل قبض' {
+            Step 'سند قبض' {
                 $script:st.rec = (Op-SaveReceipt $db @{ cls = 'تسديد'; name = $tag; amount = 2500; date = $today; user = $u }).id
                 "رقم $($script:st.rec)"
             } | Out-Null
-            Step 'وصل دفع (مصروف)' {
+            Step 'سند صرف (مصروف)' {
                 $script:st.pay = (Op-SavePayment $db @{ cls = 'مصاريف متفرقة'; name = ''; amount = 100; note = $tag; date = $today; user = $u }).id
-                Need ([double](Get-Value $db "SELECT mablak FROM mablakOut WHERE idS=$($script:st.pay)") -eq 100) 'المبلغ ما انحفظ'
-                Need ([string](Get-Value $db "SELECT classS FROM mablakOut WHERE idS=$($script:st.pay)") -eq 'مصاريف متفرقة') 'نوع المصروف ما انحفظ'
+                Need ([double](Get-Value $db "SELECT mablak FROM mablakOut WHERE idS=$($script:st.pay)") -eq 100) 'لم يُحفظ المبلغ'
+                Need ([string](Get-Value $db "SELECT classS FROM mablakOut WHERE idS=$($script:st.pay)") -eq 'مصاريف متفرقة') 'لم يُحفظ نوع المصروف'
                 "رقم $($script:st.pay)"
             } | Out-Null
             if ($script:st.supplier) {
-                Step 'قائمة شراء وتحديث سعر الشراء' {
+                Step 'فاتورة شراء وتحديث سعر الشراء' {
                     $script:st.pur = (Op-SavePurchase $db @{ type = 'اجل'; supplier = $script:st.supplier; date = $today; user = $u; updatePrices = $true
                             lines = @(@{ item = $item; unit = $big; qty = 1; price = 1 }) }).id
                     "رقم $($script:st.pur)"
                 } | Out-Null
             }
-            Step 'إضافة وتعديل ومسح مادة' {
-                $iid = (Op-SaveItem $db @{ name = $tag; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10; priceL1 = 10000; priceL2 = 1000; buyL1 = 9000; buyL2 = 900 }).id
-                Op-SaveItem $db @{ id = $iid; name = "$tag-2"; code = ''; cls = 'فحص'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 10; priceL1 = 11000; priceL2 = 1100; buyL1 = 9000; buyL2 = 900 } | Out-Null
+            Step 'إضافة صنف وتعديله وحذفه' {
+                $iid = (Op-SaveItem $db @{ name = $tag; code = ''; cls = 'فحص'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 10; priceL1 = 10000; priceL2 = 1000; buyL1 = 9000; buyL2 = 900 }).id
+                Op-SaveItem $db @{ id = $iid; name = "$tag-2"; code = ''; cls = 'فحص'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 10; priceL1 = 11000; priceL2 = 1100; buyL1 = 9000; buyL2 = 900 } | Out-Null
                 Op-DeleteItem $db @{ id = $iid } | Out-Null
-                'تمام'
+                'تمّ بنجاح'
             } | Out-Null
-            Step 'مسح القوائم والوصولات' {
+            Step 'حذف الفواتير والسندات' {
                 Op-DeleteSale $db @{ id = $script:st.sale } | Out-Null
                 Op-DeleteSale $db @{ id = $script:st.cash } | Out-Null
                 Op-DeleteReceipt $db @{ id = $script:st.rec } | Out-Null
                 Op-DeletePayment $db @{ id = $script:st.pay } | Out-Null
                 if ($script:st.pur) { Op-DeletePurchase $db @{ id = $script:st.pur } | Out-Null }
                 Op-DeleteCustomer $db @{ id = $script:st.cust } | Out-Null
-                Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 0) 'القائمة ما انمسحت'
-                'تمام'
+                Need ((Count $db "SELECT Count(*) FROM MasterOut WHERE idOut=$($script:st.sale)") -eq 0) 'لم تُحذف الفاتورة'
+                'تمّ بنجاح'
             } | Out-Null
         }
     } catch {
-        $steps.Add(@{ name = 'فتح الملف للكتابة'; ok = $false; msg = $_.Exception.Message })
+        $steps.Add(@{ name = 'فتح قاعدة البيانات للكتابة'; ok = $false; msg = $_.Exception.Message })
     }
-    Step 'الملف رجع مثل ما جان (التجربة انلغت)' {
+    Step 'عادت قاعدة البيانات كما كانت (أُلغيت التجربة)' {
         $left = Use-Database -ReadOnly { param($db) Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $tag)" }
-        Need ($left -eq 0) 'بقت بيانات تجربة بالملف!'
-        'تمام'
+        Need ($left -eq 0) 'ما زالت بيانات التجربة في قاعدة البيانات!'
+        'تمّ بنجاح'
     } | Out-Null
     return , $steps.ToArray()
 }
@@ -1941,7 +1954,7 @@ function Choose-File {
     # button, so the dialog can't end up hidden behind the program
     $owner = New-Object System.Windows.Forms.Form -Property @{
         TopMost = $true; ShowInTaskbar = $true; Opacity = 0; StartPosition = 'CenterScreen'; Size = (New-Object System.Drawing.Size 1, 1)
-        Text = 'اختيار ملف البيانات — لوحة المحل'; FormBorderStyle = 'None'
+        Text = 'اختيار قاعدة البيانات — Fr3oon'; FormBorderStyle = 'None'
     }
     $owner.Show()
     try {
@@ -1965,8 +1978,8 @@ function Choose-File {
 function Get-Places {
     $out = New-Object System.Collections.Generic.List[object]
     $cur = Get-DbPath
-    if ($cur) { $out.Add(@{ name = 'فولدر الملف الحالي'; path = (Split-Path $cur -Parent); kind = 'folder' }) }
-    $out.Add(@{ name = 'الشبكة (الحاسبات الثانية)'; path = 'net:'; kind = 'network' })
+    if ($cur) { $out.Add(@{ name = 'مجلد قاعدة البيانات الحالية'; path = (Split-Path $cur -Parent); kind = 'folder' }) }
+    $out.Add(@{ name = 'الشبكة (الأجهزة الأخرى)'; path = 'net:'; kind = 'network' })
     $userHome = $env:USERPROFILE
     foreach ($f in @(
             @{ name = 'سطح المكتب'; path = [Environment]::GetFolderPath('Desktop') },
@@ -2082,7 +2095,7 @@ function Get-NetShares([string]$pc) {
     $net = Get-FakeNet
     if ($net) {
         $p = $net.PSObject.Properties[$pc]
-        Need ($null -ne $p) "ما لكيت الحاسبة $pc"
+        Need ($null -ne $p) "لم يُعثر على الجهاز $pc"
         return , @($p.Value.PSObject.Properties.Name)
     }
     if (-not ('LawhaNetShares' -as [type])) { Add-Type -TypeDefinition $NetShareCode }
@@ -2090,9 +2103,9 @@ function Get-NetShares([string]$pc) {
         return , @(Invoke-Limited { param($s) [LawhaNetShares]::List($s) } "\\$pc" 15000)
     } catch {
         $m = [string]$_
-        if ($m -eq 'timeout' -or $m -match 'code (53|51|1231|1232|2114)\b') { throw "ما وصلت للحاسبة $pc. تأكد إنها شغّالة وعلى نفس الشبكة، أو جرّب رقم الـ IP مالها." }
-        if ($m -match 'code (5|1326|1327|1331)\b') { throw "الحاسبة $pc تحتاج اسم مستخدم وكلمة سر. افتحها مرة من File Explorer (اكتب \\$pc بشريط العنوان) واحفظ كلمة السر، وبعدين ارجع هنا." }
-        throw "ما كدرت أقرا الفولدرات المشاركة على $pc ($m)"
+        if ($m -eq 'timeout' -or $m -match 'code (53|51|1231|1232|2114)\b') { throw "تعذّر الوصول إلى الجهاز $pc. تأكّد من أنه يعمل وعلى الشبكة نفسها، أو جرّب عنوان IP الخاص به." }
+        if ($m -match 'code (5|1326|1327|1331)\b') { throw "الجهاز $pc يتطلّب اسم مستخدم وكلمة مرور. افتحه مرة من File Explorer (اكتب \\$pc في شريط العنوان) واحفظ كلمة المرور، ثم عُد إلى هنا." }
+        throw "تعذّرت قراءة المجلدات المشتركة على الجهاز $pc ($m)"
     }
 }
 
@@ -2112,7 +2125,7 @@ function Get-FolderListing([string]$dir) {
 
 # $shown: the network path to show for a test folder (see ConvertFrom-NetPath)
 function Get-RealFolderListing([string]$dir, [string]$shown) {
-    Need (Test-Path -LiteralPath $dir -PathType Container) "الفولدر مو موجود: $(if ($shown) { $shown } else { $dir })"
+    Need (Test-Path -LiteralPath $dir -PathType Container) "المجلد غير موجود: $(if ($shown) { $shown } else { $dir })"
     $folders = New-Object System.Collections.Generic.List[string]
     $files = New-Object System.Collections.Generic.List[object]
     $full = if ($shown) { $shown.TrimEnd('\') } else { (Resolve-Path -LiteralPath $dir).ProviderPath }
@@ -2590,7 +2603,7 @@ try {
 
 Write-LawhaLog "server $Version started on port $Port"
 if (-not $Hidden) {
-    Write-Host "  Lawhat Al-Mahal $Version  http://localhost:$Port/" -ForegroundColor Cyan
+    Write-Host "  Fr3oon $Version  http://localhost:$Port/" -ForegroundColor Cyan
     Write-Host '  Keep this window open while you use the program. Press Ctrl+C to stop.'
 }
 if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }

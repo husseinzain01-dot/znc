@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Builds the Windows installer: dist/LawhatAlMahal-Setup-<version>.exe
+# Builds the Windows installer: dist/Fr3oon-Setup-<version>.exe
+# (publish it with vendor/Fr3oon-Keys.html, see README.md)
 # Needs: node, npm deps, Playwright Chromium (for the icon), makensis (NSIS 3).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -24,17 +25,11 @@ win('installer/README-AR.txt', out / 'README-AR.txt')
 win('installer/launcher.nsi', out / 'launcher.nsi')
 win('installer/setup.nsi', out / 'setup.nsi')
 PY
-cp release/hisabati-reader.html "$OUT/lawha.html"
+cp release/fr3oon.html "$OUT/fr3oon.html"
 
 VERSION=$(grep -oP "^\\\$Version = '\\K[^']+" server/server.ps1)
 makensis -V2 -DOUTDIR="$OUT" -DVERSION="$VERSION" "$OUT/launcher.nsi"
 makensis -V2 -DOUTDIR="$OUT" -DVERSION="$VERSION" "$OUT/setup.nsi"
 
-# Same program without installing: unzip anywhere, put Units2026.accdb next
-# to it and run LawhatAlMahal.exe.
-PORT="$OUT/portable/LawhatAlMahal"
-mkdir -p "$PORT"
-cp "$OUT/LawhatAlMahal.exe" "$OUT/launch.ps1" "$OUT/server.ps1" "$OUT/lawha.html" "$OUT/app.ico" "$OUT/README-AR.txt" "$PORT/"
-(cd "$OUT/portable" && zip -qr -9 "$OUT/LawhatAlMahal-Portable-$VERSION.zip" LawhatAlMahal)
-rm -rf "$OUT/portable"
-ls -la "$OUT"/*.exe "$OUT"/*.zip
+ls -la "$OUT"/*.exe
+sha256sum "$OUT/Fr3oon-Setup-$VERSION.exe"

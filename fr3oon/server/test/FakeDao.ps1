@@ -70,7 +70,7 @@ function New-FakeDatabase($engine, [string]$path, $schema) {
 function New-FakeEngine([string]$jsonPath) {
     # no export given: an engine with no data (databases come from New-FakeDatabase)
     $tables = if ($jsonPath -and (Test-Path -LiteralPath $jsonPath)) { ConvertFrom-FakeJson (Get-Content -LiteralPath $jsonPath -Raw -Encoding UTF8 | ConvertFrom-Json) } else { @{} }
-    $state = @{ tables = $tables; snapshot = $null; inTrans = $false; identity = 0; statements = New-Object System.Collections.Generic.List[string] }
+    $state = @{ tables = $tables; snapshot = $null; inTrans = $false; identity = 0; statements = New-Object System.Collections.Generic.List[string]; export = ($tables.Count -gt 0) }
 
     $ws = [pscustomobject]@{ State = $state }
     $ws | Add-Member ScriptMethod BeginTrans {
@@ -111,6 +111,7 @@ function New-FakeEngine([string]$jsonPath) {
         if (-not $st.files.ContainsKey($full) -or ($st.json[$full] -and $st.stamps[$full] -ne $stamp)) {
             $loaded = Read-FakeFile $full
             if ($null -ne $loaded) { $st.files[$full] = $loaded; $st.json[$full] = $true }
+            elseif (-not $st.export) { throw "FakeDao: Unrecognized database format '$path'." }
             elseif ($st.main) { $st.files[$full] = Copy-FakeTables $st.files[$st.main] }
             else { $st.files[$full] = $st.tables }
             $st.stamps[$full] = $stamp

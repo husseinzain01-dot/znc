@@ -154,7 +154,7 @@ svg.i { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none;
 .side-foot { border-top: 1px solid rgba(255, 255, 255, .08); padding-top: 12px; margin-top: 12px; display: grid; gap: 10px; }
 .side-foot .btn.ghost { color: var(--side-text); }
 .who { display: flex; align-items: center; gap: 10px; padding: 4px; }
-.avatar { width: 34px; height: 34px; border-radius: 50%; background: #3a8ff0; color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #22d3ee, #a855f7); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
 .who-text { min-width: 0; flex: 1; }
 .who-text b { display: block; color: #fff; font-size: 14px; }
 .who-text small { color: var(--side-muted); font-size: 12px; }

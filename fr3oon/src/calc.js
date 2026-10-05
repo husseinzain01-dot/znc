@@ -100,12 +100,12 @@ function customerMovements(P) {
   const out = [];
   for (const s of P.sales) {
     if (s.type !== CREDIT) continue;
-    out.push({ name: s.customer, date: s.date, time: s.time, kind: 'sale', ref: s.id, debit: s.total, desc: `قائمة بيع آجل رقم ${s.id}` });
-    if (s.paid) out.push({ name: s.customer, date: s.date, time: s.time, kind: 'paid', ref: s.id, credit: s.paid, desc: `مدفوع مع القائمة رقم ${s.id}` });
+    out.push({ name: s.customer, date: s.date, time: s.time, kind: 'sale', ref: s.id, debit: s.total, desc: `فاتورة بيع آجل رقم ${s.id}` });
+    if (s.paid) out.push({ name: s.customer, date: s.date, time: s.time, kind: 'paid', ref: s.id, credit: s.paid, desc: `مدفوع مع الفاتورة رقم ${s.id}` });
   }
   for (const r of P.receipts) {
     if (r.cls !== SETTLE) continue;
-    out.push({ name: r.name, date: r.date, time: r.time, kind: 'receipt', ref: r.id, credit: r.amount, desc: `تسديد${r.no ? ' وصل رقم ' + r.no : ''}${r.note ? ' — ' + r.note : ''}` });
+    out.push({ name: r.name, date: r.date, time: r.time, kind: 'receipt', ref: r.id, credit: r.amount, desc: `تسديد${r.no ? ' سند رقم ' + r.no : ''}${r.note ? ' — ' + r.note : ''}` });
   }
   return out;
 }
@@ -114,11 +114,11 @@ function supplierMovements(P) {
   const out = [];
   for (const p of P.purchases) {
     if (p.type !== CREDIT) continue;
-    out.push({ name: p.supplier, date: p.date, time: p.time, kind: 'purchase', ref: p.id, debit: p.total, desc: `قائمة شراء آجل رقم ${p.id}${p.note ? ' — ' + p.note : ''}` });
+    out.push({ name: p.supplier, date: p.date, time: p.time, kind: 'purchase', ref: p.id, debit: p.total, desc: `فاتورة شراء آجل رقم ${p.id}${p.note ? ' — ' + p.note : ''}` });
   }
   for (const r of P.payments) {
     if (r.cls !== SETTLE) continue;
-    out.push({ name: r.name, date: r.date, time: r.time, kind: 'payment', ref: r.id, credit: r.amount, desc: `تسديد${r.no ? ' وصل رقم ' + r.no : ''}${r.note ? ' — ' + r.note : ''}` });
+    out.push({ name: r.name, date: r.date, time: r.time, kind: 'payment', ref: r.id, credit: r.amount, desc: `تسديد${r.no ? ' سند رقم ' + r.no : ''}${r.note ? ' — ' + r.note : ''}` });
   }
   return out;
 }
@@ -195,7 +195,7 @@ export function stock(P) {
     const k = karton(a.L1, a.L2, i.fill);
     const s = seeat(a.L1, a.L2, i.fill);
     const totalPcs = i.fill > 0 ? a.L1 * i.fill + a.L2 : a.L1;
-    const status = totalPcs < 0 ? 'بالسالب' : totalPcs === 0 ? 'نافد' : i.harig > 0 && k < i.harig ? 'قليل' : 'متوفر';
+    const status = totalPcs < 0 ? 'سالب' : totalPcs === 0 ? 'نافد' : i.harig > 0 && k < i.harig ? 'قليل' : 'متوفر';
     return { ...i, k, s, totalPcs, inPcs: a.inPcs, outPcs: a.outPcs, value: k * i.buyL1 + s * i.buyL2, status };
   });
 }

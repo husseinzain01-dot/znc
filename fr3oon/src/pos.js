@@ -50,7 +50,7 @@ export function setupPos(ctx) {
 
   function gridHtml() {
     const list = matches();
-    if (!list.length) return '<p class="empty">ما لكيت مادة بهذا الاسم</p>';
+    if (!list.length) return '<p class="empty">لا يوجد صنف بهذا الاسم</p>';
     return list
       .slice(0, 160)
       .map((it) => {
@@ -73,7 +73,7 @@ export function setupPos(ctx) {
   }
 
   function linesHtml() {
-    if (!cart.lines.length) return `<div class="cart-empty">${icon('pos')}<br>القائمة فارغة<br><small>دوس على مادة أو امسح باركود</small></div>`;
+    if (!cart.lines.length) return `<div class="cart-empty">${icon('pos')}<br>الفاتورة فارغة<br><small>اضغط على صنف أو امسح الباركود</small></div>`;
     return cart.lines
       .map((l, i) => {
         const it = itemBy(l.item);
@@ -84,8 +84,8 @@ export function setupPos(ctx) {
           <div class="row">
             ${units.length > 1 ? `<select data-f="unit">${units.map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>` : `<small class="muted">${esc(l.unit)}</small>`}
             <span class="stepper"><button type="button" data-step="-1" aria-label="أقل">−</button><input data-f="qty" inputmode="decimal" value="${l.qty}"><button type="button" data-step="1" aria-label="أكثر">+</button></span>
-            <input class="price" data-f="price" inputmode="numeric" value="${l.price}" title="${can('edit_price') ? 'السعر' : 'السعر (تغييره يحتاج صلاحية)'}"${can('edit_price') ? '' : ' readonly tabindex="-1"'}>
-            <button class="icon-btn rm" type="button" data-rm aria-label="شيل">${icon('trash')}</button>
+            <input class="price" data-f="price" inputmode="numeric" value="${l.price}" title="${can('edit_price') ? 'السعر' : 'السعر (تغييره يحتاج إلى صلاحية)'}"${can('edit_price') ? '' : ' readonly tabindex="-1"'}>
+            <button class="icon-btn rm" type="button" data-rm aria-label="إزالة">${icon('trash')}</button>
           </div>
         </div>`;
       })
@@ -95,7 +95,7 @@ export function setupPos(ctx) {
   function customerInfo() {
     if (cart.type !== C.CREDIT || !cart.customer) return '';
     const b = C.customerBalances(P()).find((x) => x.name === cart.customer);
-    return b ? `الرصيد الحالي: <b class="num">${fmt(b.balance)}</b>` : '<span class="neg">هذا الزبون مو موجود</span>';
+    return b ? `الرصيد الحالي: <b class="num">${fmt(b.balance)}</b>` : '<span class="neg">هذا العميل غير موجود</span>';
   }
 
   // Today's latest invoices (a cashier sees their own), one click away
@@ -106,7 +106,7 @@ export function setupPos(ctx) {
       .filter((s) => s.date === today && s.lines.length && (can('sales') || s.user === state.user))
       .sort((a, b) => b.id - a.id)
       .slice(0, 8);
-    if (!list.length) return '<p class="muted" style="margin:0;font-size:13px">ماكو قوائم اليوم بعد</p>';
+    if (!list.length) return '<p class="muted" style="margin:0;font-size:13px">لا توجد فواتير اليوم بعد</p>';
     return list
       .map((s) => `<button class="recent" data-sale="${s.id}">
           <span><b>رقم ${s.id}</b> <small>${esc(s.time.slice(11, 16))} — ${s.type === C.CREDIT ? esc(s.customer) : 'نقدي'}</small></span>
@@ -120,10 +120,10 @@ export function setupPos(ctx) {
     const allowed = types();
     if (!allowed.includes(cart.type)) cart.type = allowed[0] || C.CASH;
     const credit = cart.type === C.CREDIT;
-    const recentHint = [can('print') && 'تطبعها', can('sale_edit') && 'تعدّلها', can('sale_delete') && 'تمسحها'].filter(Boolean);
+    const recentHint = [can('print') && 'طباعتها', can('sale_edit') && 'تعديلها', can('sale_delete') && 'حذفها'].filter(Boolean);
     return `<div class="pos">
       <section class="pos-items">
-        <div class="pos-search">${icon('search')}<input id="posSearch" autocomplete="off" placeholder="ابحث باسم المادة أو رمزها، أو امسح الباركود ودوس Enter" value="${esc(search)}"></div>
+        <div class="pos-search">${icon('search')}<input id="posSearch" autocomplete="off" placeholder="ابحث باسم الصنف أو رمزه، أو امسح الباركود واضغط Enter" value="${esc(search)}"></div>
         <div class="chips" id="posChips">${chipsHtml()}</div>
         <div class="item-grid" id="posGrid">${gridHtml()}</div>
       </section>
@@ -135,23 +135,23 @@ export function setupPos(ctx) {
           ${allowed.length > 1 ? '' : `<p class="muted" style="margin:0">بيع ${credit ? 'آجل' : 'نقدي'}</p>`}
           <div id="posWho" ${credit ? '' : 'hidden'}>
             <datalist id="dlCust">${P().customers.map((c) => `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
-            <input id="posCustomer" list="dlCust" autocomplete="off" placeholder="اسم الزبون" value="${esc(cart.customer)}" style="width:100%">
+            <input id="posCustomer" list="dlCust" autocomplete="off" placeholder="اسم العميل" value="${esc(cart.customer)}" style="width:100%">
             <p class="muted" id="posCustInfo" style="margin:6px 2px 0;font-size:13px">${customerInfo()}</p>
           </div>
         </div>
         <div class="cart-lines" id="posLines">${linesHtml()}</div>
         <div class="card stack" style="gap:10px">
           <div class="cart-total"><span>المجموع</span><b class="num" id="posTotal">${fmt(total())}</b></div>
-          <div id="posPaidRow" ${credit ? '' : 'hidden'}><input id="posPaid" inputmode="numeric" placeholder="المدفوع هسه (اختياري)" value="${esc(cart.paid)}" style="width:100%"></div>
+          <div id="posPaidRow" ${credit ? '' : 'hidden'}><input id="posPaid" inputmode="numeric" placeholder="المدفوع الآن (اختياري)" value="${esc(cart.paid)}" style="width:100%"></div>
           <input id="posNote" placeholder="ملاحظة (اختياري)" value="${esc(cart.note)}">
           <div class="row" style="display:flex;gap:8px">
             <button class="btn primary big" id="posSave" style="flex:1">${icon('save')} حفظ <span class="kbd">F9</span></button>
             ${can('print') ? `<button class="btn big" id="posSavePrint" style="flex:1">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>` : ''}
           </div>
-          <button class="btn small" id="posClear">${icon('trash')} قائمة جديدة (مسح)</button>
+          <button class="btn small" id="posClear">${icon('trash')} فاتورة جديدة (تفريغ)</button>
         </div>
         <div class="card stack" style="gap:6px">
-          <h3 style="margin:0">آخر القوائم <small class="muted" style="font-weight:400">${recentHint.length ? '— دوس على قائمة حتى ' + recentHint.join(' أو ') : ''}</small></h3>
+          <h3 style="margin:0">آخر الفواتير <small class="muted" style="font-weight:400">${recentHint.length ? '— اضغط على فاتورة ل' + recentHint.join(' أو ') : ''}</small></h3>
           <div id="posRecent" class="stack" style="gap:6px">${recentHtml()}</div>
         </div>
       </aside>
@@ -185,9 +185,9 @@ export function setupPos(ctx) {
       $('#posSearch').value = '';
       $('#posGrid').innerHTML = gridHtml();
     } else if (!list.length) {
-      toast('ما لكيت مادة بهذا الرمز أو الاسم', true);
+      toast('لا يوجد صنف بهذا الرمز أو الاسم', true);
     } else {
-      toast(`أكو ${list.length} مواد، اختار وحدة منها`);
+      toast(`عدد الأصناف المطابقة: ${list.length}، اختر أحدها`);
     }
   }
 
@@ -198,20 +198,20 @@ export function setupPos(ctx) {
     search = '';
     if ($('#posSearch')) $('#posSearch').value = '';
     if ($('#posGrid')) $('#posGrid').innerHTML = gridHtml();
-    if (!it) return toast(`ما لكيت مادة بالباركود ${q}. حطّه برمز المادة من المخزن والأسعار.`, true);
+    if (!it) return toast(`لا يوجد صنف بالباركود ${q}. أضِفه في رمز الصنف من صفحة المخزون والأسعار.`, true);
     add(it);
   }
 
   async function save(print) {
     if (saving) return;
     if (print && !can('print')) print = false;
-    if (!types().includes(cart.type)) return toast('ما عندك صلاحية على هذا النوع من البيع', true);
+    if (!types().includes(cart.type)) return toast('ليست لديك صلاحية لهذا النوع من البيع', true);
     const lines = cart.lines.filter((l) => l.qty > 0);
     const credit = cart.type === C.CREDIT;
     let err = '';
-    if (!lines.length) err = 'ضيف مادة وحدة على الأقل';
-    else if (credit && !cart.customer) err = 'القائمة الآجل تحتاج اسم زبون';
-    else if (credit && !P().customers.some((c) => c.name === cart.customer)) err = 'الزبون مو موجود. ضيفه من صفحة الزبائن أول';
+    if (!lines.length) err = 'أضف صنفًا واحدًا على الأقل';
+    else if (credit && !cart.customer) err = 'الفاتورة الآجلة تحتاج إلى اسم عميل';
+    else if (credit && !P().customers.some((c) => c.name === cart.customer)) err = 'العميل غير موجود. أضفه أولًا من صفحة العملاء';
     if (err) return toast(err, true);
 
     saving = true;
@@ -221,7 +221,7 @@ export function setupPos(ctx) {
     const data = { type: cart.type, customer: credit ? cart.customer : '', paid, note: cart.note, date: localDay(), lines };
     try {
       const r = await write('saveSale', data, { background: true });
-      toast(`انحفظت القائمة رقم ${r.id} ✔`);
+      toast(`حُفظت الفاتورة رقم ${r.id} ✔`);
       if (print) {
         const sum = lines.reduce((a, l) => a + l.qty * l.price, 0);
         forms().printSale(
@@ -343,7 +343,7 @@ export function setupPos(ctx) {
     $('#posSave').onclick = () => save(false);
     if ($('#posSavePrint')) $('#posSavePrint').onclick = () => save(true);
     $('#posClear').onclick = () => {
-      if (cart.lines.length && !confirm('تمسح القائمة الحالية؟')) return;
+      if (cart.lines.length && !confirm('هل تريد تفريغ الفاتورة الحالية؟')) return;
       cart = emptyCart();
       persist();
       $('#main').innerHTML = view();

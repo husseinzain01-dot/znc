@@ -1,24 +1,23 @@
-﻿# Runs every write operation of server.ps1 against a real data export through
-# FakeDao, checking the rows each one leaves behind, the validation errors,
-# the rollback on failure, the cashier/manager rules and the self-test.
+# Runs the helper's work against a new Fr3oon database on the test engine
+# (FakeDao): the license, creating the database, users and passwords, every
+# write operation (the rows each one leaves behind, the validation errors,
+# the rollback on failure, the cashier/manager rules), the data for other
+# devices, the full test, backups and restore, online updates and the
+# self-test.
 #
-# Usage: pwsh test/run-ops.ps1 -Tables tables.json -DbFile Units2026.accdb
-# (-DbFile only needs to exist: backups are copied from it; data comes from -Tables.)
-
-param(
-    [Parameter(Mandatory)] [string]$Tables,
-    [Parameter(Mandatory)] [string]$DbFile
-)
+# Usage: pwsh server/test/run-ops.ps1        (KEEP_TMP=1 keeps the temp folder
+# for test/fulltest.test.mjs and test/data-export.test.mjs)
 
 $ErrorActionPreference = 'Stop'
-$env:LAWHA_FAKEDAO = (Resolve-Path $Tables).Path
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ('lawha-test-' + [guid]::NewGuid())
+$root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('fr3oon-test-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmp | Out-Null
-$dbCopy = Join-Path $tmp 'Units2026.accdb'
-Copy-Item $DbFile $dbCopy
+$env:LAWHA_FAKEDAO = 'new'
+$env:LAWHA_TESTKEY = Join-Path $PSScriptRoot 'test-vendor-key.json'
+$env:LAWHA_FAKEMACHINE = 'RUN-OPS-PC'
+$env:LAWHA_FAKEUPDATE = '1'
 
 . (Join-Path (Split-Path $PSScriptRoot -Parent) 'server.ps1') -DataDir (Join-Path $tmp 'data')
-$script:Config.dbPath = $dbCopy
 
 $script:pass = 0
 function Assert([bool]$cond, [string]$msg) {
@@ -36,119 +35,180 @@ function Assert-Throws([scriptblock]$body, [string]$pattern, [string]$msg) {
 function Rows([string]$t) { return , (Get-FakeRows $script:Engine $t) }
 function Row([string]$t, [string]$col, $val) { return (Rows $t) | Where-Object { $_[$col] -eq $val } | Select-Object -First 1 }
 function W([string]$op, [hashtable]$d) { $d.user = 'نور'; return Invoke-Write $op ([pscustomobject]$d) }
-
-$engine = Get-Engine
-Write-Host "engine: $script:EngineName"
+function Sign([string[]]$a) {
+    $out = & node (Join-Path $root 'test/sign.mjs') @a
+    if ($LASTEXITCODE) { throw "sign.mjs failed: $out" }
+    return ($out -join "`n")
+}
+$key = $env:LAWHA_TESTKEY
 $today = Get-Date -Format 'yyyy-MM-dd'
+
+Write-Host "`n== license"
+$machine = Get-MachineCode
+Assert ($machine -match '^[2-9A-HJ-NP-Z]{4}(-[2-9A-HJ-NP-Z]{4}){3}$') "machine code $machine"
+Assert (-not (Get-License).ok) 'not activated at first'
+Assert-Throws { Set-License 'abc' } 'غير صحيح' 'not a key'
+Assert-Throws { Set-License (Sign 'license', $key, 'ABCD-EFGH-JKLM-NPQR', 'محل آخر') } 'لجهاز آخر' 'key for another computer'
+Assert-Throws { Set-License (Sign 'license', $key, $machine, 'محل', '2020-01-01') } 'انتهت' 'expired key'
+$good = Sign 'license', $key, $machine, 'محل الاختبار', '2099-12-31'
+$p = $good.Split('.')
+$bad = (ConvertTo-Json -Compress @{ p = 'Fr3oon'; m = $machine; n = 'محل الاختبار'; e = ''; i = $today })
+$badB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($bad)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+Assert-Throws { Set-License "$badB64.$($p[1])" } 'غير صحيح' 'expiry removed from a signed key: signature fails'
+Set-License $good | Out-Null
+$l = Get-License
+Assert ($l.ok -and $l.name -eq 'محل الاختبار' -and $l.expiry -eq '2099-12-31') 'valid key activates'
+Assert (Test-Path -LiteralPath $LicenseFile) 'license kept on disk'
+$script:LicenseCache = $null
+Assert ((Get-License).ok) 'read back from disk'
+
+Write-Host "`n== new database"
+$dbFile = Join-Path $tmp 'db/fr3oon.accdb'
+New-ShopDatabase $dbFile 'محل الاختبار' 'نور' 'test'
+$script:Config.dbPath = $dbFile
+$script:Config.backupDir = Join-Path $tmp 'backups'
+$script:Config.keepBackups = 3
+Assert (Test-ShopDatabase $dbFile) 'a Fr3oon database'
+$names = @(Use-Database -ReadOnly { param($db) Get-TableNames $db })
+foreach ($t in $Schema.Keys) { Assert ($names -contains $t) "table $t" }
+Assert ((Get-Shop).shopName -eq 'محل الاختبار') 'shop name kept in the database'
+Assert ((Rows 'quodCodeIn').Count -eq $DefaultClassesIn.Count -and (Rows 'quodCodeOut').Count -eq $DefaultClassesOut.Count) 'default receipt and payment classes'
+Assert-Throws { New-ShopDatabase $dbFile 'x' 'y' 'zzzz' } 'مسبقاً' 'never over an existing file'
+Set-Content -LiteralPath (Join-Path $tmp 'other.accdb') -Value '{"something":"else"}'
+Assert (-not (Test-ShopDatabase (Join-Path $tmp 'other.accdb'))) 'another file is not taken for a Fr3oon database'
+
+Write-Host "`n== users"
+Assert (((Get-UserNames) -join ',') -eq 'نور') 'the first manager'
+Assert ((Test-Login 'نور' 'test') -and (Test-Admin 'نور')) 'manager signs in'
+Assert (-not (Test-Login 'نور' 'TEST')) 'password is case-sensitive'
+Assert (-not (Test-Login 'نور' '')) 'empty password refused'
+Assert (-not (Test-Login 'غير موجود' 'test')) 'unknown user refused'
+$u = Row 'Users' 'UserName' 'نور'
+Assert ($u.PassHash -and $u.PassHash -notmatch 'test' -and $u.Salt) 'password kept salted and hashed'
+Use-Database { param($db) Save-User $db @{ name = 'كاشير1'; password = '1111'; isAdmin = $false; perms = 'pos,sale_cash,print' } } | Out-Null
+Assert ((Test-Login 'كاشير1' '1111') -and -not (Test-Admin 'كاشير1')) 'cashier added'
+Assert ((Row 'Users' 'UserName' 'كاشير1').Salt -ne $u.Salt) 'each user has their own salt'
+Assert-Throws { Use-Database { param($db) Save-User $db @{ name = 'كاشير1'; password = '2222' } } } 'يوجد مستخدم' 'duplicate user'
+Assert-Throws { Use-Database { param($db) Save-User $db @{ name = 'جديد' } } } 'كلمة المرور مطلوبة' 'a new user needs a password'
+Assert-Throws { Use-Database { param($db) Save-User $db @{ name = 'جديد'; password = '12' } } } '4 أحرف' 'short password'
+Use-Database { param($db) Save-User $db @{ oldName = 'كاشير1'; name = 'كاشير 1'; isAdmin = $false; active = $false } } | Out-Null
+Assert (-not (Test-Login 'كاشير1' '1111') -and -not (Test-Login 'كاشير 1' '1111')) 'renamed and stopped: no sign-in'
+Assert ((Get-PermText 'كاشير 1') -eq 'pos,sale_cash,print') 'permissions kept through the rename'
+Use-Database { param($db) Save-User $db @{ oldName = 'كاشير 1'; name = 'كاشير1'; active = $true } } | Out-Null
+Assert (Test-Login 'كاشير1' '1111') 'active again, same password'
+Assert ((Get-AdminCount) -eq 1) 'one manager'
+
+Write-Host "`n== items, customers, suppliers"
+$r = W 'saveItem' @{ name = 'بيض أحمر كبير'; code = '6281000000011'; cls = 'ألبان وبيض'; unitL1 = 'كرتونة'; unitL2 = 'طبقة'; fill = 12; priceL1 = 84000; priceL2 = 7500; buyL1 = 80000; buyL2 = 6667 }
+$egg = Row 'madaCode' 'ID' $r.id
+Assert ($egg.madaName -eq 'بيض أحمر كبير' -and $egg.IDcode -eq '6281000000011' -and $egg.price -eq 84000 -and $egg.priceSeeat -eq 7500 -and $egg.Fill -eq 12 -and $egg.BpriceL1 -eq 80000 -and $egg.UnitL2 -eq 'طبقة') 'item fields'
+W 'saveItem' @{ name = 'برغر لحم'; code = '6281000000028'; cls = 'مجمدات'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 24; priceL1 = 120000; priceL2 = 5500; buyL1 = 100000; buyL2 = 4167 } | Out-Null
+W 'saveItem' @{ name = 'كبد دجاج'; code = '6281000000035'; cls = 'مجمدات'; unitL1 = 'كرتونة'; unitL2 = 'كيس'; fill = 10; priceL1 = 30000; priceL2 = 3500; buyL1 = 25000; buyL2 = 2500 } | Out-Null
+W 'saveItem' @{ name = 'صدر دجاج'; code = '6281000000042'; cls = 'مجمدات'; unitL1 = 'كرتونة'; unitL2 = 'كيس'; fill = 8; priceL1 = 64000; priceL2 = 8500; buyL1 = 60000; buyL2 = 7500 } | Out-Null
+W 'saveItem' @{ name = 'ماء صغير'; code = '6281000000059'; cls = 'مشروبات'; unitL1 = 'قنينة'; priceL1 = 250; buyL1 = 180 } | Out-Null
+Assert ((Row 'madaCode' 'madaName' 'ماء صغير').UnitL2 -eq 'قنينة') 'one unit: small unit = big unit'
+W 'saveCustomer' @{ name = 'أبو علي'; mobile = '07701234567'; opening = 0; type = 'مفرد' } | Out-Null
+W 'saveSupplier' @{ name = 'شركة الدواجن'; opening = 0 } | Out-Null
+$burger = Row 'madaCode' 'madaName' 'برغر لحم'
+$liver = Row 'madaCode' 'madaName' 'كبد دجاج'
 $counts = @{}
 foreach ($t in 'MasterOut', 'subOut', 'MasterIn', 'subIN', 'mablakIn', 'mablakOut', 'bayeeCode', 'shiraCode', 'madaCode') { $counts[$t] = (Rows $t).Count }
 
-Write-Host "`n== users"
-$users = @(Get-UserNames)
-Assert ($users.Count -eq 3) "3 users: $($users -join ', ')"
-Assert (Test-Login 'نور' 'test') 'right password signs in'
-Assert (-not (Test-Login 'نور' 'TEST')) 'password is case-sensitive'
-Assert (-not (Test-Login 'نور' '')) 'empty password refused'
-Assert (-not (Test-Login 'مو موجود' 'test')) 'unknown user refused'
-
 Write-Host "`n== sale (credit)"
-$egg = Row 'madaCode' 'madaName' 'بيض احمر كبير'
-$burger = Row 'madaCode' 'madaName' 'بركر العطار جامبو لحم'
-$r = W 'saveSale' @{ type = 'اجل'; customer = 'أبو علي الجزيرة'; date = $today; paid = '10000'; note = 'تجربة'
-    lines = @(@{ item = 'بيض احمر كبير'; unit = 'كارتون'; qty = 3; price = 84000 }, @{ item = 'بركر العطار جامبو لحم'; unit = 'قطعة'; qty = 1.5; price = 5500 }) }
+$r = W 'saveSale' @{ type = 'اجل'; customer = 'أبو علي'; date = $today; paid = '10000'; note = 'تجربة'
+    lines = @(@{ item = 'بيض أحمر كبير'; unit = 'كرتونة'; qty = 3; price = 84000 }, @{ item = 'برغر لحم'; unit = 'قطعة'; qty = 1.5; price = 5500 }) }
 $sale = Row 'MasterOut' 'idOut' $r.id
-Assert ($r.id -eq $counts.MasterOut -or $r.id -gt 1000) "new invoice id $($r.id)"
-Assert ($sale.TOname -eq 'أبو علي الجزيرة' -and $sale.OutType -eq 'اجل' -and $sale.Paid -eq 10000) 'master: customer, type, paid'
-Assert ($sale.Mandob -eq 'مباشر' -and $sale.Tagheez -eq $false -and $sale.strUserName -eq 'نور' -and $sale.note -eq 'تجربة') 'master: rep, flag, user, note'
+Assert ($r.id -gt 0) "new invoice id $($r.id)"
+Assert ($sale.TOname -eq 'أبو علي' -and $sale.OutType -eq 'اجل' -and $sale.Paid -eq 10000) 'master: customer, type, paid'
+Assert ($sale.strUserName -eq 'نور' -and $sale.note -eq 'تجربة') 'master: user, note'
 Assert ($sale.OutDate.ToString('yyyy-MM-dd') -eq $today -and $sale.timeS -is [datetime]) 'master: dates'
 $lines = @((Rows 'subOut') | Where-Object { $_.idOut -eq $r.id })
 Assert ($lines.Count -eq 2) '2 lines'
-$l1 = $lines | Where-Object { $_.madaNameOut -eq 'بيض احمر كبير' }
-Assert ($l1.QuntOut -eq 3 -and $l1.Price -eq 84000 -and $l1.unit -eq 'كارتون' -and $l1.UnitFactor -eq 0) 'line 1 qty/price/unit/factor'
-Assert ($l1.BpriceL1 -eq $egg.BpriceL1 -and $l1.BpriceL2 -eq $egg.BpriceL2 -and $l1.IDcode -eq $egg.IDcode) 'line 1 buy prices + code from item card'
-$l2 = $lines | Where-Object { $_.madaNameOut -eq 'بركر العطار جامبو لحم' }
+$l1 = $lines | Where-Object { $_.madaNameOut -eq 'بيض أحمر كبير' }
+Assert ($l1.QuntOut -eq 3 -and $l1.Price -eq 84000 -and $l1.unit -eq 'كرتونة' -and $l1.UnitFactor -eq 0) 'line 1 qty/price/unit/factor'
+Assert ($l1.BpriceL1 -eq $egg.BpriceL1 -and $l1.BpriceL2 -eq $egg.BpriceL2 -and $l1.IDcode -eq $egg.IDcode) 'line 1 buy prices + code from the item card'
+$l2 = $lines | Where-Object { $_.madaNameOut -eq 'برغر لحم' }
 Assert ($l2.QuntOut -eq 1.5 -and $l2.UnitFactor -eq 1 -and $l2.BpriceL2 -eq $burger.BpriceL2) 'line 2 fractional qty, small unit factor'
 $creditSaleId = $r.id
 
 Write-Host "`n== sale edit"
 $before = $sale.timeS
-W 'saveSale' @{ id = $creditSaleId; type = 'اجل'; customer = 'أبو علي الجزيرة'; date = $today; paid = 0
-    lines = @(@{ item = 'بيض احمر كبير'; unit = 'طبقة'; qty = 2; price = 7000 }) } | Out-Null
+W 'saveSale' @{ id = $creditSaleId; type = 'اجل'; customer = 'أبو علي'; date = $today; paid = 0
+    lines = @(@{ item = 'بيض أحمر كبير'; unit = 'طبقة'; qty = 2; price = 7000 }) } | Out-Null
 $sale = Row 'MasterOut' 'idOut' $creditSaleId
 $lines = @((Rows 'subOut') | Where-Object { $_.idOut -eq $creditSaleId })
 Assert ($lines.Count -eq 1 -and $lines[0].unit -eq 'طبقة' -and $sale.Paid -eq 0) 'lines replaced, paid updated'
 Assert ($sale.timeS -eq $before) 'entry time kept on edit'
 
 Write-Host "`n== sale (cash)"
-$r = W 'saveSale' @{ type = 'نقدي'; date = $today; paid = 999; lines = @(@{ item = 'كبد'; unit = (Row 'madaCode' 'madaName' 'كبد').UnitL2; qty = 1; price = 1000 }) }
+$r = W 'saveSale' @{ type = 'نقدي'; date = $today; paid = 999; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 1; price = 3500 }) }
 $cash = Row 'MasterOut' 'idOut' $r.id
-Assert ($cash.TOname -eq 'قائمة نقدي' -and $cash.Paid -eq 0 -and $cash.OutType -eq 'نقدي') 'cash invoice named قائمة نقدي, paid ignored'
-$cashId = $r.id
+Assert ($cash.TOname -eq 'عميل نقدي' -and $cash.Paid -eq 0 -and $cash.OutType -eq 'نقدي') 'cash invoice to عميل نقدي, paid ignored'
 
 Write-Host "`n== validation and rollback"
 $n = (Rows 'MasterOut').Count
-Assert-Throws { W 'saveSale' @{ type = 'اجل'; customer = ''; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'تحتاج اسم زبون' 'credit sale needs customer'
-Assert-Throws { W 'saveSale' @{ type = 'اجل'; customer = 'زبون مو موجود'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'الزبون مو موجود' 'unknown customer'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @() } } 'ما بيها مواد' 'empty invoice'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'مادة وهمية'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'المادة مو موجودة' 'unknown item'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = 'لتر'; qty = 1; price = 1 }) } } 'وحدة غلط' 'wrong unit'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 0; price = 1 }) } } 'الكمية' 'zero qty'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 'abc'; price = 1 }) } } 'رقم' 'non-numeric qty'
-Assert-Throws { W 'saveSale' @{ type = 'x'; lines = @() } } 'نوع القائمة' 'bad type'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; date = '2026-13-45'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'التاريخ' 'bad date'
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; customer = ('س' * 51); lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'طويل' 'customer name over 50'
-# second line fails after the master row and first line were written: all of it must roll back
-Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }, @{ item = 'مادة وهمية'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'المادة مو موجودة' 'failure on line 2'
+$one = @{ item = 'كبد دجاج'; unit = 'كرتونة'; qty = 1; price = 1 }
+Assert-Throws { W 'saveSale' @{ type = 'اجل'; customer = ''; lines = @($one) } } 'اسم العميل' 'credit sale needs a customer'
+Assert-Throws { W 'saveSale' @{ type = 'اجل'; customer = 'عميل غير مسجّل'; lines = @($one) } } 'العميل غير موجود' 'unknown customer'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @() } } 'لا تحتوي على أصناف' 'empty invoice'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'صنف وهمي'; unit = 'كرتونة'; qty = 1; price = 1 }) } } 'الصنف غير موجود' 'unknown item'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'لتر'; qty = 1; price = 1 }) } } 'وحدة غير صحيحة' 'wrong unit'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كرتونة'; qty = 0; price = 1 }) } } 'الكمية' 'zero qty'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كرتونة'; qty = 'abc'; price = 1 }) } } 'رقم' 'non-numeric qty'
+Assert-Throws { W 'saveSale' @{ type = 'x'; lines = @() } } 'نوع الفاتورة' 'bad type'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; date = '2026-13-45'; lines = @($one) } } 'التاريخ' 'bad date'
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; customer = ('س' * 51); lines = @($one) } } 'طويل' 'customer name over 50'
+# the second line fails after the master row and first line were written: all of it must roll back
+Assert-Throws { W 'saveSale' @{ type = 'نقدي'; lines = @($one, @{ item = 'صنف وهمي'; unit = 'كرتونة'; qty = 1; price = 1 }) } } 'الصنف غير موجود' 'failure on line 2'
 Assert ((Rows 'MasterOut').Count -eq $n) 'failed saves left no invoice behind (rollback)'
-Assert-Throws { W 'nope' @{} } 'مو معروفة' 'unknown operation'
+Assert-Throws { W 'nope' @{} } 'غير معروفة' 'unknown operation'
 
 Write-Host "`n== purchase"
-$chest = Row 'madaCode' 'madaName' 'صدر مسحب مجمد'
-$r = W 'savePurchase' @{ type = 'اجل'; supplier = 'مشروع دواجن الديوانية'; no = '9001'; date = $today; updatePrices = $true
-    lines = @(@{ item = 'صدر مسحب مجمد'; unit = $chest.UnitL1; qty = 20; price = 55000 }) }
+$chest = Row 'madaCode' 'madaName' 'صدر دجاج'
+$r = W 'savePurchase' @{ type = 'اجل'; supplier = 'شركة الدواجن'; no = '9001'; date = $today; updatePrices = $true
+    lines = @(@{ item = 'صدر دجاج'; unit = 'كرتونة'; qty = 20; price = 56000 }) }
 $pur = Row 'MasterIn' 'IdIn' $r.id
-Assert ($pur.fromname -eq 'مشروع دواجن الديوانية' -and $pur.InvoiceNo -eq 9001 -and $pur.InType -eq 'اجل') 'purchase master'
+Assert ($pur.fromname -eq 'شركة الدواجن' -and $pur.InvoiceNo -eq 9001 -and $pur.InType -eq 'اجل') 'purchase master'
 $pl = @((Rows 'subIN') | Where-Object { $_.IdIn -eq $r.id })
-Assert ($pl.Count -eq 1 -and $pl[0].QuntIn -eq 20 -and $pl[0].Price -eq 55000 -and $pl[0].IDcode -eq $chest.IDcode) 'purchase line'
-$chest2 = Row 'madaCode' 'madaName' 'صدر مسحب مجمد'
-Assert ($chest2.BpriceL1 -eq 55000 -and $chest2.BpriceL2 -eq [math]::Round(55000 / $chest.Fill)) "buy price updated to 55000 / $([math]::Round(55000 / $chest.Fill))"
+Assert ($pl.Count -eq 1 -and $pl[0].QuntIn -eq 20 -and $pl[0].Price -eq 56000 -and $pl[0].IDcode -eq $chest.IDcode) 'purchase line'
+$chest2 = Row 'madaCode' 'madaName' 'صدر دجاج'
+Assert ($chest2.BpriceL1 -eq 56000 -and $chest2.BpriceL2 -eq [math]::Round(56000 / 8)) 'buy price updated to 56000 / 7000'
 $purId = $r.id
-Assert-Throws { W 'savePurchase' @{ type = 'اجل'; supplier = 'مشروع دواجن الديوانية'; no = 'x1'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } } 'رقم' 'supplier invoice no must be a number'
-Assert-Throws { W 'savePurchase' @{ type = 'اجل'; supplier = ''; lines = @() } } 'المورد' 'purchase needs supplier'
+Assert-Throws { W 'savePurchase' @{ type = 'اجل'; supplier = 'شركة الدواجن'; no = 'x1'; lines = @($one) } } 'رقم' 'supplier invoice no must be a number'
+Assert-Throws { W 'savePurchase' @{ type = 'اجل'; supplier = ''; lines = @() } } 'المورد' 'purchase needs a supplier'
 
 Write-Host "`n== vouchers"
-$maxNo = ((Rows 'mablakIn') | ForEach-Object { $x = 0; [void][int]::TryParse([string]$_.mostandNO, [ref]$x); $x } | Measure-Object -Maximum).Maximum
-$r = W 'saveReceipt' @{ cls = 'تسديد'; name = 'مكتب العراق - علي فرات'; amount = '250000'; date = $today; note = 'دفعة' }
+$r = W 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي'; amount = '250000'; date = $today; note = 'دفعة' }
 $rec = Row 'mablakIn' 'idS' $r.id
-Assert ($rec.mablak -eq 250000 -and $rec.nameFrom -eq 'مكتب العراق - علي فرات' -and $rec.classS -eq 'تسديد' -and $rec.mostandNO -eq [string]($maxNo + 1)) "receipt, voucher no $($rec.mostandNO)"
+Assert ($rec.mablak -eq 250000 -and $rec.nameFrom -eq 'أبو علي' -and $rec.classS -eq 'تسديد' -and $rec.mostandNO -eq '1') "receipt, voucher no $($rec.mostandNO)"
 $recId = $r.id
-W 'saveReceipt' @{ id = $recId; cls = 'تسديد'; name = 'مكتب العراق - علي فرات'; amount = 300000; date = $today } | Out-Null
-Assert ((Row 'mablakIn' 'idS' $recId).mablak -eq 300000 -and (Row 'mablakIn' 'idS' $recId).mostandNO -eq $rec.mostandNO) 'receipt edit keeps number'
-$r = W 'savePayment' @{ cls = 'كهرباء'; name = ''; amount = 50000; date = $today; note = 'مولدة' }
+W 'saveReceipt' @{ id = $recId; cls = 'تسديد'; name = 'أبو علي'; amount = 300000; date = $today } | Out-Null
+Assert ((Row 'mablakIn' 'idS' $recId).mablak -eq 300000 -and (Row 'mablakIn' 'idS' $recId).mostandNO -eq '1') 'receipt edit keeps its number'
+Assert ((Row 'mablakIn' 'idS' (W 'saveReceipt' @{ cls = 'إيراد آخر'; name = ''; amount = 5 }).id).mostandNO -eq '2') 'next receipt number'
+$r = W 'savePayment' @{ cls = 'كهرباء وماء'; name = ''; amount = 50000; date = $today; note = 'مولدة' }
 $pay = Row 'mablakOut' 'idS' $r.id
-Assert ($pay.classS -eq 'كهرباء' -and $null -eq $pay.nameto -and $pay.note -eq 'مولدة') 'expense with no name'
+Assert ($pay.classS -eq 'كهرباء وماء' -and $null -eq $pay.nameto -and $pay.note -eq 'مولدة') 'expense with no name'
 $payId = $r.id
-$r = W 'savePayment' @{ cls = 'تسديد'; name = 'مشروع دواجن الديوانية'; amount = 1000000; date = $today }
-Assert ((Row 'mablakOut' 'idS' $r.id).nameto -eq 'مشروع دواجن الديوانية') 'supplier payment'
-$pay2Id = $r.id
-Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = ''; amount = 5 } } 'يحتاج اسم' 'settlement needs a name'
-Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = 'أحد'; amount = 5 } } 'الزبون مو موجود' 'receipt from unknown customer'
-Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي الجزيرة'; amount = 0 } } 'المبلغ' 'zero amount'
-Assert-Throws { W 'savePayment' @{ cls = 'تسديد'; name = 'أحد'; amount = 5 } } 'المورد مو موجود' 'payment to unknown supplier'
+$r = W 'savePayment' @{ cls = 'تسديد'; name = 'شركة الدواجن'; amount = 1000000; date = $today }
+Assert ((Row 'mablakOut' 'idS' $r.id).nameto -eq 'شركة الدواجن') 'supplier payment'
+Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = ''; amount = 5 } } 'اسم' 'settlement needs a name'
+Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = 'أحد'; amount = 5 } } 'العميل غير موجود' 'receipt from an unknown customer'
+Assert-Throws { W 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي'; amount = 0 } } 'المبلغ' 'zero amount'
+Assert-Throws { W 'savePayment' @{ cls = 'تسديد'; name = 'أحد'; amount = 5 } } 'المورد غير موجود' 'payment to an unknown supplier'
 
 Write-Host "`n== customers"
-$r = W 'saveCustomer' @{ name = 'زبون تجربة'; mobile = '07700000000'; opening = '15000'; type = 'مفرد'; address = 'المحمودية' }
+$r = W 'saveCustomer' @{ name = 'عميل تجربة'; mobile = '07700000000'; opening = '15000'; type = 'مفرد'; address = 'المحمودية' }
 $c = Row 'bayeeCode' 'id' $r.id
-Assert ($c.bayeeCode -eq 'زبون تجربة' -and $c.MB -eq 15000 -and $c.Ctype -eq 'مفرد' -and $c.Group -eq 'المجموعة العامة' -and $c.Mandob -eq 'مباشر' -and $c.credit -eq 0) 'new customer fields'
+Assert ($c.bayeeCode -eq 'عميل تجربة' -and $c.MB -eq 15000 -and $c.Ctype -eq 'مفرد' -and $c.credit -eq 0) 'new customer fields'
 $custId = $r.id
-Assert-Throws { W 'saveCustomer' @{ name = 'زبون تجربة' } } 'بنفس الاسم' 'duplicate customer'
-Assert-Throws { W 'saveCustomer' @{ name = 'زبون'; mobile = '0770000000000' } } 'الموبايل' 'mobile over 12'
-W 'saveSale' @{ type = 'اجل'; customer = 'زبون تجربة'; lines = @(@{ item = 'كبد'; unit = 'كارتون'; qty = 1; price = 1 }) } | Out-Null
-W 'saveReceipt' @{ cls = 'تسديد'; name = 'زبون تجربة'; amount = 1 } | Out-Null
-W 'saveCustomer' @{ id = $custId; name = 'زبون تجربة 2'; mobile = '07700000000'; opening = 15000; type = 'مفرد' } | Out-Null
-Assert (@((Rows 'MasterOut') | Where-Object { $_.TOname -eq 'زبون تجربة 2' }).Count -eq 1) 'rename carried into invoices'
-Assert (@((Rows 'mablakIn') | Where-Object { $_.nameFrom -eq 'زبون تجربة 2' }).Count -eq 1) 'rename carried into receipts'
-Assert (@((Rows 'MasterOut') | Where-Object { $_.TOname -eq 'زبون تجربة' }).Count -eq 0) 'old name gone'
+Assert-Throws { W 'saveCustomer' @{ name = 'عميل تجربة' } } 'بنفس الاسم' 'duplicate customer'
+Assert-Throws { W 'saveCustomer' @{ name = 'عميل'; mobile = '0770000000000' } } 'طويل|الهاتف' 'mobile over 12'
+W 'saveSale' @{ type = 'اجل'; customer = 'عميل تجربة'; lines = @($one) } | Out-Null
+W 'saveReceipt' @{ cls = 'تسديد'; name = 'عميل تجربة'; amount = 1 } | Out-Null
+W 'saveCustomer' @{ id = $custId; name = 'عميل تجربة 2'; mobile = '07700000000'; opening = 15000; type = 'مفرد' } | Out-Null
+Assert (@((Rows 'MasterOut') | Where-Object { $_.TOname -eq 'عميل تجربة 2' }).Count -eq 1) 'rename carried into invoices'
+Assert (@((Rows 'mablakIn') | Where-Object { $_.nameFrom -eq 'عميل تجربة 2' }).Count -eq 1) 'rename carried into receipts'
+Assert (@((Rows 'MasterOut') | Where-Object { $_.TOname -eq 'عميل تجربة' }).Count -eq 0) 'old name gone'
 Assert-Throws { W 'deleteCustomer' @{ id = $custId } } 'حركة' 'customer with movements cannot be deleted'
 
 Write-Host "`n== suppliers"
@@ -160,20 +220,19 @@ W 'saveSupplier' @{ id = $supId; name = 'مورد تجربة 2' } | Out-Null
 Assert (@((Rows 'mablakOut') | Where-Object { $_.nameto -eq 'مورد تجربة 2' }).Count -eq 1) 'supplier rename carried into payments'
 
 Write-Host "`n== items"
-$r = W 'saveItem' @{ name = 'مادة تجربة'; code = '9999'; cls = 'مصنعات'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 12; priceL1 = 60000; priceL2 = 5500; buyL1 = 50000; buyL2 = 4167; harig = 1 }
+$r = W 'saveItem' @{ name = 'صنف تجربة'; code = '9999'; cls = 'مصنعات'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 12; priceL1 = 60000; priceL2 = 5500; buyL1 = 50000; buyL2 = 4167; harig = 1 }
 $it = Row 'madaCode' 'ID' $r.id
-Assert ($it.IDcode -eq '9999' -and $it.price -eq 60000 -and $it.'price$' -eq 60000 -and $it.priceSeeat -eq 5500 -and $it.Fill -eq 12 -and $it.Pr -eq 0) 'new item fields'
+Assert ($it.IDcode -eq '9999' -and $it.price -eq 60000 -and $it.priceSeeat -eq 5500 -and $it.Fill -eq 12 -and $it.Pr -eq 0) 'new item fields'
 $itemId = $r.id
-Assert-Throws { W 'saveItem' @{ name = 'مادة ثانية'; code = '9999'; unitL1 = 'كارتون' } } 'بنفس الرمز' 'duplicate code'
-Assert-Throws { W 'saveItem' @{ name = 'مادة تجربة'; unitL1 = 'كارتون' } } 'بنفس الاسم' 'duplicate name'
-Assert-Throws { W 'saveItem' @{ name = 'مادة ثالثة'; code = '1234567890123456'; unitL1 = 'كارتون' } } 'الرمز' 'code over 15'
-Assert-Throws { W 'saveItem' @{ name = 'مادة رابعة'; unitL1 = '' } } 'الوحدة الكبيرة' 'item needs big unit'
-W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'مادة تجربة'; unit = 'قطعة'; qty = 2; price = 5500 }) } | Out-Null
-W 'saveItem' @{ id = $itemId; name = 'مادة تجربة 2'; code = '9999'; unitL1 = 'كارتون'; unitL2 = 'قطعة'; fill = 12; priceL1 = 61000; priceL2 = 5600 } | Out-Null
-Assert (@((Rows 'subOut') | Where-Object { $_.madaNameOut -eq 'مادة تجربة 2' }).Count -eq 1) 'item rename carried into sale lines'
+Assert-Throws { W 'saveItem' @{ name = 'صنف ثانٍ'; code = '9999'; unitL1 = 'كرتونة' } } 'بنفس الرمز' 'duplicate code'
+Assert-Throws { W 'saveItem' @{ name = 'صنف تجربة'; unitL1 = 'كرتونة' } } 'بنفس الاسم' 'duplicate name'
+Assert-Throws { W 'saveItem' @{ name = 'صنف ثالث'; code = '1234567890123456'; unitL1 = 'كرتونة' } } 'الرمز' 'code over 15'
+Assert-Throws { W 'saveItem' @{ name = 'صنف رابع'; unitL1 = '' } } 'الوحدة الكبيرة' 'item needs a big unit'
+W 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'صنف تجربة'; unit = 'قطعة'; qty = 2; price = 5500 }) } | Out-Null
+W 'saveItem' @{ id = $itemId; name = 'صنف تجربة 2'; code = '9999'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 12; priceL1 = 61000; priceL2 = 5600 } | Out-Null
+Assert (@((Rows 'subOut') | Where-Object { $_.madaNameOut -eq 'صنف تجربة 2' }).Count -eq 1) 'item rename carried into sale lines'
 Assert-Throws { W 'deleteItem' @{ id = $itemId } } 'حركة' 'item with movements cannot be deleted'
-$r = W 'saveItem' @{ name = 'مادة للمسح'; unitL1 = 'كيس' }
-Assert ((Row 'madaCode' 'ID' $r.id).UnitL2 -eq 'كيس') 'small unit defaults to big unit'
+$r = W 'saveItem' @{ name = 'صنف للحذف'; unitL1 = 'كيس' }
 W 'deleteItem' @{ id = $r.id } | Out-Null
 Assert ($null -eq (Row 'madaCode' 'ID' $r.id)) 'unused item deleted'
 
@@ -185,108 +244,72 @@ Assert ($null -eq (Row 'MasterIn' 'IdIn' $purId) -and @((Rows 'subIN') | Where-O
 W 'deleteReceipt' @{ id = $recId } | Out-Null
 W 'deletePayment' @{ id = $payId } | Out-Null
 Assert ($null -eq (Row 'mablakIn' 'idS' $recId) -and $null -eq (Row 'mablakOut' 'idS' $payId)) 'vouchers deleted'
-Assert-Throws { W 'deleteSale' @{ id = $creditSaleId } } 'مو موجودة' 'deleting twice'
+Assert-Throws { W 'deleteSale' @{ id = $creditSaleId } } 'غير موجودة' 'deleting twice'
 
 Write-Host "`n== permissions"
-$script:Config.admins = @()
-Assert (Test-Admin 'كاشير1') 'no managers set: everyone is manager'
-$script:Config.admins = @('نور')
-Assert ((Test-Admin 'نور') -and -not (Test-Admin 'كاشير1')) 'managers list respected'
-Assert (((Get-Perms 'كاشير1') -join ',') -eq 'pos,sale_cash,print') 'default for a non-manager: cash sale + print'
-$cashier = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
-$liver = Row 'madaCode' 'madaName' 'كبد'
-$small = @{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = $liver.priceSeeat }
+function Set-Perms([string]$user, [string]$perms) { Use-Database { param($db) Save-User $db @{ oldName = $user; name = $user; perms = $perms } } | Out-Null }
 function Wc([string]$op, [hashtable]$d, $session) { $d.user = $session.user; $x = [pscustomobject]$d; Test-Allowed $op $x $session; return Invoke-Write $op $x $session }
+function Session([string]$user) { return @{ user = $user; admin = (Test-Admin $user); perms = (Get-Perms $user) } }
+Assert (((Get-Perms 'كاشير1') -join ',') -eq 'pos,sale_cash,print') 'cashier: cash sale + print'
+$cashier = Session 'كاشير1'
+$small = @{ item = 'كبد دجاج'; unit = 'كيس'; qty = 1; price = 3500 }
 $r = Wc 'saveSale' @{ type = 'نقدي'; lines = @($small) } $cashier
 Assert ($r.id -gt 0) 'cashier: cash sale at list price saved'
-Assert-Throws { Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @($small) } $cashier } 'صلاحية' 'cashier: no credit sale'
-Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = 1 }) } $cashier } 'تغيير السعر' 'cashier: no price change'
-$egg = Row 'madaCode' 'madaName' 'بيض احمر كبير'
-Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 1; price = $egg.price }) } $cashier } 'الجملة' 'cashier: no wholesale (big unit)'
-$one = @((Rows 'madaCode') | Where-Object { -not $_['UnitL2'] })[0]
-Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = $one['madaName']; unit = $one['UnitL1']; qty = 1; price = $(if ($null -eq $one['price']) { 0 } else { $one['price'] }) }) } $cashier).id -gt 0) "cashier: single-unit item ($($one['madaName'])) is not wholesale"
+Assert-Throws { Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي'; lines = @($small) } $cashier } 'صلاحية' 'cashier: no credit sale'
+Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 1; price = 1 }) } $cashier } 'تغيير السعر' 'cashier: no price change'
+Assert-Throws { Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'بيض أحمر كبير'; unit = 'كرتونة'; qty = 1; price = 84000 }) } $cashier } 'الجملة' 'cashier: no wholesale (big unit)'
+Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'ماء صغير'; unit = 'قنينة'; qty = 1; price = 250 }) } $cashier).id -gt 0) 'cashier: a single-unit item is not wholesale'
 Assert-Throws { Wc 'saveSale' @{ id = $r.id; type = 'نقدي'; lines = @($small) } $cashier } 'صلاحية' 'cashier: cannot edit a sale'
 Assert-Throws { Wc 'deleteSale' @{ id = $r.id } $cashier } 'صلاحية' 'cashier: cannot delete'
-Assert-Throws { Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي الجزيرة'; amount = 5 } $cashier } 'صلاحية' 'cashier: no receipts by default'
-Assert-Throws { Wc 'savePurchase' @{ type = 'اجل'; supplier = 'مشروع دواجن الديوانية'; lines = @($small) } $cashier } 'صلاحية' 'cashier: cannot buy'
+Assert-Throws { Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي'; amount = 5 } $cashier } 'صلاحية' 'cashier: no receipts'
+Assert-Throws { Wc 'savePurchase' @{ type = 'اجل'; supplier = 'شركة الدواجن'; lines = @($small) } $cashier } 'صلاحية' 'cashier: cannot buy'
 Assert-Throws { Wc 'saveItem' @{ name = 'x'; unitL1 = 'كيس' } $cashier } 'صلاحية' 'cashier: cannot change items'
-$script:Config.perms = @{ 'كاشير1' = @('pos', 'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'receipt', 'sale_delete') }
-$seller = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
-$r2 = Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @(@{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 2; price = 70000 }) } $seller
+Set-Perms 'كاشير1' 'pos,sale_cash,sale_credit,sale_wholesale,edit_price,receipt,sale_delete'
+$seller = Session 'كاشير1'
+$r2 = Wc 'saveSale' @{ type = 'اجل'; customer = 'أبو علي'; lines = @(@{ item = 'بيض أحمر كبير'; unit = 'كرتونة'; qty = 2; price = 80000 }) } $seller
 Assert ($r2.id -gt 0) 'with permissions: credit + wholesale + own price saved'
-Assert ((Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي الجزيرة'; amount = 5 } $seller).id -gt 0) 'with permission: receipt saved'
+Assert ((Wc 'saveReceipt' @{ cls = 'تسديد'; name = 'أبو علي'; amount = 5 } $seller).id -gt 0) 'with permission: receipt saved'
 Wc 'deleteSale' @{ id = $r2.id } $seller | Out-Null
 Assert ($null -eq (Row 'MasterOut' 'idOut' $r2.id)) 'with permission: delete'
 Assert-Throws { Wc 'saveSale' @{ id = $r.id; type = 'نقدي'; lines = @($small) } $seller } 'صلاحية' 'delete permission does not include edit'
-$script:Config.perms = @{ 'كاشير1' = @('pos', 'sale_cash', 'sale_edit') }
-$editor = @{ user = 'كاشير1'; admin = $false; perms = (Get-Perms 'كاشير1') }
-$admin0 = @{ user = 'نور'; admin = $true; perms = @() }
-$r3 = Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 1; price = 777 }, @{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 1; price = $egg.price }) } $admin0
-Assert ((Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }, @{ item = 'بيض احمر كبير'; unit = $egg.UnitL1; qty = 2; price = $egg.price }) } $editor).id -eq $r3.id) 'edit permission: change quantities, keeping the invoice prices and units'
-Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 1 }) } $editor } 'تغيير السعر' 'edit permission does not include a new price'
-Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'اجل'; customer = 'أبو علي الجزيرة'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL2; qty = 3; price = 777 }) } $editor } 'الآجل' 'edit permission cannot turn it into credit'
-$script:Config.perms = @{ 'كاشير1' = [string[]]@('sale_credit', 'receipt', 'sale_edit') }
+Set-Perms 'كاشير1' 'pos,sale_cash,sale_edit'
+$editor = Session 'كاشير1'
+$admin = Session 'نور'
+$r3 = Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 1; price = 777 }, @{ item = 'بيض أحمر كبير'; unit = 'كرتونة'; qty = 1; price = 84000 }) } $admin
+Assert ((Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 3; price = 777 }, @{ item = 'بيض أحمر كبير'; unit = 'كرتونة'; qty = 2; price = 84000 }) } $editor).id -eq $r3.id) 'edit permission: change quantities, keeping the invoice prices and units'
+Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 3; price = 1 }) } $editor } 'تغيير السعر' 'edit permission does not include a new price'
+Assert-Throws { Wc 'saveSale' @{ id = $r3.id; type = 'اجل'; customer = 'أبو علي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كيس'; qty = 3; price = 777 }) } $editor } 'الآجل' 'edit permission cannot turn it into credit'
+Set-Perms 'كاشير1' 'sale_credit,receipt,sale_edit'
 $imp = [string[]](Get-Perms 'كاشير1')
-Assert ($imp -is [string[]] -and $imp -contains 'pos' -and $imp -contains 'customers' -and $imp -contains 'sales' -and $imp -notcontains 'cash') "screens come with their actions: $($imp -join ',')"
-$js = @{ perms = [string[]](Get-Perms 'كاشير1'); one = [string[]]@('pos') } | ConvertTo-Json -Compress
-Assert ($js -match '"perms":\["' -and $js -match '"one":\["pos"\]') "permissions go out as a JSON list: $js"
-$script:Config.perms = @{ 'كاشير1' = [string[]]@('pos', 'bogus', 'print') }
-Assert ((([string[]](Get-Perms 'كاشير1')) -join ',') -eq 'pos,print') 'unknown permission names are dropped'
-# every shape an older version or Windows PowerShell 5.1 may have saved
-$shapes = @(
-    @('"pos,sale_credit,print"', 'pos,sale_credit,print'),
-    @('["pos","sale_credit"]', 'pos,sale_credit'),
-    @('{"value":["sale_credit","receipt"],"Count":2}', 'sale_credit,receipt'),
-    @('[{"value":"print"}]', 'print'),
-    @('[]', ''),
-    @('""', ''),
-    @('"@{value=System.Object[]; Count=3}"', $null),
-    @('["bogus"]', $null)
-)
-foreach ($sh in $shapes) {
+Assert ($imp -contains 'pos' -and $imp -contains 'customers' -and $imp -contains 'sales' -and $imp -notcontains 'cash') "screens come with their actions: $($imp -join ',')"
+Set-Perms 'كاشير1' 'pos,bogus,print'
+Assert (((Get-Perms 'كاشير1') -join ',') -eq 'pos,print') 'unknown permission names are dropped'
+Set-Perms 'كاشير1' ''
+Assert ((Get-PermText 'كاشير1') -eq '') 'an empty list stays empty'
+foreach ($sh in @(@('"pos,sale_credit,print"', 'pos,sale_credit,print'), @('["pos","sale_credit"]', 'pos,sale_credit'), @('[]', ''), @('["bogus"]', $null))) {
     $got = ConvertTo-PermText ($sh[0] | ConvertFrom-Json)
-    Assert ($got -ceq $sh[1]) "saved as $($sh[0]) -> [$got]"
+    Assert ($got -ceq $sh[1]) "permissions sent as $($sh[0]) -> [$got]"
 }
-$oldCfg = $ConfigFile
-$oldConfig = $script:Config
-$script:ConfigFile = Join-Path $tmp 'config-test.json'
-Set-Content $script:ConfigFile -Encoding UTF8 -Value '{"dbPath":"x","admins":["نور"],"perms":{"كاشير1":{"value":["sale_credit"],"Count":1},"كاشير 2":"@{value=System.Object[]; Count=3}","ض":[]}}'
-$script:Config = Read-Config
-Assert ((Get-PermText 'كاشير1') -eq 'sale_credit,pos') "old 5.1 save read back: $(Get-PermText 'كاشير1')"
-Assert ((Get-PermText 'كاشير 2') -eq 'pos,sale_cash,print') 'unreadable old save falls back to the default'
-Assert ((Get-PermText 'ض') -eq '') 'an empty list stays empty'
-Save-Config
-$saved = Get-Content $script:ConfigFile -Raw -Encoding UTF8
-Assert ($saved -match '"كاشير1":\s*"sale_credit"' -and $saved -notmatch '"value"') "saved as text: $($saved -replace '\s+', ' ')"
-$script:Config = Read-Config
-Assert ((Get-PermText 'كاشير1') -eq 'sale_credit,pos') 'text save reads back'
-$script:ConfigFile = $oldCfg
-$script:Config = $oldConfig
-$script:Config.perms = @{}
-$admin = @{ user = 'نور'; admin = $true; perms = (Get-Perms 'نور') }
-Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد'; unit = $liver.UnitL1; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
-$script:Config.perms = @{}
+Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كرتونة'; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
+Set-Perms 'كاشير1' 'pos,sale_cash,print'
 
-Write-Host "`n== the file stays open between saves"
+Write-Host "`n== the database stays open between saves"
 Close-Db
 $o0 = [int]$script:Engine.State.opens
 Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 'x' }) | Out-Null
 Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-2'; user = 'x' }) | Out-Null
 Use-Database -ReadOnly { param($db) Count $db 'SELECT Count(*) FROM bayeeCode' } | Out-Null
-Assert (([int]$script:Engine.State.opens - $o0) -eq 1) "two saves and a read opened the file once ($([int]$script:Engine.State.opens - $o0))"
+Assert (([int]$script:Engine.State.opens - $o0) -eq 1) "two saves and a read opened it once ($([int]$script:Engine.State.opens - $o0))"
 try { Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 'x' }) | Out-Null } catch { }
-Assert ($null -eq $script:Db) 'a refused save closes it (next one opens fresh)'
+Assert ($null -eq $script:Db) 'a refused save closes it (the next one opens fresh)'
 Assert (@((Rows 'bayeeCode') | Where-Object { $_['bayeeCode'] -like 'فتح-*' }).Count -eq 2) 'nothing half-saved by the refused one'
-Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-3'; user = 'x' }) | Out-Null
-$script:DbLastUse = (Get-Date).AddSeconds(-($DbIdleSeconds + 1))
-if ($script:Db -and ((Get-Date) - $script:DbLastUse).TotalSeconds -gt $DbIdleSeconds) { Close-Db }
-Assert ($null -eq $script:Db) "closed after $($DbIdleSeconds / 60) idle minutes"
 
 Write-Host "`n== data for other devices"
 $bytes = Export-Data
 $exp = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
 Assert ($exp.ok -and $exp.tables.MasterOut.rows.Count -eq (Rows 'MasterOut').Count) "all invoices exported ($($exp.tables.MasterOut.rows.Count)), $([math]::Round($bytes.Length / 1024)) KB"
-Assert ($null -eq $exp.tables.tblUsers.cols.Where({ $_ -match 'PWD' })[0] -and @($exp.tables.tblUsers.cols) -join ',' -eq 'UserName') 'user names only, never passwords'
+Assert ((@($exp.tables.Users.cols) -join ',') -eq 'UserName,Active') 'user names only, never password hashes'
+Assert ($null -eq $exp.tables.Settings) 'settings not sent'
 Assert ([object]::ReferenceEquals($bytes, (Export-Data))) 'second request served from the cache'
 Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'تصدير-1'; user = 'x' }) | Out-Null
 $exp2 = [Text.Encoding]::UTF8.GetString((Export-Data)) | ConvertFrom-Json
@@ -295,18 +318,8 @@ Assert (@($exp2.tables.bayeeCode.rows | Where-Object { $_[$ci] -eq 'تصدير-1
 [Text.Encoding]::UTF8.GetString((Export-Data)) | Set-Content -LiteralPath (Join-Path $tmp 'data-export.json') -Encoding UTF8
 Get-FakeFileTables $script:Engine (Get-DbPath) | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'data-tables.json') -Encoding UTF8
 
-Write-Host "`n== empty rows"
-$b0 = @(Get-BrokenRows)
-Assert (-not ($b0 | Where-Object { $_.count -gt 0 })) 'real data: no empty rows found'
-Use-Database { param($db) $db.Execute('INSERT INTO [MasterOut] ([Paid]) VALUES (0)', $dbFailOnError); $db.Execute('INSERT INTO [subOut] ([QuntOut]) VALUES (1)', $dbFailOnError) } | Out-Null
-$b1 = @(Get-BrokenRows)
-Assert ((($b1 | Where-Object { $_.table -eq 'MasterOut' }).count -eq 1) -and (($b1 | Where-Object { $_.table -eq 'subOut' }).count -eq 1)) 'finds an empty invoice and an empty line'
-$before = (Rows 'MasterOut').Count
-Get-BrokenRows -Clean | Out-Null
-Assert ((Rows 'MasterOut').Count -eq $before - 1 -and -not (@(Get-BrokenRows) | Where-Object { $_.count -gt 0 })) 'clean removes only those'
-
 Write-Host "`n== full test (on a copy)"
-$counts0 = @{}; foreach ($tb in 'MasterOut', 'subOut', 'MasterIn', 'subIN', 'mablakIn', 'mablakOut', 'bayeeCode', 'shiraCode', 'madaCode') { $counts0[$tb] = (Rows $tb).Count }
+$counts0 = @{}; foreach ($tb in $counts.Keys) { $counts0[$tb] = (Rows $tb).Count }
 $st0 = Start-FullTest
 Assert (Test-Path -LiteralPath $script:FT.path) "copy made: $($st0.file)"
 Get-FakeFileTables $script:Engine $script:FT.path | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Join-Path $tmp 'fulltest-start.json') -Encoding UTF8
@@ -326,13 +339,64 @@ $copyTables2 | ConvertTo-Json -Depth 5 -Compress | Set-Content -LiteralPath (Joi
 $copyPath = $script:FT.path
 Stop-FullTest
 Assert (-not (Test-Path -LiteralPath $copyPath)) 'copy removed'
-Assert ($null -eq $script:DbOverride) 'real file in use again'
-Write-Host "   (JSON for the app check: $tmp)"
+Assert ($null -eq $script:DbOverride) 'the real database in use again'
 
-Write-Host "`n== backup"
+Write-Host "`n== backups and restore"
 Wait-Backup 60
-$backups = @(Get-ChildItem (Join-Path $tmp 'backups-lawha') -Filter '*.accdb')
-Assert ($backups.Count -eq 1 -and $backups[0].Length -eq (Get-Item $dbCopy).Length) "one daily backup: $($backups[0].Name)"
+Start-Backup -Now
+Wait-Backup 60
+Update-Backup
+$b = Get-Backups
+Assert ($b.Count -ge 1 -and -not $script:BackupError) "backup in the chosen folder: $($b[0].name)"
+Assert ((Get-Item (Join-Path (Get-BackupDir) $b[0].name)).Length -eq (Get-Item $dbFile).Length) 'same size as the database'
+Assert (Test-ShopDatabase (Join-Path (Get-BackupDir) $b[0].name)) 'the copy is a Fr3oon database'
+$keepName = $b[0].name
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'بعد النسخة'; user = 'x' }) | Out-Null
+Assert ($null -ne (Row 'bayeeCode' 'bayeeCode' 'بعد النسخة')) 'a customer added after the backup'
+Start-Sleep -Milliseconds 1100
+$rr = Restore-Backup $keepName
+function Reopen { Use-Database -ReadOnly { param($db) Count $db 'SELECT Count(*) FROM Users' } | Out-Null }
+Reopen
+Assert ($null -eq (Row 'bayeeCode' 'bayeeCode' 'بعد النسخة')) 'restore: back as it was in the backup'
+Assert (Test-Path -LiteralPath (Join-Path (Get-BackupDir) $rr.safety)) "the database before the restore was kept: $($rr.safety)"
+Restore-Backup $rr.safety | Out-Null
+Reopen
+Assert ($null -ne (Row 'bayeeCode' 'bayeeCode' 'بعد النسخة')) 'and the restore can be undone'
+Assert-Throws { Restore-Backup '..\..\x.accdb' } 'غير صحيح' 'only names of copies in the folder'
+Copy-Item (Join-Path $tmp 'other.accdb') (Join-Path (Get-BackupDir) 'fr3oon-2000-01-01_00-00-00.accdb')
+Assert-Throws { Restore-Backup 'fr3oon-2000-01-01_00-00-00.accdb' } 'ليس قاعدة بيانات' 'a broken copy is never restored'
+Remove-Item (Join-Path (Get-BackupDir) 'fr3oon-2000-01-01_00-00-00.accdb')
+for ($i = 0; $i -lt 4; $i++) { Start-Sleep -Milliseconds 1100; Start-Backup -Now; Wait-Backup 60; Update-Backup }
+$b = Get-Backups
+Assert (@($b | Where-Object { -not $_.beforeRestore }).Count -eq 3) 'only the last 3 daily copies kept'
+Assert (@($b | Where-Object { $_.beforeRestore }).Count -eq 2) 'copies made before a restore are kept'
+
+Write-Host "`n== online updates"
+$feed = Join-Path $tmp 'latest.json'
+$setup = Join-Path $tmp 'Fr3oon-Setup-9.9.9.exe'
+[IO.File]::WriteAllBytes($setup, [byte[]](1..200))
+$script:Config.updateUrl = $feed
+Sign 'update', $key, '9.9.9', $setup, $setup, 'ما الجديد' | Set-Content -LiteralPath $feed -Encoding UTF8
+$u = Get-UpdateInfo
+Assert ($u.available -and $u.latest -eq '9.9.9' -and $u.notes -eq 'ما الجديد') 'a newer signed version is found'
+$j = Get-Content $feed -Raw | ConvertFrom-Json
+$j.url = $setup + '.other'
+$j | ConvertTo-Json | Set-Content -LiteralPath $feed -Encoding UTF8
+Assert-Throws { Get-UpdateInfo } 'غير موقّع' 'a changed download link fails the signature'
+Sign 'update', $key, '1.0.0', $setup, $setup | Set-Content -LiteralPath $feed -Encoding UTF8
+Assert (-not (Get-UpdateInfo).available) 'an older version is not offered'
+Assert-Throws { Install-Update } 'آخر إصدار' 'nothing to install'
+Sign 'update', $key, '9.9.9', $setup, $setup | Set-Content -LiteralPath $feed -Encoding UTF8
+[IO.File]::WriteAllBytes($setup, [byte[]](1..201))
+Assert-Throws { Install-Update } 'لا يطابق' 'a different file than the signed one is not installed'
+Assert (-not $script:Stop) 'still running'
+Sign 'update', $key, '9.9.9', $setup, $setup | Set-Content -LiteralPath $feed -Encoding UTF8
+$inst = Install-Update
+Assert ($inst.version -eq '9.9.9' -and (Test-Path -LiteralPath $inst.file) -and $script:Stop) 'downloaded, checked, and the helper stops for the installer'
+$script:Stop = $false
+$script:Config.updateUrl = Join-Path $tmp 'missing.json'
+Assert-Throws { Get-UpdateInfo } 'تعذّر|لا توجد' 'no feed: a clear message'
+$script:Config.updateUrl = ''
 
 Write-Host "`n== self-test"
 $snap = @{}
@@ -343,5 +407,5 @@ Assert (-not ($steps | Where-Object { -not $_.ok })) "self-test: all $($steps.Co
 foreach ($t in $counts.Keys) { Assert ((Rows $t).Count -eq $snap[$t]) "self-test left $t unchanged" }
 Assert ($script:Engine.State.inTrans -eq $false) 'no transaction left open'
 
-if (-not $env:KEEP_TMP) { Remove-Item $tmp -Recurse -Force }
+if ($env:KEEP_TMP) { Write-Host "`n(temp folder kept: $tmp)" } else { Remove-Item $tmp -Recurse -Force }
 Write-Host "`nALL PASSED ($script:pass checks)" -ForegroundColor Green

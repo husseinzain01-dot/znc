@@ -1,17 +1,17 @@
-﻿; LawhatAlMahal.exe — what the shortcuts run. No window of its own: it runs
-; launch.ps1 hidden (start the helper if needed, open the app window).
+﻿; Fr3oon.exe — what the shortcuts run. No window of its own: it runs
+; launch.ps1 hidden (start the helper if needed, open the program's window).
 Unicode true
 SilentInstall silent
 RequestExecutionLevel user
-Name "لوحة المحل"
-OutFile "${OUTDIR}\LawhatAlMahal.exe"
+Name "Fr3oon"
+OutFile "${OUTDIR}\Fr3oon.exe"
 Icon "${OUTDIR}\app-nsis.ico"
 VIProductVersion "${VERSION}.0"
-VIAddVersionKey "ProductName" "لوحة المحل"
-VIAddVersionKey "FileDescription" "لوحة المحل"
+VIAddVersionKey "ProductName" "Fr3oon"
+VIAddVersionKey "FileDescription" "Fr3oon"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
-VIAddVersionKey "LegalCopyright" " "
+VIAddVersionKey "LegalCopyright" "Fr3oon"
 
 Section
   nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$EXEDIR\launch.ps1"'

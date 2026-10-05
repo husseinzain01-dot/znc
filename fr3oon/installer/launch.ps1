@@ -1,10 +1,12 @@
-﻿# Started by LawhatAlMahal.exe (hidden). Makes sure the helper is running,
-# then opens the app in its own window. Any failure is shown in a message
-# box and written to %APPDATA%\LawhatAlMahal\logs\launch.log.
+﻿# Started by Fr3oon.exe (hidden). Makes sure the helper is running, then
+# opens the program in its own window (not with -NoWindow: after an online
+# update, where the open window reloads itself). Any failure is shown in a
+# message box and written to %APPDATA%\Fr3oon\logs\launch.log.
+param([switch]$NoWindow)
 $ErrorActionPreference = 'Stop'
-$Url = 'http://localhost:8765/'
+$Url = 'http://localhost:8770/'
 $Here = $PSScriptRoot
-$LogDir = Join-Path $env:APPDATA 'LawhatAlMahal\logs'
+$LogDir = Join-Path $env:APPDATA 'Fr3oon\logs'
 
 function Log([string]$msg) {
     try {
@@ -16,7 +18,7 @@ function Log([string]$msg) {
 function Fail([string]$msg) {
     Log "ERROR $msg"
     Add-Type -AssemblyName System.Windows.Forms
-    [void][System.Windows.Forms.MessageBox]::Show("$msg`n`nالتفاصيل محفوظة بـ:`n$LogDir\launch.log", 'لوحة المحل')
+    [void][System.Windows.Forms.MessageBox]::Show("$msg`n`nالتفاصيل محفوظة في:`n$LogDir\launch.log", 'Fr3oon')
     exit 1
 }
 
@@ -34,7 +36,7 @@ function Get-Helper {
 function Test-Helper { return $null -ne (Get-Helper) }
 
 # Access's fast engine (DAO) only loads into a PowerShell of the same
-# bitness as Office. LawhatAlMahal.exe is 32-bit, so this script runs in the
+# bitness as Office. Fr3oon.exe is 32-bit, so this script runs in the
 # 32-bit PowerShell; with 64-bit Office (the usual today) the helper must run
 # in the 64-bit one, or every save goes through Access itself and is slow.
 # Try 64-bit first, then 32-bit; keep the one where DAO loads.
@@ -65,7 +67,7 @@ function Get-HelperHost {
 try {
     Log "launch from $Here (PowerShell $($PSVersionTable.PSVersion), $([IntPtr]::Size * 8)-bit)"
     $server = Join-Path $Here 'server.ps1'
-    if (-not (Test-Path -LiteralPath $server)) { Fail "ملف server.ps1 مو موجود يم البرنامج: $Here" }
+    if (-not (Test-Path -LiteralPath $server)) { Fail "الملف server.ps1 غير موجود في مجلد البرنامج: $Here" }
 
     # A helper from before an update may still be running hidden: replace it,
     # or the old code keeps answering.
@@ -90,10 +92,10 @@ try {
         $deadline = (Get-Date).AddSeconds(30)
         while (-not (Test-Helper)) {
             if ($proc.HasExited) {
-                Fail "البرنامج المساعد انسد أول ما اشتغل (رمز $($proc.ExitCode)). شوف إذا أكو برنامج حماية منعه، وجرّب مرة ثانية."
+                Fail "توقّف البرنامج المساعد فور تشغيله (الرمز $($proc.ExitCode)). تحقّق من أن برنامج الحماية لم يمنعه، ثم أعد المحاولة."
             }
             if ((Get-Date) -gt $deadline) {
-                Fail 'البرنامج المساعد ما رد خلال 30 ثانية. سد البرنامج وجرّب مرة ثانية.'
+                Fail 'لم يستجب البرنامج المساعد خلال 30 ثانية. أغلق البرنامج ثم أعد المحاولة.'
             }
             Start-Sleep -Milliseconds 400
         }
@@ -105,7 +107,7 @@ try {
     # Linked to the main computer (a second device): open that, if it answers.
     $open = $Url
     try {
-        $cfg = Get-Content -LiteralPath (Join-Path $env:APPDATA 'LawhatAlMahal\config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $cfg = Get-Content -LiteralPath (Join-Path $env:APPDATA 'Fr3oon\config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $remote = [string]$cfg.remoteUrl
     } catch { $remote = '' }
     if ($remote) {
@@ -117,6 +119,8 @@ try {
             $open = $Url + '?remote-down=1'
         }
     }
+
+    if ($NoWindow) { Log 'no window (update)'; return }
 
     # Its own window, without browser bars: Edge (always on Windows 10/11),
     # else Chrome, else the default browser.
@@ -139,5 +143,5 @@ try {
         Start-Process $open
     }
 } catch {
-    Fail ('ما اشتغل البرنامج: ' + $_.Exception.Message)
+    Fail ('تعذّر تشغيل البرنامج: ' + $_.Exception.Message)
 }

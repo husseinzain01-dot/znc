@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fr3oon Keys</title>
+<!--
+  The vendor's tool: activation keys for customers' computers, and the signed
+  update list (latest.json) for a new installer. Works offline, opened from
+  disk in Chrome or Edge. The private key file is read in this page only and
+  never leaves the computer; keep it (and its backup) somewhere safe.
+-->
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f3f4f7; --surface: #fff; --surface-2: #f5f6f9; --line: #e2e5ec; --text: #121826; --text-2: #4b5466; --muted: #7b8496;
+  --accent: #7c3aed; --accent-soft: #f1ebfe; --good: #11804a; --good-bg: #e5f5ec; --bad: #c0362c; --bad-bg: #fdeceb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1116; --surface: #171b22; --surface-2: #1d222b; --line: #2b3240; --text: #f2f4f8; --text-2: #b8c0cf; --muted: #8a93a5;
+    --accent: #8b5cf6; --accent-soft: #2a1f4a; --good: #5fd18e; --good-bg: #133222; --bad: #f28b82; --bad-bg: #3a1b18;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Segoe UI", Tahoma, Arial, sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 60px; }
+header { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+header svg { width: 56px; height: 56px; }
+h1 { margin: 0; font-size: 22px; }
+h2 { margin: 0 0 6px; font-size: 18px; }
+.muted { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
+label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-2); font-weight: 600; }
+input, textarea { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); min-width: 0; }
+textarea { font-family: Consolas, "Courier New", monospace; font-size: 13px; resize: vertical; word-break: break-all; }
+[dir="ltr"] { text-align: left; }
+button { font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.notice { padding: 10px 14px; border-radius: 10px; margin: 10px 0 0; }
+.notice.good { background: var(--good-bg); color: var(--good); }
+.notice.bad { background: var(--bad-bg); color: var(--bad); }
+.locked { opacity: .45; pointer-events: none; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: start; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td code { font-size: 12px; }
+ol { padding-inline-start: 20px; color: var(--text-2); }
+code { font-family: Consolas, "Courier New", monospace; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#0c1022"/><g fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke-width="3"><path d="M32 9C21.5 9 14.5 16.5 13.5 27L10 53M20 27.5L18.5 53M12.5 34.5h6.5M11.7 41h7.3M11 47.5h7.8" stroke="#22d3ee"/><path d="M32 9C42.5 9 49.5 16.5 50.5 27L54 53M44 27.5L45.5 53M51.5 34.5h-6.5M52.3 41h-7.3M53 47.5h-7.8" stroke="#a855f7"/><path d="M20 27.5Q32 21.5 44 27.5" stroke="#5fa8f5"/></g><g stroke-width="3.6"><path d="M24.5 50V32h7.5M24.5 41h6" stroke="#22d3ee"/><path d="M34 32h7.5l-4.4 6.6c3.3 0 5.4 2.1 5.4 5.3 0 3.6-2.6 6.1-6 6.1-1.5 0-2.8-.5-3.8-1.3" stroke="#a855f7"/></g></g></svg>
+    <div><h1>مفاتيح Fr3oon</h1><div class="muted">أداة الناشر: مفاتيح التفعيل وملف التحديثات الموقّع</div></div>
+  </header>
+
+  <section class="card">
+    <h2>1) المفتاح الخاص</h2>
+    <p class="muted">اختر ملف <code>Fr3oon-private-key.json</code>. يُقرأ داخل هذه الصفحة فقط ولا يُرسل إلى أي مكان.
+      احتفظ بنسخة منه في مكان آمن: من دونه لا يمكن إصدار مفاتيح أو تحديثات جديدة، ومن يحصل عليه يستطيع إصدارها.</p>
+    <div class="row"><input type="file" id="keyFile" accept=".json,application/json"></div>
+    <p id="keyStatus" class="notice bad" hidden></p>
+  </section>
+
+  <section class="card locked" id="licCard">
+    <h2>2) مفتاح تفعيل لجهاز عميل</h2>
+    <p class="muted">يظهر «رمز هذا الجهاز» في شاشة التفعيل على جهاز العميل. المفتاح يعمل على ذلك الجهاز وحده.</p>
+    <div class="grid">
+      <label>رمز الجهاز <input id="lMachine" dir="ltr" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="24"></label>
+      <label>اسم العميل أو المحل <input id="lName" maxlength="80"></label>
+      <label>ينتهي في (اتركه فارغاً لترخيص دائم) <input id="lExpiry" type="date"></label>
+    </div>
+    <button class="primary" id="lMake">إصدار المفتاح</button>
+    <p id="lErr" class="notice bad" hidden></p>
+    <div id="lOut" hidden>
+      <label style="margin-top:12px">مفتاح التفعيل (أرسله إلى العميل كما هو) <textarea id="lKey" dir="ltr" rows="4" readonly></textarea></label>
+      <div class="row" style="margin-top:8px"><button id="lCopy">نسخ المفتاح</button></div>
+    </div>
+  </section>
+
+  <section class="card locked" id="upCard">
+    <h2>3) نشر تحديث</h2>
+    <ol>
+      <li>غيّر رقم الإصدار في البرنامج وابنِ ملف التثبيت (مثل <code>Fr3oon-Setup-2.0.1.exe</code>).</li>
+      <li>في مستودع <code>fr3oon-updates</code> على GitHub: أنشئ Release باسم <code>v2.0.1</code> وارفع إليه ملف التثبيت.</li>
+      <li>اختر الملف نفسه هنا، ثم نزّل <code>latest.json</code> واستبدل به الملف الموجود في المستودع.</li>
+    </ol>
+    <div class="grid">
+      <label>رقم الإصدار <input id="uVersion" dir="ltr" placeholder="2.0.1"></label>
+      <label>ملف التثبيت <input id="uFile" type="file" accept=".exe"></label>
+    </div>
+    <label>رابط تنزيل ملف التثبيت <input id="uUrl" dir="ltr"></label>
+    <label style="margin-top:12px">ما الجديد في هذا الإصدار (يظهر للمستخدم) <textarea id="uNotes" rows="4" style="font-family:inherit"></textarea></label>
+    <div class="row" style="margin-top:12px"><button class="primary" id="uMake">إنشاء latest.json</button></div>
+    <p id="uErr" class="notice bad" hidden></p>
+    <p id="uOk" class="notice good" hidden></p>
+  </section>
+
+  <section class="card">
+    <h2>المفاتيح الصادرة</h2>
+    <p class="muted">سجل المفاتيح التي أصدرتها من هذا المتصفح (محفوظ فيه فقط). صدّره من حين لآخر.</p>
+    <div class="row"><button id="hExport">تصدير CSV</button></div>
+    <div id="hList" style="margin-top:10px"></div>
+  </section>
+</main>
+
+<script>
+// Same as $VendorKey in server/server.ps1: the program accepts only what
+// this key pair signs.
+const VENDOR_PUBLIC = { x: 'MUsling1wiVjg7EmUEz2iBXVY6IdPwDlK0exjnfn-NQ', y: 'EcYr6IWTh2FPbj1YcU8jF3EHpY0f_Gm5wxNbSkBIklM' };
+const REPO = 'husseinzain01-dot/fr3oon-updates';
+const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+const $ = (s) => document.querySelector(s);
+const enc = new TextEncoder();
+const b64u = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const b64uText = (s) => b64u(enc.encode(s));
+const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+const today = () => new Date().toISOString().slice(0, 10);
+const show = (el, msg) => { el.textContent = msg; el.hidden = !msg; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+let key = null;
+
+// WebCrypto's ECDSA signature is r||s (IEEE P1363), as the program expects.
+async function sign(context, data) {
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${context}\n${data}`));
+  return b64u(sig);
+}
+
+$('#keyFile').onchange = async (e) => {
+  const f = e.target.files[0];
+  key = null;
+  $('#licCard').classList.add('locked');
+  $('#upCard').classList.add('locked');
+  if (!f) return;
+  const st = $('#keyStatus');
+  try {
+    if (!window.crypto?.subtle) throw new Error('افتح هذه الصفحة في Chrome أو Edge (التشفير غير متاح في هذا المتصفح).');
+    const j = JSON.parse(await f.text());
+    if (j.kty !== 'EC' || j.crv !== 'P-256' || !j.d) throw new Error('هذا ليس ملف مفتاح خاص صالحاً.');
+    if (j.x !== VENDOR_PUBLIC.x || j.y !== VENDOR_PUBLIC.y) throw new Error('هذا المفتاح لا يطابق المفتاح المضمَّن في البرنامج؛ ما يوقّعه لن يقبله البرنامج.');
+    key = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: j.x, y: j.y, d: j.d, ext: false }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    st.className = 'notice good';
+    show(st, '✔ تم تحميل المفتاح، ويطابق البرنامج.');
+    $('#licCard').classList.remove('locked');
+    $('#upCard').classList.remove('locked');
+  } catch (err) {
+    st.className = 'notice bad';
+    show(st, err.message);
+  }
+};
+
+// ---------------------------------------------------------------- licenses
+function normaliseMachine(v) {
+  const s = v.toUpperCase().replace(/[^0-9A-Z]/g, '');
+  if (s.length !== 16 || [...s].some((c) => !ALPHABET.includes(c))) return '';
+  return s.match(/.{4}/g).join('-');
+}
+
+$('#lMake').onclick = async () => {
+  show($('#lErr'), '');
+  $('#lOut').hidden = true;
+  const machine = normaliseMachine($('#lMachine').value);
+  const name = $('#lName').value.trim();
+  const expiry = $('#lExpiry').value;
+  if (!machine) return show($('#lErr'), 'رمز الجهاز غير صحيح: 16 حرفاً ورقماً بالشكل XXXX-XXXX-XXXX-XXXX، كما يظهر في شاشة التفعيل.');
+  if (!name) return show($('#lErr'), 'اكتب اسم العميل أو المحل.');
+  if (expiry && expiry <= today()) return show($('#lErr'), 'تاريخ الانتهاء يجب أن يكون بعد اليوم.');
+  const payload = b64uText(JSON.stringify({ p: 'Fr3oon', m: machine, n: name, e: expiry, i: today() }));
+  const k = `${payload}.${await sign('FR3OON-LICENSE', payload)}`;
+  $('#lMachine').value = machine;
+  $('#lKey').value = k;
+  $('#lOut').hidden = false;
+  addHistory({ date: today(), name, machine, expiry, key: k });
+};
+$('#lCopy').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($('#lKey').value);
+    $('#lCopy').textContent = 'تم النسخ ✔';
+  } catch {
+    $('#lKey').select();
+    document.execCommand('copy');
+    $('#lCopy').textContent = 'تم النسخ ✔';
+  }
+  setTimeout(() => ($('#lCopy').textContent = 'نسخ المفتاح'), 2000);
+};
+
+// ---------------------------------------------------------------- history
+const HKEY = 'fr3oon-keys-history';
+const loadHistory = () => { try { return JSON.parse(localStorage.getItem(HKEY) || '[]'); } catch { return []; } };
+function addHistory(h) {
+  const list = loadHistory();
+  list.unshift(h);
+  try { localStorage.setItem(HKEY, JSON.stringify(list)); } catch { /* history is a convenience */ }
+  drawHistory();
+}
+function drawHistory() {
+  const list = loadHistory();
+  $('#hList').innerHTML = list.length
+    ? `<table><tr><th>التاريخ</th><th>العميل</th><th>رمز الجهاز</th><th>ينتهي</th></tr>${list
+        .map((h) => `<tr><td>${esc(h.date)}</td><td>${esc(h.name)}</td><td><code dir="ltr">${esc(h.machine)}</code></td><td>${esc(h.expiry || 'دائم')}</td></tr>`)
+        .join('')}</table>`
+    : '<p class="muted">لا توجد مفاتيح بعد.</p>';
+}
+$('#hExport').onclick = () => {
+  const rows = [['date', 'customer', 'machine', 'expiry', 'key'], ...loadHistory().map((h) => [h.date, h.name, h.machine, h.expiry, h.key])];
+  const csv = '﻿' + rows.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  download('fr3oon-keys.csv', csv, 'text/csv');
+};
+drawHistory();
+
+// ---------------------------------------------------------------- updates
+function download(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const defaultUrl = (v) => `https://github.com/${REPO}/releases/download/v${v}/Fr3oon-Setup-${v}.exe`;
+$('#uVersion').oninput = () => {
+  const v = $('#uVersion').value.trim();
+  if (!$('#uUrl').dataset.edited) $('#uUrl').value = /^\d+\.\d+\.\d+$/.test(v) ? defaultUrl(v) : '';
+};
+$('#uUrl').oninput = () => ($('#uUrl').dataset.edited = '1');
+$('#uFile').onchange = () => {
+  const m = $('#uFile').files[0]?.name.match(/(\d+\.\d+\.\d+)/);
+  if (m && !$('#uVersion').value) {
+    $('#uVersion').value = m[1];
+    $('#uVersion').oninput();
+  }
+};
+$('#uMake').onclick = async () => {
+  show($('#uErr'), '');
+  show($('#uOk'), '');
+  const version = $('#uVersion').value.trim();
+  const url = $('#uUrl').value.trim();
+  const file = $('#uFile').files[0];
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return show($('#uErr'), 'رقم الإصدار بالشكل 2.0.1');
+  if (!file) return show($('#uErr'), 'اختر ملف التثبيت.');
+  if (!/^https:\/\//.test(url)) return show($('#uErr'), 'رابط التنزيل يجب أن يبدأ بـ https://');
+  const m = file.name.match(/(\d+\.\d+\.\d+)/);
+  if (m && m[1] !== version && !confirm(`اسم الملف يدل على الإصدار ${m[1]} وليس ${version}. متابعة؟`)) return;
+  $('#uMake').disabled = true;
+  try {
+    const sha256 = hex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+    const j = {
+      product: 'Fr3oon', version, url, sha256, size: file.size, notes: $('#uNotes').value.trim(), date: today(),
+      sig: await sign('FR3OON-UPDATE', `${version}\n${url}\n${sha256}`),
+    };
+    download('latest.json', JSON.stringify(j, null, 2) + '\n', 'application/json');
+    show($('#uOk'), `✔ نُزّل latest.json للإصدار ${version}. ارفعه إلى المستودع بعد رفع ملف التثبيت إلى الـ Release؛ ستجده الأجهزة عند البحث عن تحديث.`);
+  } catch (err) {
+    show($('#uErr'), err.message);
+  } finally {
+    $('#uMake').disabled = false;
+  }
+};
+</script>
+</body>
+</html>
