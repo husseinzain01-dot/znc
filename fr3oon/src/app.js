@@ -8,6 +8,7 @@ import { setupForms } from './forms.js';
 import { setupPos } from './pos.js';
 import { setupSettings } from './settings.js';
 import { setupReports } from './reports.js';
+import { lowStockCount } from './analysis.js';
 import { setupAnalytics } from './analytics.js';
 import { setupStockCount } from './stockcount.js';
 import { setupLabels } from './labels.js';
@@ -563,7 +564,8 @@ async function signedIn(me) {
   setMe(me);
   $('#who').hidden = false;
   $('#whoName').textContent = me.user;
-  $('#whoAvatar').textContent = (me.user || '?').trim().charAt(0);
+  // the first letter of the name, after «ال» (المدير → م)
+  $('#whoAvatar').textContent = ((me.user || '?').trim().replace(/^ال(?=.)/, '') || '?').charAt(0);
   buildNav();
   POS?.reset();
   state.view = homeView();
@@ -618,8 +620,10 @@ function applyPreset(p, { draw = true } = {}) {
 function periodLabel() {
   const { from, to } = state.filter;
   if (!from && !to) return 'كل الفترات';
-  if (from === to) return from;
-  return `${from || '…'} إلى ${to || '…'}`;
+  // each date isolated left-to-right inside the Arabic text
+  const d = (x) => (x ? `\u2066${x}\u2069` : '…');
+  if (from === to) return d(from);
+  return `${d(from)} إلى ${d(to)}`;
 }
 
 // ---------- generic sortable table ----------
@@ -921,6 +925,13 @@ function viewHome() {
   if (!s.count && P.lastDate && state.preset === 'today') {
     hint = `<p class="notice">لا توجد مبيعات مسجّلة اليوم. آخر يوم فيه مبيعات: <b>${P.lastDate}</b>
       <button class="btn small" id="goLast">اعرضه</button></p>`;
+  }
+
+  // items at their reorder level or sold out while still selling
+  const low = can('reports') || !state.server ? lowStockCount(P, localDay()) : 0;
+  if (low) {
+    hint += `<p class="notice low-alert">${icon('stock')} <span><b>${fmt(low)}</b> ${low === 1 ? 'صنف وصل' : low === 2 ? 'صنفان وصلا' : 'أصناف وصلت'} إلى حد الطلب أو نفدت.</span>
+      <button class="btn small" id="goLow">عرض النواقص وطلبية الشراء</button></p>`;
   }
 
   const topItems = s.byItem.slice(0, 8);
@@ -1405,10 +1416,15 @@ function render() {
   $('#pageSub').textContent = period ? periodLabel() : sub;
   $('#main').innerHTML = views[state.view]();
   $('#pageActions').innerHTML = pendingActions
-    .map(([id, label]) => `<button class="btn primary" data-act="${id}">${esc(label)}</button>`)
+    .map(([id, label], i) => `<button class="btn${i === 0 ? ' primary' : ''}" data-act="${id}">${esc(label)}</button>`)
     .join('');
   $('#shopTitle').textContent = state.shopName || APP;
   for (const fn of afterRender) fn();
+  $('#goLow')?.addEventListener('click', () => {
+    store.set('fr3oon-report-tab', 'low');
+    REP = null;
+    go('reports');
+  });
   $('#goLast')?.addEventListener('click', () => {
     state.preset = '';
     state.filter.from = state.filter.to = state.P.lastDate;
