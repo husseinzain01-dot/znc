@@ -62,7 +62,8 @@ export function setupForms(ctx) {
     return [item.code, item.cls, stock].filter(Boolean).join(' — ');
   }
 
-  function invoiceEditor(kind, inv) {
+  // preset (a new invoice only): { who, type, lines: [{item, unit, qty, price}] }
+  function invoiceEditor(kind, inv, preset = null) {
     const sale = kind === 'sale';
     const items = P().items;
     // Sales: the big (wholesale) unit and other prices need permissions; a
@@ -77,12 +78,12 @@ export function setupForms(ctx) {
       : [C.CASH, C.CREDIT];
     const priceFor = (it, unit) =>
       sale ? (unit === it.unitL1 ? it.priceL1 : it.priceL2) : unit === it.unitL1 ? it.buyL1 : it.buyL2;
-    const lines = (inv?.lines || []).map((l) => ({ item: l.item, unit: l.unit, qty: l.qty, price: l.price }));
-    let type = inv?.type || (sale ? C.CASH : C.CREDIT);
+    const lines = (inv?.lines || preset?.lines || []).map((l) => ({ item: l.item, unit: l.unit, qty: l.qty, price: l.price }));
+    let type = inv?.type || preset?.type || (sale ? C.CASH : C.CREDIT);
 
     const people = sale ? P().customers : P().suppliers;
     const balances = new Map((sale ? C.customerBalances(P()) : C.supplierBalances(P())).map((b) => [b.name, b.balance]));
-    const who = inv ? (sale ? (inv.customer === 'عميل نقدي' ? '' : inv.customer) : inv.supplier) : '';
+    const who = inv ? (sale ? (inv.customer === 'عميل نقدي' ? '' : inv.customer) : inv.supplier) : preset?.who || '';
 
     openModal(`<h2>${inv ? `تعديل ${sale ? 'فاتورة بيع' : 'فاتورة شراء'} رقم ${inv.id}` : sale ? 'فاتورة بيع جديدة' : 'فاتورة شراء جديدة'}</h2>
       ${datalist('dlPeople', people.map((p) => ({ value: p.name, label: p.mobile })))}

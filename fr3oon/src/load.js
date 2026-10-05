@@ -122,5 +122,27 @@ export function loadDatabase(reader) {
     ? reader.getTable('Users').getData({ columns: ['UserName', 'Active'] }).filter((r) => r.Active !== false && r.Active !== 0).map((r) => str(r.UserName)).filter(Boolean)
     : [];
 
-  return { items, sales, saleLines, purchases, purchaseLines, customers, suppliers, receipts, payments, classesIn, classesOut, userNames };
+  // Stock counts: quantities in the item's small unit; counted − expected
+  // corrects the stock from the count on.
+  const stockCounts = rows(reader, 'StockCount').map((r) => ({
+    id: r.ID,
+    date: day(r.CountDate),
+    time: stamp(r.CountDate),
+    user: str(r.UserName),
+    note: str(r.Note),
+    scope: str(r.Scope),
+  }));
+  const stockCountLines = rows(reader, 'StockCountLine').map((r) => ({
+    id: r.ID,
+    countId: r.CountID,
+    item: str(r.Item),
+    expected: num(r.Expected),
+    counted: num(r.Counted),
+    cost: num(r.Cost),
+  }));
+
+  return {
+    items, sales, saleLines, purchases, purchaseLines, customers, suppliers, receipts, payments, classesIn, classesOut, userNames,
+    stockCounts, stockCountLines,
+  };
 }

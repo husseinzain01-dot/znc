@@ -161,7 +161,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 /* ---------------- layout ---------------- */
 .app { display: grid; grid-template-columns: 272px 1fr; min-height: 100vh; }
 .side {
-  color: var(--side-text); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 18px 14px;
+  color: var(--side-text); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; padding: 18px 14px;
   background:
     radial-gradient(320px 220px at 100% 0%, rgba(124, 58, 237, .28), transparent 70%),
     radial-gradient(260px 220px at 0% 100%, rgba(34, 211, 238, .14), transparent 70%),
@@ -174,7 +174,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px;
 .wordmark { display: block; font-size: 11px; font-weight: 700; letter-spacing: .14em; background: linear-gradient(90deg, #22d3ee, #a78bfa); -webkit-background-clip: text; background-clip: text; color: transparent; direction: ltr; text-align: end; }
 .side-brand b { display: block; color: #fff; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-brand small { display: block; color: var(--side-muted); font-size: 11.5px; line-height: 1.4; }
-.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; margin-inline: -14px; padding-inline: 14px; }
 .nav .group { color: var(--side-muted); font-size: 11.5px; font-weight: 600; padding: 12px 12px 4px; letter-spacing: .03em; }
 .nav button {
   position: relative; display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: 0; border-radius: 12px;

@@ -77,7 +77,8 @@ $AllPerms = @(
     'pos', 'home', 'sales', 'purchases', 'customers', 'suppliers', 'stock', 'cash', 'profit', 'checks',
     'sale_cash', 'sale_credit', 'sale_wholesale', 'edit_price', 'print', 'sale_edit', 'sale_delete',
     'purchase', 'purchase_edit', 'receipt', 'payment', 'voucher_edit',
-    'customer_add', 'customer_edit', 'supplier_manage', 'item_manage'
+    'customer_add', 'customer_edit', 'supplier_manage', 'item_manage',
+    'reports', 'analytics', 'stock_count', 'labels'
 )
 
 # Permissions are kept and sent as one text, "pos,sale_cash,print": Windows
@@ -226,7 +227,29 @@ function Open-Db([string]$path) {
         throw "تعذّر فتح قاعدة البيانات. إذا كان برنامج آخر يفتحها فتحاً حصرياً فأغلقه وأعد المحاولة. ($($_.Exception.Message))"
     }
     $script:DbOpenPath = $path
+    try { Update-Schema $script:Db } catch { Write-LawhaLog "database upgrade FAILED: $($_.Exception.Message)" }
     return $script:Db
+}
+
+# A database made by an older version gets the tables added since, once,
+# when it is opened (also a restored backup). Checking a file (a backup
+# before restoring it) never changes it.
+$script:NoUpgrade = $false
+function Update-Schema($db) {
+    if ($script:NoUpgrade) { return }
+    $names = Get-TableNames $db
+    if ($names -notcontains 'Settings') { return }
+    $v = 0
+    [void][int]::TryParse((Get-ShopSetting $db 'schema'), [ref]$v)
+    if ($v -lt 1 -or $v -ge $SchemaVersion) { return }
+    $missing = @($Schema.Keys | Where-Object { $names -notcontains $_ })
+    $ws = $script:Engine.Workspaces.Item(0)
+    # the test engine keeps only what was committed
+    if ($env:LAWHA_FAKEDAO) { $ws.BeginTrans() }
+    foreach ($sql in (Get-SchemaSql $missing)) { $db.Execute($sql, $dbFailOnError) }
+    Set-ShopSetting $db 'schema' ([string]$SchemaVersion)
+    if ($env:LAWHA_FAKEDAO) { $ws.CommitTrans() }
+    Write-LawhaLog "database upgraded from version $v to $SchemaVersion (added: $($missing -join ', '))"
 }
 
 function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) {
@@ -268,7 +291,7 @@ function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) 
 # Fr3oon's own database, created by the program at setup. Defined once
 # here: CREATE TABLE for Access (DAO), and the same columns for the test
 # engine. Prices are CURRENCY (exact), quantities DOUBLE.
-$SchemaVersion = 1
+$SchemaVersion = 2
 $Schema = [ordered]@{
     madaCode    = 'ID COUNTER', 'IDcode TEXT(15)', 'MadaClass TEXT(100)', 'madaName TEXT(150)', 'harig LONG', 'price CURRENCY',
                   'priceSeeat CURRENCY', 'Fill LONG', 'BpriceL1 CURRENCY', 'BpriceL2 CURRENCY', 'UnitL1 TEXT(10)', 'UnitL2 TEXT(10)',
@@ -294,12 +317,18 @@ $Schema = [ordered]@{
     Users       = 'ID COUNTER', 'UserName TEXT(45)', 'PassHash TEXT(100)', 'Salt TEXT(50)', 'IsAdmin BIT', 'Perms MEMO',
                   'Active BIT', 'Created DATETIME'
     Settings    = 'ID COUNTER', 'Name TEXT(50)', 'Val TEXT(255)'
+    # version 2: who did what (سجل العمليات), and stock counts (الجرد) whose
+    # differences correct the stock: quantities in the item's small unit
+    ActivityLog = 'ID COUNTER', 'At DATETIME', 'UserName TEXT(45)', 'Action TEXT(40)', 'Target TEXT(150)', 'Details MEMO'
+    StockCount  = 'ID COUNTER', 'CountDate DATETIME', 'UserName TEXT(45)', 'Note TEXT(255)', 'Scope TEXT(100)'
+    StockCountLine = 'ID COUNTER', 'CountID LONG', 'Item TEXT(150)', 'Expected DOUBLE', 'Counted DOUBLE', 'Cost DOUBLE'
 }
 # Lookups the program does all the time.
 $SchemaIndexes = @(
     'subOut(idOut)', 'subOut(madaNameOut)', 'subIN(IdIn)', 'subIN(madaNameIn)', 'MasterOut(TOname)', 'MasterOut(OutDate)',
     'MasterIn(fromname)', 'mablakIn(nameFrom)', 'mablakOut(nameto)', 'madaCode(madaName)', 'madaCode(IDcode)',
-    'bayeeCode(bayeeCode)', 'shiraCode(shiraCode)', 'Users(UserName)', 'Settings(Name)'
+    'bayeeCode(bayeeCode)', 'shiraCode(shiraCode)', 'Users(UserName)', 'Settings(Name)',
+    'ActivityLog(At)', 'StockCountLine(CountID)', 'StockCountLine(Item)'
 )
 $DefaultClassesIn = @('تسديد', 'إيراد آخر', 'رأس مال')
 $DefaultClassesOut = @('تسديد', 'مصاريف متفرقة', 'رواتب', 'إيجار', 'كهرباء وماء', 'نقل', 'سحب شخصي')
@@ -313,9 +342,11 @@ function Get-SchemaColumns([string]$table) {
     }
 }
 
-function Get-SchemaSql {
+# All tables, or only the ones named (adding tables to an older database).
+function Get-SchemaSql([string[]]$only) {
     $out = New-Object System.Collections.Generic.List[string]
-    foreach ($t in $Schema.Keys) {
+    $tables = @($Schema.Keys | Where-Object { -not $only -or $only -contains $_ })
+    foreach ($t in $tables) {
         $cols = foreach ($c in (Get-SchemaColumns $t)) {
             if ($c.sqlType -eq 'COUNTER') { "[$($c.name)] COUNTER CONSTRAINT [PK_$t] PRIMARY KEY" }
             elseif ($c.sqlType -eq 'TEXT') { "[$($c.name)] TEXT($($c.size))" }
@@ -323,9 +354,8 @@ function Get-SchemaSql {
         }
         $out.Add("CREATE TABLE [$t] (" + ($cols -join ', ') + ')')
     }
-    $i = 0
     foreach ($x in $SchemaIndexes) {
-        if ($x -match '^(\w+)\((\w+)\)$') { $i++; $out.Add("CREATE INDEX [IX$i] ON [$($Matches[1])] ([$($Matches[2])])") }
+        if ($x -match '^(\w+)\((\w+)\)$' -and $tables -contains $Matches[1]) { $out.Add("CREATE INDEX [IX_$($Matches[1])_$($Matches[2])] ON [$($Matches[1])] ([$($Matches[2])])") }
     }
     return , $out.ToArray()
 }
@@ -374,6 +404,7 @@ function Get-FakeSchema {
 # Is this a Fr3oon database (and not some other Access file)?
 function Test-ShopDatabase([string]$path) {
     $script:DbOverride = $path
+    $script:NoUpgrade = $true
     try {
         return [bool](Use-Database -ReadOnly { param($db)
                 $names = Get-TableNames $db
@@ -383,6 +414,7 @@ function Test-ShopDatabase([string]$path) {
     } catch { return $false } finally {
         Close-Db
         $script:DbOverride = $null
+        $script:NoUpgrade = $false
     }
 }
 
@@ -405,6 +437,10 @@ function Set-ShopSetting($db, [string]$name, [string]$value) {
         Add-Row $db 'Settings' @{ Name = $name; Val = $value } '' | Out-Null
     }
 }
+# The printed receipt: paper width (80 or 58 mm), the shop's address and
+# phone, a closing line, and the invoice number as a barcode.
+$ReceiptKeys = [ordered]@{ width = 4; address = 120; phone = 40; footer = 200; barcode = 1; logo = 1 }
+
 # Read often (every page and request): kept a few seconds.
 $script:ShopCache = $null
 function Get-Shop {
@@ -425,7 +461,9 @@ function Get-Shop {
                 $rs.MoveNext()
             }
         } finally { $rs.Close() }
-        return @{ shopName = (Get-ShopSetting $db 'shopName'); users = $users }
+        $receipt = @{}
+        foreach ($k in $ReceiptKeys.Keys) { $receipt[$k] = Get-ShopSetting $db ('receipt.' + $k) }
+        return @{ shopName = (Get-ShopSetting $db 'shopName'); users = $users; receipt = $receipt }
     }
     $c.at = Get-Date
     $c.path = $p
@@ -915,7 +953,7 @@ function Op-DeletePayment($db, $d) { return Delete-Voucher $db 'mablakOut' $d }
 $Links = @{
     customer = @(@('MasterOut', 'TOname'), @('mablakIn', 'nameFrom'))
     supplier = @(@('MasterIn', 'fromname'), @('mablakOut', 'nameto'))
-    item     = @(@('subOut', 'madaNameOut'), @('subIN', 'madaNameIn'))
+    item     = @(@('subOut', 'madaNameOut'), @('subIN', 'madaNameIn'), @('StockCountLine', 'Item'))
 }
 
 function Rename-Links($db, [string]$kind, [string]$old, [string]$new) {
@@ -1020,6 +1058,267 @@ function Op-DeleteCustomer($db, $d) { return Delete-Named $db 'customer' 'bayeeC
 function Op-DeleteSupplier($db, $d) { return Delete-Named $db 'supplier' 'shiraCode' 'ID' 'shiraCode' $d }
 function Op-DeleteItem($db, $d) { return Delete-Named $db 'item' 'madaCode' 'ID' 'madaName' $d }
 
+# ---------------------------------------------------------------- stock counts (الجرد)
+# What was counted, against what the program expected, both in the item's
+# small unit; the difference corrects the stock from then on.
+function Dbl($v) { if ($null -eq $v -or $v -is [DBNull]) { return 0.0 } return [double]$v }
+function Get-PieceCost($it) {
+    $fill = Dbl $it.Fill
+    if ($it.UnitL2 -and $it.UnitL1 -ne $it.UnitL2 -and $fill -gt 0) {
+        $c = Dbl $it.BpriceL2
+        if ($c -le 0) { $c = (Dbl $it.BpriceL1) / $fill }
+        return $c
+    }
+    return Dbl $it.BpriceL1
+}
+function Op-SaveStockCount($db, $d) {
+    $lines = @($d.lines | Where-Object { $null -ne $_ })
+    Need ($lines.Count -gt 0) 'لم يُعَدّ أي صنف'
+    $id = [int](Add-Row $db 'StockCount' @{
+            CountDate = (Get-Date); UserName = (Text $d.user 45 'اسم المستخدم'); Note = (Text $d.note 255 'الملاحظة'); Scope = (Text $d.scope 100 'نطاق الجرد')
+        } 'ID')
+    $plus = 0.0; $minus = 0.0; $changed = 0
+    $seen = @{}
+    foreach ($l in $lines) {
+        $name = [string]$l.item
+        Need (-not $seen.ContainsKey($name)) "الصنف مكرر في الجرد: $name"
+        $seen[$name] = $true
+        $it = Get-MadaItem $db $name
+        $expected = Num $l.expected 'الرصيد المتوقع'
+        $counted = Num $l.counted "الكمية المعدودة ($name)"
+        Need ($counted -ge 0) "لا تكون الكمية المعدودة سالبة: $name"
+        $cost = Get-PieceCost $it
+        Add-Row $db 'StockCountLine' @{ CountID = $id; Item = $name; Expected = $expected; Counted = $counted; Cost = $cost } '' | Out-Null
+        $diff = $counted - $expected
+        if ($diff -gt 0) { $plus += $diff * $cost } elseif ($diff -lt 0) { $minus += - $diff * $cost }
+        if ($diff -ne 0) { $changed++ }
+    }
+    return @{ id = $id; items = $lines.Count; changed = $changed; plus = $plus; minus = $minus }
+}
+function Op-DeleteStockCount($db, $d) {
+    $id = [int]$d.id
+    Need ((Count $db "SELECT Count(*) FROM StockCount WHERE ID=$id") -gt 0) 'الجرد غير موجود'
+    $db.Execute("DELETE FROM StockCountLine WHERE CountID=$id", $dbFailOnError)
+    $db.Execute("DELETE FROM StockCount WHERE ID=$id", $dbFailOnError)
+    return @{ id = $id }
+}
+
+# Barcodes for items that have none (printing labels).
+function Op-SetItemCodes($db, $d) {
+    $list = @($d.codes | Where-Object { $null -ne $_ })
+    Need ($list.Count -gt 0) 'لا توجد رموز للحفظ'
+    $seen = @{}
+    foreach ($c in $list) {
+        $id = [int]$c.id
+        $code = Text ([string]$c.code) 15 'الرمز'
+        Need ($code -ne '') 'رمز فارغ'
+        Need (-not $seen.ContainsKey($code)) "رمز مكرر: $code"
+        $seen[$code] = $true
+        Need ((Count $db "SELECT Count(*) FROM madaCode WHERE IDcode=$(Q $code) AND ID<>$id") -eq 0) "يوجد صنف آخر بنفس الرمز: $code"
+        Edit-Row $db 'madaCode' 'ID' $id @{ IDcode = $code }
+    }
+    return @{ id = 0; count = $list.Count }
+}
+
+# ---------------------------------------------------------------- activity log (سجل العمليات)
+# Every save, delete, sign-in and change of settings, with who and when,
+# kept in the database. A save and its line in the log are one transaction.
+$ActivityNames = [ordered]@{
+    saveSale_new = 'فاتورة بيع'; saveSale_edit = 'تعديل فاتورة بيع'; deleteSale = 'حذف فاتورة بيع'; price_change = 'بيع بسعر غير سعر البطاقة'
+    savePurchase_new = 'فاتورة شراء'; savePurchase_edit = 'تعديل فاتورة شراء'; deletePurchase = 'حذف فاتورة شراء'
+    saveReceipt_new = 'سند قبض'; saveReceipt_edit = 'تعديل سند قبض'; deleteReceipt = 'حذف سند قبض'
+    savePayment_new = 'سند صرف'; savePayment_edit = 'تعديل سند صرف'; deletePayment = 'حذف سند صرف'
+    saveCustomer_new = 'إضافة عميل'; saveCustomer_edit = 'تعديل عميل'; deleteCustomer = 'حذف عميل'
+    saveSupplier_new = 'إضافة مورد'; saveSupplier_edit = 'تعديل مورد'; deleteSupplier = 'حذف مورد'
+    saveItem_new = 'إضافة صنف'; saveItem_edit = 'تعديل صنف'; deleteItem = 'حذف صنف'
+    saveStockCount_new = 'جرد المخزون'; deleteStockCount = 'إلغاء جرد'; setItemCodes = 'توليد باركود'
+    login = 'تسجيل الدخول'; login_failed = 'محاولة دخول فاشلة'; logout = 'تسجيل الخروج'; password = 'تغيير كلمة المرور'
+    settings = 'تعديل الإعدادات'; user_save = 'حفظ مستخدم'; user_delete = 'حذف مستخدم'
+    backup = 'نسخ احتياطي يدوي'; restore = 'استعادة نسخة احتياطية'; update = 'تثبيت تحديث'; remote = 'الأجهزة الأخرى'
+}
+# shown highlighted: what a manager usually looks for
+$ActivityWarn = @('deleteSale', 'deletePurchase', 'deleteReceipt', 'deletePayment', 'deleteCustomer', 'deleteSupplier', 'deleteItem',
+    'saveSale_edit', 'savePurchase_edit', 'saveReceipt_edit', 'savePayment_edit', 'price_change', 'login_failed', 'restore',
+    'deleteStockCount', 'user_delete')
+
+function Format-Amount($n) { return ([double]$n).ToString('#,0.##', [Globalization.CultureInfo]::InvariantCulture) }
+function Limit-Text([string]$s, [int]$n) { if ($s.Length -gt $n) { return $s.Substring(0, $n - 1) + '…' } return $s }
+
+function Add-Activity($db, [string]$user, [string]$action, [string]$target, [string]$details) {
+    Add-Row $db 'ActivityLog' @{
+        At = (Get-Date); UserName = (Limit-Text $user 45); Action = (Limit-Text $action 40)
+        Target = (Limit-Text $target 150); Details = (Limit-Text $details 4000)
+    } '' | Out-Null
+}
+# Outside a save (sign-in, settings…): its own short transaction; never
+# stops what is being logged.
+function Write-Activity([string]$user, [string]$action, [string]$target = '', [string]$details = '') {
+    if (-not (Get-DbPath)) { return }
+    try { Use-Database { param($db) Add-Activity $db $user $action $target $details } | Out-Null }
+    catch { Write-LawhaLog "activity log FAILED ($action): $($_.Exception.Message)" }
+}
+
+function Get-InvoiceSummary($db, [string]$kind, [int]$id) {
+    $sale = $kind -eq 'sale'
+    $m = if ($sale) { "SELECT TOname, OutType, Paid FROM MasterOut WHERE idOut=$id" } else { "SELECT fromname, InType FROM MasterIn WHERE IdIn=$id" }
+    $rs = $db.OpenRecordset($m, $dbOpenSnapshot)
+    try {
+        if ($rs.EOF) { return '' }
+        $who = [string]$rs.Fields.Item(0).Value
+        $type = [string]$rs.Fields.Item(1).Value
+        $paid = if ($sale) { Dbl $rs.Fields.Item(2).Value } else { 0 }
+    } finally { $rs.Close() }
+    $l = if ($sale) { "SELECT madaNameOut, QuntOut, unit, Price FROM subOut WHERE idOut=$id" } else { "SELECT madaNameIn, QuntIn, unit, Price FROM subIN WHERE IdIn=$id" }
+    $total = 0.0
+    $names = New-Object System.Collections.Generic.List[string]
+    $rs = $db.OpenRecordset($l, $dbOpenSnapshot)
+    try {
+        while (-not $rs.EOF) {
+            $q = Dbl $rs.Fields.Item(1).Value
+            $total += $q * (Dbl $rs.Fields.Item(3).Value)
+            $names.Add("$($rs.Fields.Item(0).Value) × $(Format-Amount $q) $($rs.Fields.Item(2).Value)")
+            $rs.MoveNext()
+        }
+    } finally { $rs.Close() }
+    $t = if ($type -eq 'اجل') { 'آجل' } else { 'نقدي' }
+    $out = "$who — $t — المجموع $(Format-Amount $total)"
+    if ($paid) { $out += " — المدفوع $(Format-Amount $paid)" }
+    return $out + "`n" + ($names -join '، ')
+}
+function Get-VoucherSummary($db, [string]$table, [int]$id) {
+    $nameField = if ($table -eq 'mablakIn') { 'nameFrom' } else { 'nameto' }
+    $rs = $db.OpenRecordset("SELECT mostandNO, [$nameField], classS, mablak, note FROM [$table] WHERE idS=$id", $dbOpenSnapshot)
+    try {
+        if ($rs.EOF) { return '' }
+        $name = [string]$rs.Fields.Item(1).Value
+        $out = "رقم $($rs.Fields.Item(0).Value) — $($rs.Fields.Item(2).Value)$(if ($name) { " — $name" }) — المبلغ $(Format-Amount (Dbl $rs.Fields.Item(3).Value))"
+        $note = [string]$rs.Fields.Item(4).Value
+        if ($note) { $out += " — $note" }
+        return $out
+    } finally { $rs.Close() }
+}
+$ItemFields = [ordered]@{ madaName = 'الاسم'; IDcode = 'الرمز'; price = 'سعر البيع (الكبيرة)'; priceSeeat = 'سعر البيع (الصغيرة)'; BpriceL1 = 'سعر الشراء (الكبيرة)'; BpriceL2 = 'سعر الشراء (الصغيرة)' }
+function Get-ItemRecord($db, [int]$id) {
+    $rs = $db.OpenRecordset("SELECT madaName, IDcode, price, priceSeeat, BpriceL1, BpriceL2 FROM madaCode WHERE ID=$id", $dbOpenSnapshot)
+    try {
+        if ($rs.EOF) { return $null }
+        $o = [ordered]@{}
+        foreach ($f in $ItemFields.Keys) { $v = $rs.Fields.Item($f).Value; $o[$f] = if ($v -is [DBNull] -or $null -eq $v) { '' } else { $v } }
+        return $o
+    } finally { $rs.Close() }
+}
+function Get-NamedRecord($db, [string]$kind, [int]$id) {
+    $q = if ($kind -eq 'customer') { "SELECT bayeeCode FROM bayeeCode WHERE id=$id" } else { "SELECT shiraCode FROM shiraCode WHERE ID=$id" }
+    return [string](Get-Value $db $q)
+}
+
+# What a record was before an edit or delete.
+function Get-OpBefore($db, [string]$op, $d) {
+    if (-not $d.id) { return $null }
+    $id = [int]$d.id
+    switch -Regex ($op) {
+        'Sale$' { return Get-InvoiceSummary $db 'sale' $id }
+        'Purchase$' { return Get-InvoiceSummary $db 'purchase' $id }
+        'Receipt$' { return Get-VoucherSummary $db 'mablakIn' $id }
+        'Payment$' { return Get-VoucherSummary $db 'mablakOut' $id }
+        'Customer$' { return Get-NamedRecord $db 'customer' $id }
+        'Supplier$' { return Get-NamedRecord $db 'supplier' $id }
+        'Item$' { return Get-ItemRecord $db $id }
+        'StockCount$' {
+            $n = Count $db "SELECT Count(*) FROM StockCountLine WHERE CountID=$id"
+            return "بتاريخ $(([datetime](Get-Value $db "SELECT CountDate FROM StockCount WHERE ID=$id")).ToString('yyyy-MM-dd HH:mm')) — عدد الأصناف $n"
+        }
+    }
+    return $null
+}
+
+function Add-OpActivity($db, [string]$op, $d, $r, $before) {
+    $user = [string]$d.user
+    $edit = [bool]$d.id
+    $action = if ($op -like 'save*') { $op + $(if ($edit) { '_edit' } else { '_new' }) } else { $op }
+    $id = [int]$r.id
+    $target = ''; $details = ''
+    switch -Regex ($op) {
+        'Sale$' {
+            $target = "فاتورة بيع رقم $id"
+            if ($op -eq 'saveSale') {
+                $details = Get-InvoiceSummary $db 'sale' $id
+                # a price other than the item card's: its own line in the log
+                $changes = foreach ($l in @($d.lines | Where-Object { $null -ne $_ })) {
+                    $it = Get-MadaItem $db ([string]$l.item)
+                    $list = Dbl $(if ([string]$l.unit -eq $it.UnitL1) { $it.price } else { $it.priceSeeat })
+                    $price = Dbl $l.price
+                    if ([math]::Abs($price - $list) -gt 0.001) { "«$($l.item)» ($($l.unit)): بيع بـ $(Format-Amount $price) وسعر البطاقة $(Format-Amount $list)" }
+                }
+                if (@($changes).Count) { Add-Activity $db $user 'price_change' $target (@($changes) -join "`n") }
+            }
+        }
+        'Purchase$' { $target = "فاتورة شراء رقم $id"; if ($op -eq 'savePurchase') { $details = Get-InvoiceSummary $db 'purchase' $id } }
+        'Receipt$' { $target = 'سند قبض'; if ($op -eq 'saveReceipt') { $details = Get-VoucherSummary $db 'mablakIn' $id } }
+        'Payment$' { $target = 'سند صرف'; if ($op -eq 'savePayment') { $details = Get-VoucherSummary $db 'mablakOut' $id } }
+        'Customer$|Supplier$' {
+            $kind = if ($op -like '*Customer') { 'customer' } else { 'supplier' }
+            $target = if ($op -like 'save*') { Get-NamedRecord $db $kind $id } else { [string]$before }
+            if ($edit -and $op -like 'save*' -and $before -and $before -ne $target) { $details = "الاسم: من «$before» إلى «$target»" }
+        }
+        'Item$' {
+            if ($op -eq 'saveItem') {
+                $now = Get-ItemRecord $db $id
+                $target = [string]$now.madaName
+                if ($edit -and $before) {
+                    $details = @(foreach ($f in $ItemFields.Keys) {
+                            if ([string]$before[$f] -ne [string]$now[$f]) { "$($ItemFields[$f]): من $($before[$f]) إلى $($now[$f])" }
+                        }) -join "`n"
+                } else {
+                    $details = "الرمز $($now.IDcode) — سعر البيع $(Format-Amount (Dbl $now.price)) — سعر الشراء $(Format-Amount (Dbl $now.BpriceL1))"
+                }
+            } else { $target = [string]$before.madaName }
+        }
+        'StockCount$' {
+            $target = "جرد رقم $id"
+            if ($op -eq 'saveStockCount') {
+                $details = "عدد الأصناف $($r.items) — بفرق $($r.changed) — قيمة الزيادة $(Format-Amount $r.plus) — قيمة النقص $(Format-Amount $r.minus)"
+            }
+        }
+        'setItemCodes' {
+            $target = "$($r.count) صنف"
+            $details = @(foreach ($c in @($d.codes | Select-Object -First 60)) { "$([string](Get-Value $db "SELECT madaName FROM madaCode WHERE ID=$([int]$c.id)")): $($c.code)" }) -join "`n"
+        }
+    }
+    if ($before -is [string] -and $before -and $op -notlike 'save*Customer' -and $op -notlike 'save*Supplier') {
+        $details = if ($op -like 'delete*') { $before } else { "قبل: $before`nبعد: $details" }
+    }
+    Add-Activity $db $user $action $target $details
+}
+
+# The log, newest first: at most $limit lines between two days.
+function Get-Activity([string]$from, [string]$to, [int]$limit = 5000) {
+    $where = @()
+    if ($from -match '^\d{4}-\d\d-\d\d$') { $where += "At >= #$from 00:00:00#" }
+    if ($to -match '^\d{4}-\d\d-\d\d$') { $where += "At <= #$to 23:59:59#" }
+    $sql = "SELECT TOP $limit ID, At, UserName, Action, Target, Details FROM ActivityLog" + $(if ($where) { ' WHERE ' + ($where -join ' AND ') }) + ' ORDER BY ID DESC'
+    $rows = Use-Database -ReadOnly { param($db)
+        $out = New-Object System.Collections.Generic.List[object]
+        $rs = $db.OpenRecordset($sql, $dbOpenSnapshot)
+        try {
+            while (-not $rs.EOF) {
+                $a = [string]$rs.Fields.Item('Action').Value
+                $at = $rs.Fields.Item('At').Value
+                $out.Add(@{
+                        id = [int]$rs.Fields.Item('ID').Value; at = $(if ($at -is [datetime]) { $at.ToString('yyyy-MM-dd HH:mm:ss') } else { '' })
+                        user = [string]$rs.Fields.Item('UserName').Value; action = $a
+                        label = $(if ($ActivityNames.Contains($a)) { $ActivityNames[$a] } else { $a }); warn = ($ActivityWarn -contains $a)
+                        target = [string]$rs.Fields.Item('Target').Value; details = [string]$rs.Fields.Item('Details').Value
+                    })
+                $rs.MoveNext()
+            }
+        } finally { $rs.Close() }
+        return , $out.ToArray()
+    }
+    # one line must stay a list (PowerShell unrolls it on the way out)
+    return , @($rows)
+}
+
 $Ops = @{
     saveSale = 'Op-SaveSale'; deleteSale = 'Op-DeleteSale'
     savePurchase = 'Op-SavePurchase'; deletePurchase = 'Op-DeletePurchase'
@@ -1028,6 +1327,8 @@ $Ops = @{
     saveCustomer = 'Op-SaveCustomer'; deleteCustomer = 'Op-DeleteCustomer'
     saveSupplier = 'Op-SaveSupplier'; deleteSupplier = 'Op-DeleteSupplier'
     saveItem = 'Op-SaveItem'; deleteItem = 'Op-DeleteItem'
+    saveStockCount = 'Op-SaveStockCount'; deleteStockCount = 'Op-DeleteStockCount'
+    setItemCodes = 'Op-SetItemCodes'
 }
 
 # ---------------------------------------------------------------- permissions
@@ -1076,6 +1377,7 @@ $PermNames = @{
     purchase = 'فواتير الشراء'; purchase_edit = 'تعديل وحذف فواتير الشراء'; receipt = 'سند القبض'
     payment = 'سند الصرف والمصاريف'; voucher_edit = 'تعديل وحذف السندات'; customer_add = 'إضافة عميل'
     customer_edit = 'تعديل وحذف العملاء'; supplier_manage = 'إدارة الموردين'; item_manage = 'الأصناف والأسعار'
+    stock_count = 'جرد المخزون'; labels = 'طباعة الباركود'
 }
 
 function Need-Perm($session, [string]$perm) {
@@ -1103,6 +1405,9 @@ function Test-Allowed([string]$op, $data, $session) {
         'deleteCustomer' { Need-Perm $session 'customer_edit' }
         { $_ -in 'saveSupplier', 'deleteSupplier' } { Need-Perm $session 'supplier_manage' }
         { $_ -in 'saveItem', 'deleteItem' } { Need-Perm $session 'item_manage' }
+        'saveStockCount' { Need-Perm $session 'stock_count' }
+        # codes for items that have none: whoever prints labels may make them
+        'setItemCodes' { if ($session.perms -notcontains 'labels') { Need-Perm $session 'item_manage' } }
         default { Need $false 'هذه العملية تتطلّب صلاحية المدير' }
     }
 }
@@ -1150,7 +1455,12 @@ function Invoke-Write([string]$op, $data, $session = $null) {
     try {
         return Use-Database { param($db)
             if ($session -and $op -eq 'saveSale') { Test-SaleLines $db $data $session }
-            & $fn $db $data
+            $before = $null
+            try { $before = Get-OpBefore $db $op $data } catch { }
+            $r = & $fn $db $data
+            # the log never stops a save (an older database not yet upgraded)
+            try { Add-OpActivity $db $op $data $r $before } catch { Write-LawhaLog "activity log FAILED ($op): $($_.Exception.Message)" }
+            $r
         }
     } finally { $script:ItemCache = $null }
 }
@@ -1581,6 +1891,8 @@ $DataTables = [ordered]@{
     quodCodeOut = 'quodCode'
     # names only: password hashes never leave this computer
     Users      = 'UserName,Active'
+    StockCount = 'ID,CountDate,UserName,Note,Scope'
+    StockCountLine = 'ID,CountID,Item,Expected,Counted,Cost'
 }
 $script:DataCache = $null
 
@@ -2334,12 +2646,14 @@ function Handle($ctx) {
                 Need ($user -ne '') 'اختر المستخدم'
                 if (-not (Test-Login $user ([string]$b.password))) {
                     Write-LawhaLog "login FAILED $user"
+                    Write-Activity $user 'login_failed' '' $(if (Test-RemoteRequest $req) { "من جهاز آخر: $($req.RemoteEndPoint.Address)" } else { '' })
                     return Send-Json $ctx 200 @{ ok = $false; error = 'كلمة المرور غير صحيحة' }
                 }
                 $t = New-Token
                 $permText = Get-PermText $user
                 $script:Sessions[$t] = @{ user = $user; admin = (Test-Admin $user); perms = [string[]](Get-Perms $user) }
                 Write-LawhaLog "login $user ($(if (Test-Admin $user) { 'manager' } else { $permText }))"
+                Write-Activity $user 'login' '' $(if (Test-RemoteRequest $req) { "من جهاز آخر: $($req.RemoteEndPoint.Address)" } else { 'من هذا الجهاز' })
                 return Send-Json $ctx 200 @{ ok = $true; token = $t; user = $user; admin = (Test-Admin $user); perms = $permText }
             }
             '/api/remote' {
@@ -2367,6 +2681,7 @@ function Handle($ctx) {
             }
             '/api/logout' {
                 $script:Sessions.Remove([string]$req.Headers['X-Token'])
+                Write-Activity $s.user 'logout'
                 return Send-Json $ctx 200 @{ ok = $true }
             }
             '/api/data' {
@@ -2394,6 +2709,7 @@ function Handle($ctx) {
                 Need (Test-Login $s.user ([string]$b.old)) 'كلمة المرور الحالية غير صحيحة'
                 Use-Database { param($db) Save-User $db @{ oldName = $s.user; name = $s.user; password = [string]$b.new; isAdmin = (Test-Admin $s.user); active = $true } } | Out-Null
                 Write-LawhaLog "$($s.user)  changed own password"
+                Write-Activity $s.user 'password'
                 return Send-Json $ctx 200 @{ ok = $true }
             }
             '/api/settings' {
@@ -2401,11 +2717,24 @@ function Handle($ctx) {
                 if ($req.HttpMethod -eq 'POST') {
                     Need $s.admin 'الإعدادات تحتاج صلاحية المدير'
                     $b = Read-Body $req
+                    $changed = New-Object System.Collections.Generic.List[string]
+                    if ($null -ne $b.receipt) {
+                        $vals = @{}
+                        foreach ($k in $ReceiptKeys.Keys) {
+                            if ($null -ne $b.receipt.$k) { $vals[$k] = Text ([string]$b.receipt.$k) $ReceiptKeys[$k] 'إعدادات الإيصال' }
+                        }
+                        if ($vals.Count) {
+                            Use-Database { param($db) foreach ($k in $vals.Keys) { Set-ShopSetting $db ('receipt.' + $k) $vals[$k] } } | Out-Null
+                            $script:ShopCache = $null
+                            $changed.Add('الإيصال')
+                        }
+                    }
                     if ($null -ne $b.shopName) {
                         $name = Text ([string]$b.shopName) 60 'اسم المحل'
                         Need ($name -ne '') 'اسم المحل مطلوب'
                         Use-Database { param($db) Set-ShopSetting $db 'shopName' $name } | Out-Null
                         $script:ShopCache = $null
+                        $changed.Add("اسم المحل: $name")
                     }
                     if (($null -ne $b.backupDir -or $null -ne $b.keepBackups) -and -not $remote) {
                         if ($null -ne $b.backupDir) {
@@ -2417,14 +2746,16 @@ function Handle($ctx) {
                         }
                         if ($null -ne $b.keepBackups) { $script:Config.keepBackups = [math]::Max(3, [math]::Min(365, [int]$b.keepBackups)) }
                         Save-Config
+                        $changed.Add("النسخ الاحتياطي: $(Get-BackupDir) (الاحتفاظ بـ $($script:Config.keepBackups))")
                     }
                     Write-LawhaLog "$($s.user)  settings saved"
+                    if ($changed.Count) { Write-Activity $s.user 'settings' '' ($changed -join "`n") }
                 }
                 $lic = Get-License
                 $r = @{
                     ok = $true; shopName = (Get-Shop).shopName; version = $Version; product = $Product; engine = $script:EngineName
                     allPerms = ($AllPerms -join ','); defaultPerms = ($DefaultPerms -join ',')
-                    licenseName = [string]$lic.name; licenseExpiry = [string]$lic.expiry
+                    licenseName = [string]$lic.name; licenseExpiry = [string]$lic.expiry; receipt = (Get-Shop).receipt
                 }
                 if ($s.admin -and -not $remote) {
                     $r.dbPath = Get-DbPath; $r.dataDir = $DataDir; $r.machine = Get-MachineCode
@@ -2432,6 +2763,12 @@ function Handle($ctx) {
                     $r.backupError = $script:BackupError; $r.lastBackup = [string]$script:BackupDay; $r.updateUrl = Get-UpdateUrl
                 }
                 return Send-Json $ctx 200 $r
+            }
+            '/api/activity' {
+                Need $s.admin 'سجل العمليات يحتاج صلاحية المدير'
+                $b = Read-Body $req
+                $rows = Get-Activity ([string]$b.from) ([string]$b.to) 5000
+                return Send-Json $ctx 200 @{ ok = $true; rows = $rows; limit = 5000; labels = $ActivityNames }
             }
             '/api/users-list' {
                 Need $s.admin 'إدارة المستخدمين تحتاج صلاحية المدير'
@@ -2454,6 +2791,12 @@ function Handle($ctx) {
                 Use-Database { param($db) Save-User $db @{ oldName = $old; name = [string]$b.name; password = [string]$b.password; isAdmin = $isAdmin; perms = $perms; active = $active } } | Out-Null
                 if ($old -and ($old -ne [string]$b.name -or -not $active)) { Remove-UserSessions $old }
                 Write-LawhaLog "$($s.user)  user saved: $([string]$b.name)$(if ($old -and $old -ne [string]$b.name) { " (was $old)" })"
+                Write-Activity $s.user 'user_save' ([string]$b.name) (@(
+                        $(if (-not $old) { 'مستخدم جديد' } elseif ($old -ne [string]$b.name) { "الاسم: من «$old» إلى «$([string]$b.name)»" })
+                        $(if ($isAdmin) { 'مدير' } else { "الصلاحيات: $perms" })
+                        $(if (-not $active) { 'الحساب موقوف' })
+                        $(if ([string]$b.password) { 'كلمة مرور جديدة' })
+                    ) -join "`n")
                 return Send-Json $ctx 200 @{ ok = $true }
             }
             '/api/user-delete' {
@@ -2468,6 +2811,7 @@ function Handle($ctx) {
                 $script:ShopCache = $null
                 Remove-UserSessions $name
                 Write-LawhaLog "$($s.user)  user deleted: $name"
+                Write-Activity $s.user 'user_delete' $name
                 return Send-Json $ctx 200 @{ ok = $true }
             }
             '/api/backups' {
@@ -2482,12 +2826,14 @@ function Handle($ctx) {
                 Wait-Backup 600
                 Need (-not $script:BackupError) "تعذّر النسخ: $($script:BackupError)"
                 Write-LawhaLog "$($s.user)  backup now"
+                Write-Activity $s.user 'backup' '' (Get-BackupDir)
                 return Send-Json $ctx 200 @{ ok = $true; backups = (Get-Backups) }
             }
             '/api/restore' {
                 Need $s.admin 'الاستعادة تحتاج صلاحية المدير'
                 $b = Read-Body $req
                 $r = Restore-Backup ([string]$b.name)
+                Write-Activity $s.user 'restore' ([string]$b.name) "حُفظت البيانات السابقة باسم $($r.safety)"
                 return Send-Json $ctx 200 (@{ ok = $true } + $r)
             }
             '/api/open-backups' {
@@ -2506,6 +2852,7 @@ function Handle($ctx) {
                 Wait-Backup 600
                 Start-Backup -Now -Label '-before-update'
                 Wait-Backup 600
+                Write-Activity $s.user 'update' "الإصدار الحالي $Version"
                 $r = Install-Update
                 return Send-Json $ctx 200 (@{ ok = $true } + $r)
             }
@@ -2547,6 +2894,7 @@ function Handle($ctx) {
                 Save-Config
                 $script:RestartListener = $true
                 Write-LawhaLog "$($s.user)  other devices $(if ($b.enable) { 'allowed' } else { 'not allowed' })"
+                Write-Activity $s.user 'remote' $(if ($b.enable) { 'السماح بالاتصال' } else { 'إيقاف الاتصال' })
                 return Send-Json $ctx 200 @{ ok = $true; allowRemote = [bool]$script:Config.allowRemote; addresses = (Get-MyAddresses); port = $Port }
             }
             '/api/addresses' {

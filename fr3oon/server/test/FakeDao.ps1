@@ -220,6 +220,8 @@ function Split-FakeSql([string]$sql) {
             $tokens.Add(@{ k = 'id'; v = $sql.Substring($i + 1, $end - $i - 1) }); $i = $end + 1; continue
         }
         if ($ch -eq '<' -and $i + 1 -lt $sql.Length -and $sql[$i + 1] -eq '>') { $tokens.Add(@{ k = 'op'; v = '<>' }); $i += 2; continue }
+        if (($ch -eq '<' -or $ch -eq '>') -and $i + 1 -lt $sql.Length -and $sql[$i + 1] -eq '=') { $tokens.Add(@{ k = 'op'; v = "$ch=" }); $i += 2; continue }
+        if ($ch -eq '<' -or $ch -eq '>') { $tokens.Add(@{ k = 'op'; v = [string]$ch }); $i++; continue }
         if ('=,*();'.Contains([string]$ch)) { $tokens.Add(@{ k = 'op'; v = [string]$ch }); $i++; continue }
         if ($ch -eq '@' -and $sql.Substring($i).StartsWith('@@IDENTITY')) { $tokens.Add(@{ k = 'identity'; v = '@@IDENTITY' }); $i += 10; continue }
         if ([char]::IsDigit($ch) -or ($ch -eq '-' -and $i + 1 -lt $sql.Length -and [char]::IsDigit($sql[$i + 1]))) {
@@ -258,7 +260,7 @@ function Read-FakeWhere($t, [ref]$pos) {
             $conds += @{ col = $col.v; op = 'isnull' }
             $pos.Value += 3
         } else {
-            if ($col.k -ne 'id' -or $op.k -ne 'op' -or $op.v -notin '=', '<>' -or $val.k -notin 'str', 'num') {
+            if ($col.k -ne 'id' -or $op.k -ne 'op' -or $op.v -notin '=', '<>', '<', '>', '<=', '>=' -or $val.k -notin 'str', 'num', 'date') {
                 throw 'FakeDao: unsupported WHERE clause'
             }
             $conds += @{ col = $col.v; op = $op.v; val = $val.v }
@@ -276,6 +278,12 @@ function Test-FakeRow($row, $conds, $table) {
         $v = $row[$c.col]
         if ($c.op -eq 'isnull') { if ($null -ne $v) { return $false } else { continue } }
         if ($null -eq $v) { return $false }
+        if ($c.op -in '<', '>', '<=', '>=') {
+            $cmp = if ($c.val -is [datetime]) { ([datetime]$v).CompareTo($c.val) } elseif ($c.val -is [string]) { [string]::CompareOrdinal([string]$v, $c.val) } else { ([double]$v).CompareTo([double]$c.val) }
+            $ok = switch ($c.op) { '<' { $cmp -lt 0 } '>' { $cmp -gt 0 } '<=' { $cmp -le 0 } '>=' { $cmp -ge 0 } }
+            if (-not $ok) { return $false }
+            continue
+        }
         $eq = if ($c.val -is [string]) { ([string]$v).TrimEnd() -ieq $c.val.TrimEnd() } else { [double]$v -eq [double]$c.val }
         if ($c.op -eq '=' -and -not $eq) { return $false }
         if ($c.op -eq '<>' -and $eq) { return $false }
@@ -356,6 +364,16 @@ function New-FakeDb($state, [bool]$readOnly) {
         if ($this.Closed) { throw 'FakeDao: database is closed' }
         if ($this.ReadOnly) { throw 'FakeDao: database is read-only' }
         $this.State.statements.Add($sql)
+        # DDL (upgrading an older database): the table as the server defines it
+        if ($sql -match '^\s*CREATE\s+TABLE\s+\[(\w+)\]') {
+            $name = $Matches[1]
+            if ($this.State.tables.ContainsKey($name)) { throw "FakeDao: Table '$name' already exists." }
+            $cols = @((Get-FakeSchema)[$name] | ForEach-Object { [pscustomobject]$_ })
+            $auto = ($cols | Where-Object { $_.auto } | Select-Object -First 1).name
+            $this.State.tables[$name] = @{ name = $name; columns = $cols; rows = (New-Object System.Collections.Generic.List[hashtable]); auto = $auto; next = 1 }
+            return
+        }
+        if ($sql -match '^\s*CREATE\s+INDEX\s') { return }
         $t = Split-FakeSql $sql
         if ($t[0].v -ieq 'DELETE') {
             if ($t[1].v -ine 'FROM' -or $t[3].v -ine 'WHERE') { throw "FakeDao: unsupported DELETE: $sql" }

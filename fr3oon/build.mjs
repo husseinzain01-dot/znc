@@ -33,7 +33,8 @@ for (const w of [400, 600, 700]) {
 }
 
 const js = out.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
-const css = fs.readFileSync('src/styles.css', 'utf8');
+// the app's styles, then each screen's own (src/css/*.css)
+const css = [fs.readFileSync('src/styles.css', 'utf8'), ...fs.readdirSync('src/css').filter((f) => f.endsWith('.css')).sort().map((f) => fs.readFileSync(path.join('src/css', f), 'utf8'))].join('\n');
 const favicon = 'data:image/svg+xml,' + encodeURIComponent(LOGO);
 const html = fs
   .readFileSync('src/index.html', 'utf8')

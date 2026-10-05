@@ -189,6 +189,16 @@ export function stock(P) {
   };
   for (const l of P.purchaseLines) apply(l, +1);
   for (const l of P.saleLines) apply(l, -1);
+  // stock counts: the difference, in small units (whole units for an item
+  // with one unit)
+  for (const l of P.stockCountLines || []) {
+    const item = P.itemByName.get(l.item);
+    const a = item && acc.get(item.name);
+    if (!a) continue;
+    const diff = l.counted - l.expected;
+    a[item.fill > 0 ? 'L2' : 'L1'] += diff;
+    a.adjPcs = (a.adjPcs || 0) + diff;
+  }
 
   return P.items.map((i) => {
     const a = acc.get(i.name);
@@ -196,7 +206,7 @@ export function stock(P) {
     const s = seeat(a.L1, a.L2, i.fill);
     const totalPcs = i.fill > 0 ? a.L1 * i.fill + a.L2 : a.L1;
     const status = totalPcs < 0 ? 'سالب' : totalPcs === 0 ? 'نافد' : i.harig > 0 && k < i.harig ? 'قليل' : 'متوفر';
-    return { ...i, k, s, totalPcs, inPcs: a.inPcs, outPcs: a.outPcs, value: k * i.buyL1 + s * i.buyL2, status };
+    return { ...i, k, s, totalPcs, inPcs: a.inPcs, outPcs: a.outPcs, adjPcs: a.adjPcs || 0, value: k * i.buyL1 + s * i.buyL2, status };
   });
 }
 

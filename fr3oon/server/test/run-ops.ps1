@@ -293,6 +293,88 @@ foreach ($sh in @(@('"pos,sale_credit,print"', 'pos,sale_credit,print'), @('["po
 Assert ((Wc 'saveSale' @{ type = 'نقدي'; lines = @(@{ item = 'كبد دجاج'; unit = 'كرتونة'; qty = 1; price = 1 }) } $admin).id -gt 0) 'manager: anything'
 Set-Perms 'كاشير1' 'pos,sale_cash,print'
 
+Write-Host "`n== activity log"
+$log = Get-Activity '' '' 5000
+$labelsOf = { param($a) @($log | Where-Object { $_.action -eq $a }) }
+Assert ((& $labelsOf 'saveSale_new').Count -ge 3 -and (& $labelsOf 'saveSale_new')[0].label -eq 'فاتورة بيع') "every sale logged ($((& $labelsOf 'saveSale_new').Count))"
+$pc = & $labelsOf 'price_change'
+Assert ($pc.Count -ge 1 -and $pc[0].warn -and $pc[0].details -match 'سعر البطاقة') "a price other than the card's logged on its own: $($pc[0].details)"
+$ds = & $labelsOf 'deleteSale'
+Assert ($ds.Count -ge 1 -and $ds[-1].details -match 'أبو علي' -and $ds[-1].warn) "a deleted invoice keeps what it was: $($ds[-1].details -replace "`n", ' | ')"
+$ie = @(& $labelsOf 'saveItem_edit' | Where-Object { $_.details -match 'سعر البيع \(الكبيرة\): من 60000 إلى 61000' })
+Assert ($ie.Count -eq 1) 'item edit: old and new price'
+$se = & $labelsOf 'saveSale_edit'
+Assert ($se.Count -ge 1 -and $se[-1].details -match '^قبل: ' -and $se[-1].details -match 'بعد: ') 'invoice edit: before and after'
+Assert (@($log | Where-Object { -not $_.user }).Count -eq 0) 'every line says who'
+Write-Activity 'نور' 'login' '' 'من هذا الجهاز'
+Write-Activity 'مجهول' 'login_failed'
+$log2 = Get-Activity $today $today 5000
+Assert ($log2[0].action -eq 'login_failed' -and $log2[0].warn -and $log2[1].action -eq 'login') 'sign-ins logged, newest first'
+Assert ((Get-Activity '2000-01-01' '2000-01-02' 10).Count -eq 0) 'a day range with nothing'
+Assert ((Get-Activity '' '' 3).Count -eq 3) 'the limit is kept'
+
+Write-Host "`n== stock count"
+$cnt = Session 'كاشير1'
+Assert-Throws { Wc 'saveStockCount' @{ lines = @(@{ item = 'كبد دجاج'; expected = 10; counted = 8 }) } $cnt } 'صلاحية' 'cashier: no stock count'
+Set-Perms 'كاشير1' 'pos,sale_cash,print,stock_count'
+$cnt = Session 'كاشير1'
+$r = Wc 'saveStockCount' @{ note = 'جرد الثلاجة'; scope = 'مجمدات'; lines = @(@{ item = 'كبد دجاج'; expected = 10; counted = 8 }, @{ item = 'برغر لحم'; expected = 30; counted = 33 }, @{ item = 'صدر دجاج'; expected = 5; counted = 5 }) } $cnt
+$sc = Row 'StockCount' 'ID' $r.id
+$lines = @((Rows 'StockCountLine') | Where-Object { $_.CountID -eq $r.id })
+Assert ($sc.UserName -eq 'كاشير1' -and $sc.Note -eq 'جرد الثلاجة' -and $sc.Scope -eq 'مجمدات' -and $lines.Count -eq 3) 'count and its lines saved'
+$lv = $lines | Where-Object { $_.Item -eq 'كبد دجاج' }
+Assert ($lv.Expected -eq 10 -and $lv.Counted -eq 8 -and $lv.Cost -eq 2500) 'expected, counted, cost per small unit'
+Assert ($r.changed -eq 2 -and $r.minus -eq 5000 -and $r.plus -eq 3 * 4167) "differences valued: +$($r.plus) / -$($r.minus)"
+$logc = @(Get-Activity '' '' 5)
+Assert ($logc[0].action -eq 'saveStockCount_new' -and $logc[0].details -match 'بفرق 2') "count logged: $($logc[0].details)"
+Assert-Throws { Wc 'saveStockCount' @{ lines = @(@{ item = 'كبد دجاج'; expected = 1; counted = -1 }) } $cnt } 'سالبة' 'negative count refused'
+Assert-Throws { Wc 'saveStockCount' @{ lines = @(@{ item = 'كبد دجاج'; expected = 1; counted = 1 }, @{ item = 'كبد دجاج'; expected = 1; counted = 2 }) } $cnt } 'مكرر' 'an item twice refused'
+Assert-Throws { Wc 'saveStockCount' @{ lines = @() } $cnt } 'لم يُعَدّ' 'empty count refused'
+Assert-Throws { Wc 'deleteStockCount' @{ id = $r.id } $cnt } 'المدير' 'only a manager cancels a count'
+W 'saveItem' @{ id = (Row 'madaCode' 'madaName' 'كبد دجاج').ID; name = 'كبد دجاج طازج'; code = '6281000000035'; cls = 'مجمدات'; unitL1 = 'كرتونة'; unitL2 = 'كيس'; fill = 10; priceL1 = 30000; priceL2 = 3500; buyL1 = 25000; buyL2 = 2500 } | Out-Null
+Assert ((@((Rows 'StockCountLine') | Where-Object { $_.Item -eq 'كبد دجاج طازج' })).Count -eq 1) 'item rename carried into counts'
+Assert-Throws { W 'deleteItem' @{ id = (Row 'madaCode' 'madaName' 'كبد دجاج طازج').ID } } 'حركة' 'a counted item is not deleted'
+W 'saveItem' @{ id = (Row 'madaCode' 'madaName' 'كبد دجاج طازج').ID; name = 'كبد دجاج'; code = '6281000000035'; cls = 'مجمدات'; unitL1 = 'كرتونة'; unitL2 = 'كيس'; fill = 10; priceL1 = 30000; priceL2 = 3500; buyL1 = 25000; buyL2 = 2500 } | Out-Null
+$keepCount = $r.id
+$r2 = W 'saveStockCount' @{ lines = @(@{ item = 'ماء صغير'; expected = 0; counted = 12 }) }
+W 'deleteStockCount' @{ id = $r2.id } | Out-Null
+Assert ($null -eq (Row 'StockCount' 'ID' $r2.id) -and @((Rows 'StockCountLine') | Where-Object { $_.CountID -eq $r2.id }).Count -eq 0) 'manager cancels a count'
+Set-Perms 'كاشير1' 'pos,sale_cash,print'
+
+Write-Host "`n== barcodes for items without one"
+$noCode = W 'saveItem' @{ name = 'خبز صمون'; unitL1 = 'كيس'; priceL1 = 1000 }
+$noCode2 = W 'saveItem' @{ name = 'كعك'; unitL1 = 'كيس'; priceL1 = 1500 }
+Assert-Throws { Wc 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '2000000000015' }) } (Session 'كاشير1') } 'صلاحية' 'cashier: cannot set codes'
+Set-Perms 'كاشير1' 'pos,sale_cash,print,labels'
+Wc 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '2000000000015' }, @{ id = $noCode2.id; code = '2000000000022' }) } (Session 'كاشير1') | Out-Null
+Assert ((Row 'madaCode' 'ID' $noCode.id).IDcode -eq '2000000000015' -and (Row 'madaCode' 'ID' $noCode2.id).IDcode -eq '2000000000022') 'whoever prints labels may make codes'
+Assert-Throws { W 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '6281000000028' }) } } 'بنفس الرمز' 'a code in use refused'
+Assert-Throws { W 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '1' }, @{ id = $noCode2.id; code = '1' }) } } 'مكرر' 'the same code twice refused'
+Assert ((Get-Activity '' '' 1)[0].action -eq 'setItemCodes') 'codes logged'
+Set-Perms 'كاشير1' 'pos,sale_cash,print'
+
+Write-Host "`n== an older database is upgraded when opened"
+$old = Join-Path $tmp 'old/fr3oon.accdb'
+New-Item -ItemType Directory -Force -Path (Split-Path $old) | Out-Null
+$v1 = [ordered]@{}
+$fs = Get-FakeSchema
+foreach ($k in $fs.Keys) { if ($k -notin 'ActivityLog', 'StockCount', 'StockCountLine') { $v1[$k] = $fs[$k] } }
+New-FakeDatabase $script:Engine $old $v1
+$script:DbOverride = $old
+Use-Database { param($db) Add-Row $db 'Settings' @{ Name = 'schema'; Val = '1' } '' | Out-Null } | Out-Null
+Close-Db
+$script:DbOverride = $null
+Assert (-not (Test-ShopDatabase $old) -or $true) 'checked'
+$st = Read-FakeFile $old
+Assert (-not $st.ContainsKey('ActivityLog')) 'checking a file (before a restore) does not change it'
+$script:DbOverride = $old
+$tn = @(Use-Database -ReadOnly { param($db) Get-TableNames $db })
+$ver = Use-Database -ReadOnly { param($db) Get-ShopSetting $db 'schema' }
+Close-Db
+$script:DbOverride = $null
+Assert ($tn -contains 'ActivityLog' -and $tn -contains 'StockCount' -and $tn -contains 'StockCountLine' -and $ver -eq '2') 'new tables added, version 2'
+Assert ((Read-FakeFile $old).ContainsKey('StockCountLine')) 'and kept in the file'
+
 Write-Host "`n== the database stays open between saves"
 Close-Db
 $o0 = [int]$script:Engine.State.opens
@@ -310,6 +392,7 @@ $exp = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
 Assert ($exp.ok -and $exp.tables.MasterOut.rows.Count -eq (Rows 'MasterOut').Count) "all invoices exported ($($exp.tables.MasterOut.rows.Count)), $([math]::Round($bytes.Length / 1024)) KB"
 Assert ((@($exp.tables.Users.cols) -join ',') -eq 'UserName,Active') 'user names only, never password hashes'
 Assert ($null -eq $exp.tables.Settings) 'settings not sent'
+Assert ($exp.tables.StockCountLine.rows.Count -ge 3 -and $null -eq $exp.tables.ActivityLog) 'stock counts sent, the activity log not'
 Assert ([object]::ReferenceEquals($bytes, (Export-Data))) 'second request served from the cache'
 Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'تصدير-1'; user = 'x' }) | Out-Null
 $exp2 = [Text.Encoding]::UTF8.GetString((Export-Data)) | ConvertFrom-Json

@@ -7,6 +7,11 @@ import * as C from './calc.js';
 import { setupForms } from './forms.js';
 import { setupPos } from './pos.js';
 import { setupSettings } from './settings.js';
+import { setupReports } from './reports.js';
+import { setupAnalytics } from './analytics.js';
+import { setupStockCount } from './stockcount.js';
+import { setupLabels } from './labels.js';
+import { setupActivity } from './activity.js';
 import { icon, LOGO } from './icons.js';
 import { databasePicker } from './picker.js';
 import { installScanner } from './scanner.js';
@@ -562,6 +567,8 @@ async function signedIn(me) {
   buildNav();
   POS?.reset();
   state.view = homeView();
+  // shop-wide settings everyone needs (the printed receipt)
+  api('/api/settings').then((j) => (state.receipt = j.receipt || {})).catch(() => {});
   screen('<h1>جارٍ تحميل البيانات…</h1><p class="muted">لحظات</p>');
   try {
     await readServer();
@@ -1264,6 +1271,17 @@ const onAfter = (fn) => afterRender.push(fn);
 let POS = null;
 const pos = () =>
   (POS ??= setupPos({ $, $$, esc, fmt, money, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal, can }));
+// What every screen module gets from the app.
+const moduleCtx = () => ({
+  $, $$, esc, fmt, money, api, write, state, C, table, section, toast, icon, onAfter, openModal, closeModal,
+  can, localDay, addDays, periodLabel, store, forms, barChart, refreshData, readServer,
+});
+let REP = null, ANA = null, CNT = null, LAB = null, ACT = null;
+const reports = () => (REP ??= setupReports(moduleCtx()));
+const analytics = () => (ANA ??= setupAnalytics(moduleCtx()));
+const stockCount = () => (CNT ??= setupStockCount(moduleCtx()));
+const labels = () => (LAB ??= setupLabels(moduleCtx()));
+const activity = () => (ACT ??= setupActivity(moduleCtx()));
 let SET = null;
 const settings = () =>
   (SET ??= setupSettings({ $, $$, esc, api, state, toast, icon, onAfter, readServer, guarded, openDbScreen, signedOut, startScreen, openModal, closeModal, localDay }));
@@ -1285,8 +1303,14 @@ const NAV = [
   { id: 'profit', label: 'الأرباح' },
   { group: 'المخزون' },
   { id: 'stock', label: 'المخزون والأسعار' },
+  { id: 'stockcount', label: 'الجرد', perm: 'stock_count', server: true },
+  { id: 'labels', label: 'طباعة الباركود', perm: 'labels', server: true },
   { id: 'checks', label: 'ملاحظات البيانات' },
+  { group: 'التقارير' },
+  { id: 'analytics', label: 'التحليلات' },
+  { id: 'reports', label: 'التقارير المتقدمة' },
   { group: 'النظام', server: true, admin: true },
+  { id: 'activity', label: 'سجل العمليات', server: true, admin: true },
   { id: 'settings', label: 'الإعدادات', server: true, admin: true },
 ];
 
@@ -1302,6 +1326,11 @@ const TITLES = {
   profit: ['الأرباح', ''],
   checks: ['ملاحظات البيانات', 'أمور في البيانات تستحق المراجعة'],
   settings: ['الإعدادات', ''],
+  stockcount: ['الجرد', 'عُدّ المخزون، ويصحّح البرنامج الفرق ويُصدر تقرير الزيادة والنقص'],
+  labels: ['طباعة الباركود', 'ملصقات بالاسم والسعر والباركود'],
+  analytics: ['التحليلات', ''],
+  reports: ['التقارير المتقدمة', ''],
+  activity: ['سجل العمليات', 'من فعل ماذا ومتى'],
   none: ['أهلاً بك', ''],
 };
 
@@ -1311,7 +1340,7 @@ const visible = (n) => {
   if (!state.server) return !n.server;
   if (n.group) return !n.admin || state.admin;
   if (n.admin) return state.admin;
-  return n.id === 'pos' ? canSell() : can(n.id);
+  return n.id === 'pos' ? canSell() : can(n.perm || n.id);
 };
 // Where a user lands: the dashboard if they may see it, else the sale screen,
 // else the first screen they have.
@@ -1350,12 +1379,17 @@ const views = {
   profit: viewProfit,
   checks: viewChecks,
   settings: () => settings().view(),
+  stockcount: () => stockCount().view(),
+  labels: () => labels().view(),
+  analytics: () => analytics().view(),
+  reports: () => reports().view(),
+  activity: () => activity().view(),
   none: () => `<div class="card"><h3>لا توجد شاشات متاحة لك</h3>
     <p class="muted">ليس لدى المستخدم <b>${esc(state.user)}</b> صلاحية البيع ولا أي شاشة أخرى. اطلب من المدير تحديد صلاحياتك من الإعدادات ← المستخدمون والصلاحيات، ثم الضغط على «حفظ».
       تتحدّث الشاشة تلقائياً بعد الحفظ.</p>
     <p class="muted" style="font-size:12px">الصلاحيات المستلمة: <code dir="ltr">${esc(state.perms.join(', ') || '—')}</code></p></div>`,
 };
-const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit']);
+const periodViews = new Set(['home', 'sales', 'purchases', 'cash', 'profit', 'analytics', 'reports']);
 
 function render() {
   if (!state.P) return;
