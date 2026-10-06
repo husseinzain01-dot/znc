@@ -76,7 +76,7 @@ const SECTIONS = [
 ];
 
 export function setupSettings(ctx) {
-  const { $, esc, api, state, toast, icon, onAfter, openModal, closeModal, localDay, openDbScreen, signedOut } = ctx;
+  const { $, $$, esc, api, state, toast, icon, onAfter, openModal, closeModal, localDay, openDbScreen, signedOut } = ctx;
 
   const remote = () => !['localhost', '127.0.0.1'].includes(location.hostname);
   const size = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
@@ -659,25 +659,87 @@ export function setupSettings(ctx) {
     }
   }
 
+  // Installing: a window with the steps and a progress bar, following the
+  // helper (backup → download → verify → install), then the new version.
   async function installUpdate(version) {
-    if (!confirm(`تثبيت الإصدار ${version}؟\nسيُغلق البرنامج ويُعاد فتحه تلقائياً خلال دقيقة تقريباً. تُؤخذ نسخة احتياطية قبل التثبيت.`)) return;
-    $('#upResult').innerHTML = '<p class="notice info">جارٍ تنزيل التحديث والتحقق منه…</p>';
+    if (!confirm(`تثبيت الإصدار ${version}؟\nتُؤخذ نسخة احتياطية أولاً، ثم يُنزَّل التحديث ويُثبَّت، ويعود البرنامج للعمل وحده خلال دقيقة تقريباً.`)) return;
+    const STEPS = [['backup', 'نسخة احتياطية من البيانات'], ['download', 'تنزيل التحديث'], ['verify', 'التحقق من سلامة الملف'], ['install', 'التثبيت وإعادة التشغيل']];
+    openModal(`<h2>تحديث ${APP} إلى الإصدار <span dir="ltr">${esc(version)}</span></h2>
+      <ol class="up-steps" id="upSteps">${STEPS.map(([id, label]) => `<li data-p="${id}"><span class="up-mark"></span><span>${label}</span><small data-d="${id}"></small></li>`).join('')}</ol>
+      <div class="up-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span id="upBar"></span></div>
+      <p class="muted" id="upMsg">جارٍ البدء…</p>
+      <p class="muted" style="font-size:13px">لا تُغلق البرنامج أثناء التحديث.</p>
+      <div class="form-actions" id="upActions" hidden><button class="btn" id="upClose">إغلاق</button></div>`);
+    $('#modalClose').hidden = true;
+    const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
+    const draw = (phase, pct, msg, detail = {}) => {
+      const order = STEPS.map(([id]) => id);
+      const at = order.indexOf(phase);
+      $$('#upSteps li').forEach((li, i) => {
+        li.className = phase === 'error' ? (li.classList.contains('now') ? 'bad' : li.className) : i < at ? 'done' : i === at ? 'now' : '';
+      });
+      for (const [k, v] of Object.entries(detail)) {
+        const el = $(`[data-d="${k}"]`);
+        if (el) el.textContent = v;
+      }
+      if (pct != null) {
+        $('#upBar').style.width = Math.max(2, Math.min(100, pct)) + '%';
+        $('#upBar').parentElement.setAttribute('aria-valuenow', String(Math.round(pct)));
+      }
+      $('#upBar').parentElement.classList.toggle('busy', phase === 'install');
+      if (msg != null) $('#upMsg').textContent = msg;
+    };
+    const fail = (m) => {
+      draw('error', null, m);
+      $('#upMsg').className = 'notice error';
+      $('#upActions').hidden = false;
+      $('#modalClose').hidden = false;
+      $('#upClose').onclick = closeModal;
+    };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     try {
       await api('/api/update-install', { method: 'POST', body: {} });
-      $('#upResult').innerHTML = '<p class="notice info">جارٍ التثبيت… سيُعاد فتح البرنامج تلقائياً.</p>';
-      // wait for the new version to answer, then load it
-      for (let i = 0; i < 90; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        try {
-          const st = await (await fetch('/api/state', { cache: 'no-store' })).json();
-          if (st.version === version) return location.reload();
-        } catch {
-          /* still installing */
-        }
-      }
     } catch (e) {
-      $('#upResult').innerHTML = `<p class="notice error">${esc(e.message)}</p>`;
+      return fail(e.message);
     }
+    draw('backup', 4, 'جارٍ أخذ نسخة احتياطية من البيانات…');
+    // the helper's own steps
+    for (;;) {
+      await wait(400);
+      let p;
+      try {
+        p = await api('/api/update-progress', { method: 'POST', body: {} });
+      } catch {
+        break; // stopped for the installer
+      }
+      if (p.phase === 'error') return fail(p.error || 'تعذّر التحديث');
+      if (p.phase === 'backup') draw('backup', 6, 'جارٍ أخذ نسخة احتياطية من البيانات…');
+      if (p.phase === 'download') {
+        const f = p.total ? p.received / p.total : 0;
+        draw('download', 10 + f * 75, `جارٍ تنزيل التحديث… ${Math.round(f * 100)}%`, { download: p.total ? `${kb(p.received)} / ${kb(p.total)}` : kb(p.received) });
+      }
+      if (p.phase === 'verify') draw('verify', 88, 'جارٍ التحقق من سلامة الملف…', { download: p.total ? kb(p.total) : '' });
+      if (p.phase === 'install') {
+        draw('install', 92, 'جارٍ التثبيت… سيُعاد فتح البرنامج تلقائياً.');
+        break;
+      }
+    }
+    draw('install', 94, 'جارٍ التثبيت… سيُعاد فتح البرنامج تلقائياً.');
+    // the new version answering: load it
+    for (let i = 0; i < 120; i++) {
+      await wait(1500);
+      try {
+        const st = await (await fetch('/api/state', { cache: 'no-store' })).json();
+        if (st.version === version) {
+          draw('install', 100, 'تم التحديث ✔ جارٍ فتح الإصدار الجديد…');
+          await wait(600);
+          return location.reload();
+        }
+      } catch {
+        /* still installing */
+      }
+    }
+    fail('انتهت مهلة الانتظار. افتح البرنامج من أيقونته؛ إن لم يتغير الإصدار فأعد المحاولة من «البحث عن تحديث».');
   }
 
   // ------------------------------------------------------------ license

@@ -153,3 +153,22 @@ button.act-kpi:focus-visible { outline: none; box-shadow: var(--ring); }
 /* one more section (الإيصال) in the settings chips: keep them on one line */
 .settings-nav { gap: 6px; }
 .settings-nav .chip { padding: 6px 12px; font-size: 14px; }
+
+/* updating: steps and a progress bar */
+.up-steps { list-style: none; margin: 6px 0 16px; padding: 0; display: grid; gap: 8px; }
+.up-steps li { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.up-steps li small { margin-inline-start: auto; font-size: 12px; direction: ltr; }
+.up-mark { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line-strong); flex: none; display: inline-grid; place-items: center; font-size: 12px; }
+.up-steps li.done { color: var(--text); }
+.up-steps li.done .up-mark { background: var(--good); border-color: var(--good); }
+.up-steps li.done .up-mark::after { content: '✓'; color: #fff; font-weight: 700; }
+.up-steps li.now { color: var(--text); font-weight: 600; }
+.up-steps li.now .up-mark { border-color: var(--accent); border-top-color: transparent; animation: up-spin .8s linear infinite; }
+.up-steps li.bad { color: var(--bad); }
+.up-steps li.bad .up-mark { border-color: var(--bad); }
+.up-steps li.bad .up-mark::after { content: '✕'; color: var(--bad); font-weight: 700; }
+.up-bar { height: 10px; border-radius: 99px; background: var(--surface-3); overflow: hidden; position: relative; }
+.up-bar > span { display: block; height: 100%; width: 2%; border-radius: 99px; background: var(--accent); transition: width .35s ease; }
+.up-bar.busy > span { background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent) 100%); background-size: 200% 100%; animation: up-move 1.2s linear infinite; }
+@keyframes up-spin { to { transform: rotate(360deg); } }
+@keyframes up-move { to { background-position: -200% 0; } }

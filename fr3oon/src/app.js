@@ -175,16 +175,21 @@ async function api(path, { method = 'GET', body } = {}) {
 const isRemote = () => !['localhost', '127.0.0.1'].includes(location.hostname);
 
 // The data, as compact JSON read by the helper from the database.
+// A database on another computer, or this device reaching the main one over
+// a network or VPN, can falter for a moment: try again a few times, waiting
+// a little longer each time, before saying it failed.
 async function readServer({ quiet = false } = {}) {
-  for (let i = 0; i < 2; i++) {
+  const waits = [700, 1500, 3000];
+  for (let i = 0; ; i++) {
     try {
       const j = await api('/api/data');
       const out = await showData(C.prepare(loadDatabase(readerFromTables(j.tables))), { quiet });
       refreshMe();
       return out;
     } catch (e) {
-      if (i === 1 || e.license || /سجّل الدخول|لا يمكن الاتصال/.test(e.message)) throw e;
-      await sleep(800);
+      if (i >= waits.length || e.license || /سجّل الدخول/.test(e.message)) throw e;
+      if ($('#fileStatus')) $('#fileStatus').textContent = `الاتصال بطيء، إعادة المحاولة (${i + 1})…`;
+      await sleep(waits[i]);
     }
   }
 }
@@ -535,6 +540,7 @@ async function loginScreen(error = '', chosen = '') {
     ${info.dbPath ? `<div class="login-file">
       <small class="muted">قاعدة البيانات</small>
       <code dir="ltr">${esc(info.dbPath)}</code>
+      ${/^\\\\/.test(info.dbPath) ? `<p class="notice info">قاعدة البيانات على جهاز آخر في الشبكة، وفتحها بهذه الطريقة أبطأ وقد يتعثر. الأسرع والأثبت: شغّل ${APP} على ذلك الجهاز، وفعّل فيه «السماح للأجهزة الأخرى بالاتصال»، ثم اجعل هذا الجهاز «جهازاً إضافياً» متصلاً به.</p>` : ''}
       <button type="button" class="btn small" id="lChange">${icon('file')} فتح قاعدة بيانات أخرى</button>
     </div>` : ''}
     ${versionLine()}`);
@@ -649,9 +655,11 @@ async function signedIn(me) {
   }
 }
 
-async function checkUpdate() {
+async function checkUpdate(tries = 0) {
   try {
     const j = await api('/api/update-status');
+    // looked up on the side: ask again a little later
+    if (j.pending && tries < 6) setTimeout(() => checkUpdate(tries + 1), 10000);
     $('#updateNote').hidden = !j.available;
     if (j.available) {
       $('#updateNote').innerHTML = `${icon('refresh')}<span><b>يتوفر تحديث</b><small>الإصدار ${esc(j.latest)}</small></span>`;

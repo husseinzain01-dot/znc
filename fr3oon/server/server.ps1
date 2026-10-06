@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.1'
+$Version = '2.2.2'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -258,7 +258,22 @@ function Update-Schema($db) {
     Write-LawhaLog "database upgraded from version $v to $SchemaVersion (added: $($missing -join ', '))"
 }
 
+# A database on another computer (a shared folder) can drop for a moment, or
+# be locked by another save: try again, a few times, before giving up. A
+# save is one transaction, so a retried save is never half done.
+$TransientDbError = 'network|disk or network|3043|3044|3045|3049|3051|3218|3260|3262|3734|lock|in use|unexpected error from external|could not find file|الشبكة|تعذّر فتح قاعدة البيانات|مقفل|قيد الاستخدام'
 function Use-Database([scriptblock]$body, [switch]$Rollback, [switch]$ReadOnly) {
+    for ($try = 1; ; $try++) {
+        try { return (Invoke-DatabaseOnce $body $Rollback $ReadOnly) }
+        catch {
+            $m = $_.Exception.Message
+            if ($try -ge 4 -or $m -notmatch $TransientDbError) { throw }
+            Write-LawhaLog "database busy or unreachable, try $try again: $m"
+            Start-Sleep -Milliseconds (500 * $try)
+        }
+    }
+}
+function Invoke-DatabaseOnce([scriptblock]$body, [bool]$Rollback, [bool]$ReadOnly) {
     $path = Get-DbPath
     Need ($path -ne '') 'لم تُحدَّد قاعدة البيانات. اخترها من الإعدادات.'
     $engine = Get-Engine
@@ -1707,6 +1722,51 @@ function Get-WebText([string]$url, [int]$ms = 8000) {
     } finally { $rs.Close() }
 }
 
+# The automatic check (after a manager signs in) fetches on the side, so the
+# program never waits on the internet; the result is checked here as usual.
+$UpdateFetchScript = {
+    param($urls, $ms, $ver)
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    foreach ($u in $urls) {
+        try {
+            $rq = [Net.HttpWebRequest]::Create($u + '?t=' + [DateTime]::UtcNow.Ticks)
+            $rq.Timeout = $ms; $rq.ReadWriteTimeout = $ms; $rq.UserAgent = "Fr3oon/$ver"
+            $rs = $rq.GetResponse()
+            try { return (New-Object IO.StreamReader($rs.GetResponseStream(), [Text.Encoding]::UTF8)).ReadToEnd() } finally { $rs.Close() }
+        } catch { }
+    }
+    return ''
+}
+$script:UpdateJob = $null
+$script:UpdateCache = $null
+function Start-UpdateFetch {
+    if ($script:UpdateJob) { return }
+    $urls = [string[]]@((Get-UpdateUrls) | Where-Object { $_ -match '^https?://' })
+    if (-not $urls) { return }
+    $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
+    $ps = [PowerShell]::Create(); $ps.Runspace = $rs
+    [void]$ps.AddScript($UpdateFetchScript.ToString()).AddArgument($urls).AddArgument(8000).AddArgument($Version)
+    $script:UpdateJob = @{ ps = $ps; rs = $rs; h = $ps.BeginInvoke() }
+}
+function Update-UpdateFetch {
+    $j = $script:UpdateJob
+    if (-not $j -or -not $j.h.IsCompleted) { return }
+    $info = @{ available = $false; current = $Version }
+    $until = (Get-Date).AddHours(1)
+    try {
+        $text = [string]($j.ps.EndInvoke($j.h) | Select-Object -Last 1)
+        if ($text) {
+            $u = $text | ConvertFrom-Json
+            if ([string]$u.product -eq 'Fr3oon' -and (Test-VendorSignature 'FR3OON-UPDATE' "$($u.version)`n$($u.url)`n$($u.sha256)" ([string]$u.sig))) {
+                $info = @{ available = (([version][string]$u.version) -gt ([version]$Version)); latest = [string]$u.version; notes = [string]$u.notes; current = $Version }
+                $until = (Get-Date).AddHours(6)
+            }
+        }
+    } catch { Write-LawhaLog "update check: $($_.Exception.Message)" }
+    finally { $j.ps.Dispose(); $j.rs.Dispose(); $script:UpdateJob = $null }
+    $script:UpdateCache = @{ info = $info; until = $until }
+}
+
 function Get-UpdateInfo([int]$ms = 8000) {
     $j = $null; $failed = ''
     foreach ($url in (Get-UpdateUrls)) {
@@ -1727,6 +1787,95 @@ function Get-UpdateInfo([int]$ms = 8000) {
     Need (Test-VendorSignature 'FR3OON-UPDATE' "$($j.version)`n$($j.url)`n$($j.sha256)" ([string]$j.sig)) 'ملف التحديثات غير موقّع من الناشر، لن يُستخدم.'
     $newer = ([version][string]$j.version) -gt ([version]$Version)
     return @{ current = $Version; latest = [string]$j.version; available = $newer; notes = [string]$j.notes; date = [string]$j.date; url = [string]$j.url; sha256 = ([string]$j.sha256).ToLower(); size = [long]$j.size }
+}
+
+# Installing from Settings, in steps the page follows with a progress bar
+# (/api/update-progress): backup → download (bytes) → verify → install.
+$UpdateDownloadScript = {
+    param($url, $file, $st)
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        if ($url -notmatch '^https?://') {
+            $in = [IO.File]::OpenRead($url)
+            $st.total = $in.Length
+        } else {
+            $rq = [Net.HttpWebRequest]::Create($url)
+            $rq.Timeout = 30000; $rq.ReadWriteTimeout = 30000; $rq.UserAgent = 'Fr3oon'
+            $rs = $rq.GetResponse()
+            if ($rs.ContentLength -gt 0) { $st.total = $rs.ContentLength }
+            $in = $rs.GetResponseStream()
+        }
+        $out = [IO.File]::Create($file)
+        try {
+            $buf = New-Object byte[] 65536
+            while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) {
+                $out.Write($buf, 0, $n)
+                $st.received += $n
+            }
+        } finally { $out.Close(); $in.Close() }
+        $st.downloaded = $true
+    } catch { $st.error = 'تعذّر تنزيل التحديث. تحقّق من اتصال الإنترنت ثم أعد المحاولة. (' + $_.Exception.Message + ')' }
+}
+$script:UpdateRun = $null
+$script:StopAt = $null
+function Start-UpdateInstall([string]$user) {
+    $r = $script:UpdateRun
+    Need (-not $r -or $r.state.phase -in 'error', 'install') 'التحديث جارٍ بالفعل.'
+    $u = Get-UpdateInfo
+    Need $u.available "أنت تستخدم آخر إصدار ($Version)."
+    $dir = Join-Path ([IO.Path]::GetTempPath()) 'fr3oon-update'
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $st = [hashtable]::Synchronized(@{ phase = 'backup'; received = 0; total = [long]$u.size; error = ''; version = $u.latest; downloaded = $false })
+    $script:UpdateRun = @{ state = $st; info = $u; file = (Join-Path $dir "Fr3oon-Setup-$($u.latest).exe"); job = $null; user = $user }
+    Write-LawhaLog "update $Version -> $($u.latest): started"
+    Wait-Backup 600
+    Start-Backup -Now -Label '-before-update'
+    return @{ version = $u.latest; size = [long]$u.size }
+}
+# Moves the install on (from the main loop and from each progress request).
+function Step-UpdateRun {
+    $r = $script:UpdateRun
+    if (-not $r) { return }
+    $st = $r.state
+    try {
+        switch ($st.phase) {
+            'backup' {
+                Update-Backup
+                if ($script:BackupJob) { return }
+                Need (-not $script:BackupError) "تعذّر أخذ نسخة احتياطية قبل التحديث: $($script:BackupError)"
+                $rs = [runspacefactory]::CreateRunspace(); $rs.Open()
+                $ps = [PowerShell]::Create(); $ps.Runspace = $rs
+                $url = [string]$r.info.url
+                [void]$ps.AddScript($UpdateDownloadScript.ToString()).AddArgument($url).AddArgument($r.file).AddArgument($st)
+                $r.job = @{ ps = $ps; rs = $rs; h = $ps.BeginInvoke() }
+                $st.phase = 'download'
+            }
+            'download' {
+                if (-not $r.job.h.IsCompleted) { return }
+                try { [void]$r.job.ps.EndInvoke($r.job.h) } finally { $r.job.ps.Dispose(); $r.job.rs.Dispose() }
+                Need (-not $st.error) $st.error
+                Need $st.downloaded 'لم يكتمل تنزيل التحديث.'
+                $st.phase = 'verify'
+            }
+            'verify' {
+                $hash = (Get-FileHash -LiteralPath $r.file -Algorithm SHA256).Hash.ToLower()
+                if ($hash -ne $r.info.sha256) {
+                    Remove-Item -LiteralPath $r.file -Force -ErrorAction SilentlyContinue
+                    throw 'ملف التحديث الذي نُزّل لا يطابق الملف المنشور، لن يُثبَّت.'
+                }
+                Write-Activity $r.user 'update' "من الإصدار $Version إلى $($st.version)"
+                Write-LawhaLog "update $Version -> $($st.version): installing $($r.file)"
+                $st.phase = 'install'
+                if (-not $env:LAWHA_FAKEUPDATE) { Start-Process -FilePath $r.file -ArgumentList '/S', '/RELAUNCH' }
+                # a moment for the page to show the last step, then make way for the installer
+                $script:StopAt = (Get-Date).AddSeconds(2)
+            }
+        }
+    } catch {
+        $st.error = $_.Exception.Message
+        $st.phase = 'error'
+        Write-LawhaLog "update FAILED: $($st.error)"
+    }
 }
 
 function Install-Update {
@@ -2083,7 +2232,12 @@ function Export-Data {
     if (-not ('LawhaJson' -as [type])) { Add-Type -TypeDefinition $JsonCode }
     $p = Get-DbPath
     Need ($p -ne '') 'لم تُحدَّد قاعدة البيانات'
-    $fi = Get-Item -LiteralPath $p
+    # a shared folder may not answer at once
+    $fi = $null
+    for ($try = 1; -not $fi; $try++) {
+        try { $fi = Get-Item -LiteralPath $p -ErrorAction Stop }
+        catch { if ($try -ge 4) { throw "تعذّر الوصول إلى قاعدة البيانات: $p. تحقّق من اتصال الشبكة بالجهاز الذي يحفظها." }; Start-Sleep -Milliseconds (500 * $try) }
+    }
     $key = "$($fi.Length)|$($fi.LastWriteTimeUtc.Ticks)"
     # at most 20 seconds old: حساباتي may have saved without the file's time changing yet
     if ($script:DataCache -and $script:DataCache.key -eq $key -and $script:DataCache.path -eq $p -and
@@ -2671,7 +2825,7 @@ function Test-RemoteRequest($req) {
 # What only someone sitting at this computer may do.
 $LocalOnly = @('/api/choose-file', '/api/candidates', '/api/browse', '/api/choose-folder', '/api/shutdown', '/api/open-backups',
     '/api/remote', '/api/remote-access', '/api/fulltest', '/api/fulltest-data', '/api/selftest', '/api/activate', '/api/setup',
-    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install', '/api/new-database', '/api/db-info', '/api/link-hisabati')
+    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install', '/api/update-progress', '/api/new-database', '/api/db-info', '/api/link-hisabati')
 
 function Get-State($req) {
     $remote = Test-RemoteRequest $req
@@ -2714,6 +2868,8 @@ $script:SeenPage = $false
 $script:ByeAt = $null
 function Test-NoWindow {
     if (-not $AutoStop) { return $false }
+    # other devices work through this computer: it keeps serving them
+    if ($script:Config.allowRemote) { return $false }
     $now = Get-Date
     if ($script:ByeAt -and $now -gt $script:ByeAt) { return $true }
     # before the first page: time for the window to open and sign-in
@@ -3070,26 +3226,25 @@ function Handle($ctx) {
             # (a failure: an hour), so it rarely waits on the internet.
             '/api/update-status' {
                 if (-not $s.admin -or (Test-RemoteRequest $req)) { return Send-Json $ctx 200 @{ ok = $true; available = $false } }
+                Update-UpdateFetch
                 $c = $script:UpdateCache
-                if (-not $c -or (Get-Date) -gt $c.until) {
-                    try {
-                        $i = Get-UpdateInfo 5000
-                        $c = @{ info = @{ available = $i.available; latest = $i.latest; notes = $i.notes; current = $Version }; until = (Get-Date).AddHours(6) }
-                    } catch {
-                        $c = @{ info = @{ available = $false; current = $Version; error = $_.Exception.Message }; until = (Get-Date).AddHours(1) }
-                    }
-                    $script:UpdateCache = $c
-                }
-                return Send-Json $ctx 200 (@{ ok = $true } + $c.info)
+                # never waits: answers with what it knows, and looks again on the side
+                if (-not $c -or (Get-Date) -gt $c.until) { Start-UpdateFetch }
+                if (-not $c) { return Send-Json $ctx 200 @{ ok = $true; available = $false; pending = $true } }
+                return Send-Json $ctx 200 (@{ ok = $true; pending = [bool]$script:UpdateJob } + $c.info)
             }
             '/api/update-install' {
                 Need $s.admin 'التحديث يحتاج صلاحية المدير'
-                Wait-Backup 600
-                Start-Backup -Now -Label '-before-update'
-                Wait-Backup 600
-                Write-Activity $s.user 'update' "الإصدار الحالي $Version"
-                $r = Install-Update
-                return Send-Json $ctx 200 (@{ ok = $true } + $r)
+                $r = Start-UpdateInstall $s.user
+                return Send-Json $ctx 200 (@{ ok = $true; started = $true } + $r)
+            }
+            '/api/update-progress' {
+                Need $s.admin 'التحديث يحتاج صلاحية المدير'
+                Step-UpdateRun
+                $r = $script:UpdateRun
+                if (-not $r) { return Send-Json $ctx 200 @{ ok = $true; phase = 'none' } }
+                $st = $r.state
+                return Send-Json $ctx 200 @{ ok = $true; phase = $st.phase; received = [long]$st.received; total = [long]$st.total; error = [string]$st.error; version = $st.version }
             }
             '/api/selftest' {
                 Need $s.admin 'فحص النظام يحتاج صلاحية المدير'
@@ -3199,13 +3354,17 @@ if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
 
 try {
     while ($listener.IsListening -and -not $script:Stop) {
+        Step-UpdateRun
+        if ($script:StopAt -and (Get-Date) -gt $script:StopAt) { Write-LawhaLog 'stopping for the installer'; break }
         # also between requests (other devices or checks may keep it busy)
         if (Test-NoWindow) {
             Write-LawhaLog 'no window open: stopping'
             break
         }
         $async = $listener.BeginGetContext($null, $null)
-        while (-not $async.AsyncWaitHandle.WaitOne(1000)) {
+        while (-not $async.AsyncWaitHandle.WaitOne(500)) {
+            Step-UpdateRun
+            if ($script:StopAt -and (Get-Date) -gt $script:StopAt) { $script:Stop = $true; break }
             if (Test-NoWindow) {
                 Write-LawhaLog 'no window open: stopping'
                 $script:Stop = $true

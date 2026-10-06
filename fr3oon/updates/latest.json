@@ -1,10 +1,10 @@
 {
   "product": "Fr3oon",
-  "version": "2.2.1",
-  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.1.exe",
-  "sha256": "7ffbaa2251655d9ed2dad1dc08fc56e6518f350df18ee4887589999603bc4243",
-  "size": 572653,
-  "notes": "- البرنامج المساعد يتوقف عند إغلاق نافذة البرنامج، ويبدأ من جديد عند فتحه (لا حاجة لإعادة تشغيل الجهاز).\n- اختصار «إعادة تشغيل Fr3oon» في قائمة ابدأ.\n- التنبيه بالتحديثات الجديدة تلقائياً للمدير.",
+  "version": "2.2.2",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.2.exe",
+  "sha256": "71b3819b7f98552fbe83b76fc9b42a3131ed79850a1fdf91bd09a9448774030e",
+  "size": 575752,
+  "notes": "- البرنامج يفتح أسرع بكثير، دون انتظار عند التشغيل.\n- البحث عن التحديثات يجري في الخلفية ولا يؤخّر البرنامج.\n- شريط يبيّن مراحل التحديث: النسخة الاحتياطية، التنزيل بالنسبة المئوية، التحقق، التثبيت.\n- قاعدة بيانات على جهاز آخر في الشبكة: إعادة المحاولة تلقائياً عند تعثّر الاتصال بدل رسالة الفشل.\n- الجهاز الرئيسي يبقى يخدم الأجهزة الإضافية حتى بعد إغلاق نافذته.",
   "date": "2026-10-06",
-  "sig": "Af9WH27xmfaOuiK98j7OORsl5VWAKKbRUeUSAKrtqTjyyBQhkKbbyswQjxOPzE2hYouaSXf7nJ01oRFDfBL6xw"
+  "sig": "6k7BSHJdPKdQRn4yYmPGW1shRxr4uTrmuP-asC3iDp4mqwQH-NK_ojFdg2eC8FRFSUji50m5us7lRDVn4agEFQ"
 }

@@ -386,6 +386,18 @@ try { Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'فتح-1'; user = 
 Assert ($null -eq $script:Db) 'a refused save closes it (the next one opens fresh)'
 Assert (@((Rows 'bayeeCode') | Where-Object { $_['bayeeCode'] -like 'فتح-*' }).Count -eq 2) 'nothing half-saved by the refused one'
 
+Write-Host "`n== a database on another computer faltering"
+$script:flaky = 0
+$v = Use-Database -ReadOnly { param($db) $script:flaky++; if ($script:flaky -lt 3) { throw 'Disk or network error.' }; Count $db 'SELECT Count(*) FROM bayeeCode' }
+Assert ($script:flaky -eq 3 -and $v -gt 0) 'a network error is tried again (third time worked)'
+$script:flaky = 0
+Assert-Throws { Use-Database { param($db) $script:flaky++; throw 'اسم العميل مطلوب' } } 'اسم العميل' 'a refused save is not tried again'
+Assert ($script:flaky -eq 1) 'tried once only'
+$n0 = (Rows 'bayeeCode').Count
+$script:flaky = 0
+Invoke-Write 'saveCustomer' ([pscustomobject]@{ name = 'بعد انقطاع'; user = 'x' }) | Out-Null
+Assert ((Rows 'bayeeCode').Count -eq $n0 + 1) 'saves still work'
+
 Write-Host "`n== data for other devices"
 $bytes = Export-Data
 $exp = [Text.Encoding]::UTF8.GetString($bytes) | ConvertFrom-Json
@@ -477,6 +489,23 @@ Sign 'update', $key, '9.9.9', $setup, $setup | Set-Content -LiteralPath $feed -E
 $inst = Install-Update
 Assert ($inst.version -eq '9.9.9' -and (Test-Path -LiteralPath $inst.file) -and $script:Stop) 'downloaded, checked, and the helper stops for the installer'
 $script:Stop = $false
+# from Settings: in steps, with progress
+$script:UpdateRun = $null
+Start-UpdateInstall 'نور' | Out-Null
+for ($i = 0; $i -lt 200 -and $script:UpdateRun.state.phase -notin 'install', 'error'; $i++) { Start-Sleep -Milliseconds 100; Step-UpdateRun }
+$st = $script:UpdateRun.state
+Assert ($st.phase -eq 'install' -and $st.received -eq $st.total -and $st.total -gt 0 -and $script:StopAt) "steps: backup, download ($($st.received) bytes), verify, install"
+Assert (@(Get-Backups | Where-Object { $_.name -like '*-before-update*' }).Count -ge 1) 'a backup before the update'
+$st.phase = 'download'
+Assert-Throws { Start-UpdateInstall 'نور' } 'جارٍ' 'not a second one while one is under way'
+$script:StopAt = $null; $script:UpdateRun = $null
+[IO.File]::WriteAllBytes($setup, [byte[]](1..202))
+Sign 'update', $key, '9.9.9', $setup, $setup | Set-Content -LiteralPath $feed -Encoding UTF8
+[IO.File]::WriteAllBytes($setup, [byte[]](1..203))
+Start-UpdateInstall 'نور' | Out-Null
+for ($i = 0; $i -lt 200 -and $script:UpdateRun.state.phase -notin 'install', 'error'; $i++) { Start-Sleep -Milliseconds 100; Step-UpdateRun }
+Assert ($script:UpdateRun.state.phase -eq 'error' -and $script:UpdateRun.state.error -match 'لا يطابق' -and -not $script:StopAt) 'a changed file stops at the check, nothing installed'
+$script:UpdateRun = $null
 $script:Config.updateUrl = Join-Path $tmp 'missing.json'
 Assert-Throws { Get-UpdateInfo } 'تعذّر|لا توجد' 'no feed: a clear message'
 $script:Config.updateUrl = ''

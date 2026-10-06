@@ -27,7 +27,18 @@ function Fail([string]$msg) {
 # (one that doesn't skip local addresses would make the program look stopped).
 [Net.WebRequest]::DefaultWebProxy = $null
 
+# Is anything listening on the port? A TCP probe answers in milliseconds
+# (an HTTP request to a closed port on Windows takes seconds).
+$PortNo = 8770
+function Test-Port([int]$ms = 400) {
+    $c = New-Object Net.Sockets.TcpClient
+    try {
+        $t = $c.ConnectAsync('127.0.0.1', $PortNo)
+        return ($t.Wait($ms) -and $c.Connected)
+    } catch { return $false } finally { $c.Close() }
+}
 function Get-Helper([int]$timeout = 3) {
+    if (-not (Test-Port)) { return $null }
     try {
         $r = Invoke-WebRequest -UseBasicParsing -Uri ($Url + 'api/ping') -TimeoutSec $timeout
         if ($r.StatusCode -ne 200) { return $null }
@@ -35,9 +46,11 @@ function Get-Helper([int]$timeout = 3) {
     } catch { return $null }
 }
 function Test-Helper { return $null -ne (Get-Helper) }
-# Answering, allowing a moment for a helper busy with a save or a backup.
+# Answering? Nothing on the port: no (at once). Something on the port: allow
+# a moment for a helper busy with a save or a backup.
 function Wait-Helper([int]$tries = 3) {
     for ($i = 0; $i -lt $tries; $i++) {
+        if (-not (Test-Port)) { return $null }
         $h = Get-Helper 3
         if ($h) { return $h }
         Start-Sleep -Milliseconds 500
@@ -69,6 +82,7 @@ function Get-HelperProcesses([string]$server) {
 # A helper that no longer answers keeps the port, and a new one cannot
 # start: stop it (no need to restart the computer).
 function Stop-Helpers([string]$server, [string]$why) {
+    if (-not (Test-Port) -and -not (Test-Path -LiteralPath $PidFile)) { return }
     try { Invoke-WebRequest -UseBasicParsing -Method POST -Headers @{ 'X-Lawha' = '1' } -Uri ($Url + 'api/shutdown') -TimeoutSec 2 | Out-Null } catch { }
     $ids = Get-HelperProcesses $server
     foreach ($id in $ids) {
@@ -89,7 +103,7 @@ function Start-Helper([string]$server) {
     while (-not (Test-Helper)) {
         if ($proc.HasExited) { return "exited:$($proc.ExitCode)" }
         if ((Get-Date) -gt $deadline) { return 'timeout' }
-        Start-Sleep -Milliseconds 400
+        Start-Sleep -Milliseconds 150
     }
     return 'ok'
 }
@@ -107,7 +121,19 @@ function Test-Dao([string]$exe) {
     } catch { return $false }
 }
 
+# Which PowerShell loads DAO is found once (it starts PowerShell twice, a few
+# seconds) and remembered; «إعادة تشغيل Fr3oon» finds it again.
+$HostFile = Join-Path $env:APPDATA 'Fr3oon\helper-host.txt'
 function Get-HelperHost {
+    try {
+        $known = ([string](Get-Content -LiteralPath $HostFile -ErrorAction Stop | Select-Object -First 1)).Trim()
+        if ($known -and (Test-Path -LiteralPath $known)) { return $known }
+    } catch { }
+    $h = Find-HelperHost
+    try { Set-Content -LiteralPath $HostFile -Value $h -Encoding UTF8 } catch { }
+    return $h
+}
+function Find-HelperHost {
     $win = $env:windir
     $sys = Join-Path $win 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if ([Environment]::Is64BitOperatingSystem) {
@@ -124,11 +150,15 @@ function Get-HelperHost {
 }
 
 try {
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     Log "launch from $Here (PowerShell $($PSVersionTable.PSVersion), $([IntPtr]::Size * 8)-bit)"
     $server = Join-Path $Here 'server.ps1'
     if (-not (Test-Path -LiteralPath $server)) { Fail "الملف server.ps1 غير موجود في مجلد البرنامج: $Here" }
 
-    if ($Restart) { Stop-Helpers $server 'restart requested' }
+    if ($Restart) {
+        Stop-Helpers $server 'restart requested'
+        try { Remove-Item -LiteralPath $HostFile -Force -ErrorAction SilentlyContinue } catch { }
+    }
 
     # A helper from before an update may still be running hidden: replace it,
     # or the old code keeps answering.
@@ -147,6 +177,7 @@ try {
 
     if (-not $running) {
         # not answering: anything left from before is stuck, so stop it first
+        # (nothing on the port and no pid file: nothing to stop, no delay)
         Stop-Helpers $server 'not answering'
         $r = Start-Helper $server
         if ($r -ne 'ok') {
@@ -161,9 +192,9 @@ try {
         if ($r -ne 'ok') {
             Fail 'لم يستجب البرنامج المساعد خلال 40 ثانية. شغّل «إعادة تشغيل Fr3oon» من قائمة ابدأ.'
         }
-        Log 'helper answering'
+        Log "helper answering ($($clock.ElapsedMilliseconds) ms)"
     } else {
-        Log 'helper already running'
+        Log "helper already running ($($clock.ElapsedMilliseconds) ms)"
     }
 
     # Linked to the main computer (a second device): open that, if it answers.
