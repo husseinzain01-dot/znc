@@ -72,6 +72,15 @@ export function setupPos(ctx) {
       .join('');
   }
 
+  // Rows grow when the invoice is short and tighten as it fills up, so the
+  // lines always fill the panel and stay easy to read.
+  const density = () => (cart.lines.length <= 3 ? 'd-lg' : cart.lines.length <= 6 ? 'd-md' : 'd-sm');
+  function countHtml() {
+    if (!cart.lines.length) return '';
+    const qty = cart.lines.reduce((a, l) => a + (Number(l.qty) || 0), 0);
+    return `<span>عدد الأصناف: <b class="num">${cart.lines.length}</b></span><span>مجموع الكميات: <b class="num">${fmt(qty)}</b></span>`;
+  }
+
   function linesHtml() {
     if (!cart.lines.length) return `<div class="cart-empty">${icon('pos')}<br>الفاتورة فارغة<br><small>اضغط على صنف أو امسح الباركود</small></div>`;
     return cart.lines
@@ -79,7 +88,7 @@ export function setupPos(ctx) {
         const it = itemBy(l.item);
         const units = it ? unitsOf(it, l.unit) : [l.unit];
         return `<div class="cart-line" data-i="${i}">
-          <span class="name">${esc(l.item)}</span>
+          <span class="name"><small class="ln num">${i + 1}</small>${esc(l.item)}</span>
           <span class="line-total num">${fmt(l.qty * l.price)}</span>
           <div class="row">
             ${units.length > 1 ? `<select data-f="unit">${units.map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>` : `<small class="muted">${esc(l.unit)}</small>`}
@@ -128,38 +137,49 @@ export function setupPos(ctx) {
         <div class="item-grid" id="posGrid">${gridHtml()}</div>
       </section>
       <aside class="pos-cart">
-        <div class="card stack" style="gap:10px">
-          <div class="seg" id="posType" style="width:100%"${allowed.length > 1 ? '' : ' hidden'}>${allowed
-            .map((t) => `<button data-t="${t}" class="${t === cart.type ? 'on' : ''}" style="flex:1">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`)
-            .join('')}</div>
-          ${allowed.length > 1 ? '' : `<p class="muted" style="margin:0">بيع ${credit ? 'آجل' : 'نقدي'}</p>`}
-          <div id="posWho" ${credit ? '' : 'hidden'}>
+        <div class="card cart-card">
+          <div class="cart-head">
+            <div class="seg" id="posType"${allowed.length > 1 ? '' : ' hidden'}>${allowed
+              .map((t) => `<button data-t="${t}" class="${t === cart.type ? 'on' : ''}">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`)
+              .join('')}</div>
+            ${allowed.length > 1 ? '' : `<b class="cart-kind">بيع ${credit ? 'آجل' : 'نقدي'}</b>`}
+            <button class="btn small" type="button" id="posRecentBtn" aria-expanded="false">${icon('activity')} آخر الفواتير</button>
+          </div>
+          <div id="posWho" class="cart-who" ${credit ? '' : 'hidden'}>
             <datalist id="dlCust">${P().customers.map((c) => `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
             <input id="posCustomer" list="dlCust" autocomplete="off" placeholder="اسم العميل" value="${esc(cart.customer)}" style="width:100%">
             <p class="muted" id="posCustInfo" style="margin:6px 2px 0;font-size:13px">${customerInfo()}</p>
           </div>
-        </div>
-        <div class="cart-lines" id="posLines">${linesHtml()}</div>
-        <div class="card stack" style="gap:10px">
-          <div class="cart-total"><span>المجموع</span><b class="num" id="posTotal">${fmt(total())}</b></div>
-          <div id="posPaidRow" ${credit ? '' : 'hidden'}><input id="posPaid" inputmode="numeric" placeholder="المدفوع الآن (اختياري)" value="${esc(cart.paid)}" style="width:100%"></div>
-          <input id="posNote" placeholder="ملاحظة (اختياري)" value="${esc(cart.note)}">
-          <div class="row" style="display:flex;gap:8px">
-            <button class="btn primary big" id="posSave" style="flex:1">${icon('save')} حفظ <span class="kbd">F9</span></button>
-            ${can('print') ? `<button class="btn big" id="posSavePrint" style="flex:1">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>` : ''}
+          <div class="cart-count" id="posCount">${countHtml()}</div>
+          <div class="cart-lines ${density()}" id="posLines">${linesHtml()}</div>
+          <div class="cart-foot">
+            <div class="cart-total">
+              <span>المجموع</span>
+              <button class="btn small" type="button" id="posNoteBtn"${cart.note ? ' hidden' : ''}>${icon('edit')} ملاحظة</button>
+              <b class="num" id="posTotal">${fmt(total())}</b>
+            </div>
+            <div id="posPaidRow" ${credit ? '' : 'hidden'}><input id="posPaid" inputmode="numeric" placeholder="المدفوع الآن (اختياري)" value="${esc(cart.paid)}" style="width:100%"></div>
+            <input id="posNote" placeholder="ملاحظة على الفاتورة" value="${esc(cart.note)}"${cart.note ? '' : ' hidden'}>
+            <div class="cart-actions">
+              <button class="btn primary big" id="posSave">${icon('save')} حفظ <span class="kbd">F9</span></button>
+              ${can('print') ? `<button class="btn big" id="posSavePrint">${icon('print')} حفظ وطباعة <span class="kbd">F10</span></button>` : ''}
+              <button class="btn big danger icon-only" type="button" id="posClear" title="فاتورة جديدة (تفريغ)" aria-label="فاتورة جديدة (تفريغ)">${icon('trash')}</button>
+            </div>
           </div>
-          <button class="btn small" id="posClear">${icon('trash')} فاتورة جديدة (تفريغ)</button>
-        </div>
-        <div class="card stack" style="gap:6px">
-          <h3 style="margin:0">آخر الفواتير <small class="muted" style="font-weight:400">${recentHint.length ? '— اضغط على فاتورة ل' + recentHint.join(' أو ') : ''}</small></h3>
-          <div id="posRecent" class="stack" style="gap:6px">${recentHtml()}</div>
+          <div class="cart-recent" id="posRecentPop" hidden>
+            <div class="cart-recent-head"><b>آخر فواتير اليوم</b><button class="icon-btn" type="button" id="posRecentClose" aria-label="إغلاق">×</button></div>
+            ${recentHint.length ? `<p class="muted">اضغط على فاتورة ل${recentHint.join(' أو ')}</p>` : ''}
+            <div id="posRecent" class="stack" style="gap:6px">${recentHtml()}</div>
+          </div>
         </div>
       </aside>
     </div>`;
   }
 
   function drawLines() {
+    $('#posLines').className = 'cart-lines ' + density();
     $('#posLines').innerHTML = linesHtml();
+    $('#posCount').innerHTML = countHtml();
     $('#posTotal').textContent = fmt(total());
     persist();
   }
@@ -297,6 +317,11 @@ export function setupPos(ctx) {
       cart.paid = e.target.value;
       persist();
     };
+    $('#posNoteBtn').onclick = () => {
+      $('#posNoteBtn').hidden = true;
+      $('#posNote').hidden = false;
+      $('#posNote').focus();
+    };
     $('#posNote').oninput = (e) => {
       cart.note = e.target.value;
       persist();
@@ -310,6 +335,7 @@ export function setupPos(ctx) {
       if (e.target.dataset.f === 'price' && can('edit_price')) l.price = Number(e.target.value.replace(/,/g, '')) || 0;
       row.querySelector('.line-total').textContent = fmt(l.qty * l.price);
       $('#posTotal').textContent = fmt(total());
+      $('#posCount').innerHTML = countHtml();
       persist();
     };
     lines.onchange = (e) => {
@@ -335,10 +361,19 @@ export function setupPos(ctx) {
         drawLines();
       }
     };
+    const recent = (open) => {
+      $('#posRecentPop').hidden = !open;
+      $('#posRecentBtn').setAttribute('aria-expanded', String(open));
+    };
+    $('#posRecentBtn').onclick = () => recent($('#posRecentPop').hidden);
+    $('#posRecentClose').onclick = () => recent(false);
     $('#posRecent').onclick = (e) => {
       const b = e.target.closest('[data-sale]');
       const inv = b && P().saleById.get(Number(b.dataset.sale));
-      if (inv) invoiceModal(inv);
+      if (inv) {
+        recent(false);
+        invoiceModal(inv);
+      }
     };
     $('#posSave').onclick = () => save(false);
     if ($('#posSavePrint')) $('#posSavePrint').onclick = () => save(true);
