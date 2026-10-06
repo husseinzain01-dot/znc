@@ -84,7 +84,7 @@ export function setupForms(ctx) {
 
     const people = sale ? P().customers : P().suppliers;
     const balances = new Map((sale ? C.customerBalances(P()) : C.supplierBalances(P())).map((b) => [b.name, b.balance]));
-    const who = inv ? (sale ? (inv.customer === 'عميل نقدي' ? '' : inv.customer) : inv.supplier) : preset?.who || '';
+    const who = inv ? (sale ? (['عميل نقدي', 'قائمة نقدي'].includes(inv.customer) ? '' : inv.customer) : inv.supplier) : preset?.who || '';
 
     openModal(`<h2>${inv ? `تعديل ${sale ? 'فاتورة بيع' : 'فاتورة شراء'} رقم ${inv.id}` : sale ? 'فاتورة بيع جديدة' : 'فاتورة شراء جديدة'}</h2>
       ${datalist('dlPeople', people.map((p) => ({ value: p.name, label: p.mobile })))}

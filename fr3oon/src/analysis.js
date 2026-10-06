@@ -8,6 +8,8 @@
 import * as C from './calc.js';
 
 export const CASH_CUSTOMER = 'عميل نقدي';
+// the same in a حساباتي database
+export const CASH_NAMES = new Set([CASH_CUSTOMER, 'قائمة نقدي']);
 export const NO_CLASS = 'بدون فئة';
 export const NO_SUPPLIER = 'بدون مورد سابق';
 // Week as the shop counts it: Saturday first.
@@ -334,7 +336,7 @@ export function salesTrend(P, filter = {}) {
 // Customers by sales in the period; the walk-in cash customer is summed apart.
 export function topCustomers(P, filter = {}, n = 10) {
   const list = saleList(P, filter);
-  const isCash = (s) => !s.customer || s.customer === CASH_CUSTOMER;
+  const isCash = (s) => !s.customer || CASH_NAMES.has(s.customer);
   const m = byKey(list.filter((s) => !isCash(s)), (s) => s.customer);
   const all = [...m].map(([name, e]) => ({ name, ...e })).sort((a, b) => b.total - a.total);
   const cash = list.filter(isCash);

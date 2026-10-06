@@ -8,3 +8,8 @@
 .db-facts b { font-size: 15px; }
 .db-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .db-note { font-size: 13px; margin: 10px 0 0; }
+
+/* linking a حساباتي database */
+.link-file { display: grid; gap: 10px; margin: 16px 0 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); text-align: start; }
+.link-file code { word-break: break-all; font-size: 12.5px; }
+.link-steps { margin: 0 0 6px; padding-inline-start: 20px; color: var(--text-2); font-size: 14px; display: grid; gap: 4px; text-align: start; }

@@ -389,7 +389,7 @@ function setupScreen(st, error = '', keep = {}) {
       ${error ? `<p class="notice error">${esc(error)}</p>` : ''}
       <button class="btn primary big block" type="submit" id="sGo">إنشاء قاعدة البيانات</button>
     </form>
-    <button class="btn block" id="sOpen" style="margin-top:8px">${icon('file')} لديّ قاعدة بيانات ${APP} سابقة: فتحها</button>
+    <button class="btn block" id="sOpen" style="margin-top:8px">${icon('file')} لديّ قاعدة بيانات موجودة (${APP} أو حساباتي): فتحها</button>
     ${versionLine()}`, true);
   $$('[data-pick]').forEach((b) => {
     b.onclick = async () => {
@@ -427,11 +427,12 @@ function setupScreen(st, error = '', keep = {}) {
 // Windows, or another copy). Users may differ, so everyone signs in again.
 function openDbScreen() {
   screen(`<h1>فتح قاعدة بيانات</h1>
-    <p class="muted">اختر ملف قاعدة بيانات ${APP} (<code>fr3oon.accdb</code>).</p>
+    <p class="muted">اختر ملف قاعدة بيانات ${APP} (<code>fr3oon.accdb</code>)، أو قاعدة بيانات برنامج حساباتي (مثل <code>Units2026.accdb</code>) ليعمل عليها ${APP} مباشرة.</p>
     <div id="setupPicker"></div>
     <button class="btn block" id="pkBack" style="margin-top:12px">رجوع بدون تغيير</button>`, true);
   $('#pkBack').onclick = () => startScreen();
   databasePicker({ esc, api, icon }, $('#setupPicker'), async (j) => {
+    if (j.hisabati) return linkHisabatiScreen(j);
     toast('فُتحت قاعدة البيانات: ' + j.file);
     try {
       await api('/api/logout', { method: 'POST', body: {} });
@@ -440,6 +441,62 @@ function openDbScreen() {
     }
     signedOut();
   }, { auto: true });
+}
+
+// A حساباتي database: Fr3oon works on it directly once linked (its own
+// tables added, حساباتي's users brought over), after a safety copy.
+function linkHisabatiScreen(info, error = '', keep = {}) {
+  const users = info.users || [];
+  const v = (k, d = '') => esc(keep[k] ?? d);
+  screen(`<h1>ربط قاعدة بيانات حساباتي</h1>
+    <p class="muted">هذا الملف قاعدة بيانات برنامج «حساباتي». يعمل ${APP} عليها مباشرة، ويبقى حساباتي يعمل عليها كالمعتاد في الوقت نفسه.</p>
+    <div class="link-file">
+      <code dir="ltr">${esc(info.path)}</code>
+      <div class="db-facts">
+        <span><small class="muted">الأصناف</small><b class="num">${fmt(info.items)}</b></span>
+        <span><small class="muted">فواتير البيع</small><b class="num">${fmt(info.sales)}</b></span>
+        <span><small class="muted">العملاء</small><b class="num">${fmt(info.customers)}</b></span>
+        <span><small class="muted">الموردون</small><b class="num">${fmt(info.suppliers)}</b></span>
+        <span><small class="muted">المستخدمون</small><b class="num">${fmt(users.length)}</b></span>
+      </div>
+    </div>
+    <ul class="link-steps">
+      <li>تُؤخذ نسخة من الملف أولاً في مجلد النسخ الاحتياطي.</li>
+      <li>تُضاف جداول ${APP} الخاصة (المستخدمون، الإعدادات، سجل العمليات، الجرد) دون تغيير أي شيء من بيانات حساباتي.</li>
+      <li>${users.length ? 'يُنقل مستخدمو حساباتي بكلمات مرورهم. المستخدم الذي تختاره أدناه يكون المدير، والباقون يبيعون نقداً ويطبعون، ويمكنك تعديل صلاحياتهم من الإعدادات.' : 'لا يوجد مستخدمون في حساباتي: أنشئ حساب المدير أدناه.'}</li>
+    </ul>
+    <form id="hForm" class="setup-form" autocomplete="off">
+      <label class="field">اسم المحل <input id="hShop" maxlength="60" value="${v('shopName')}" required></label>
+      <div class="form-grid">
+        <label class="field">${users.length ? 'المدير (من مستخدمي حساباتي)' : 'اسم المدير'}
+          ${users.length
+            ? `<select id="hAdmin">${users.map((u) => `<option${u === keep.admin ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>`
+            : `<input id="hAdmin" maxlength="45" value="${v('admin', 'المدير')}">`}</label>
+        <label class="field">${users.length ? 'كلمة مروره في حساباتي' : 'كلمة المرور'} <input id="hPass" type="password" required></label>
+      </div>
+      ${error ? `<p class="notice error">${esc(error)}</p>` : ''}
+      <button class="btn primary big block" type="submit" id="hGo">ربط والبدء</button>
+    </form>
+    <button class="btn block" id="hBack" style="margin-top:8px">رجوع</button>
+    ${versionLine()}`, true);
+  $('#hBack').onclick = () => openDbScreen();
+  $('#hForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const body = { path: info.path, shopName: $('#hShop').value.trim(), admin: $('#hAdmin').value.trim(), password: $('#hPass').value };
+    $('#hGo').disabled = true;
+    $('#hGo').textContent = 'جارٍ الربط…';
+    try {
+      const j = await api('/api/link-hisabati', { method: 'POST', body });
+      store.set('fr3oon-last-user', body.admin);
+      alert(`تم ربط قاعدة البيانات ✔\nحُفظت نسخة منها قبل الربط في:\n${j.copy}${j.skipped?.length ? `\n\nلم يُنقل (بلا كلمة مرور في حساباتي): ${j.skipped.join('، ')}` : ''}`);
+      state.token = '';
+      store.set('fr3oon-token', '');
+      startScreen();
+    } catch (err) {
+      linkHisabatiScreen(info, err.message, body);
+    }
+  };
+  $('#hShop').focus();
 }
 
 async function loginScreen(error = '', chosen = '') {

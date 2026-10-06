@@ -15,13 +15,13 @@ export function databasePicker(ctx, host, onDone, { auto = false } = {}) {
       <button class="btn primary big block" id="pkNative">${icon('file')} اختيار الملف من نافذة Windows</button>
       <p class="muted pk-hint" id="pkNativeHint">${nativeHint}</p>
       <h3>أو من الملفات التي عُثر عليها</h3>
-      <div id="pkFound" class="pk-list"><p class="muted">جارٍ البحث عن قواعد بيانات Fr3oon على هذا الجهاز…</p></div>
+      <div id="pkFound" class="pk-list"><p class="muted">جارٍ البحث عن قواعد البيانات (Fr3oon وحساباتي) على هذا الجهاز…</p></div>
       <div class="pk-tabs">
         <button class="btn" id="pkBrowseBtn">${icon('file')} تصفّح المجلدات</button>
         <button class="btn" id="pkPathBtn">${icon('edit')} كتابة مسار الملف</button>
       </div>
       <div id="pkPath" hidden class="row" style="display:flex;gap:8px;margin-top:10px">
-        <input id="pkPathInput" dir="ltr" placeholder="C:\\Fr3oon\\Data\\fr3oon.accdb  أو  \\\\PC\\share\\fr3oon.accdb" style="flex:1">
+        <input id="pkPathInput" dir="ltr" placeholder="C:\\Fr3oon\\Data\\fr3oon.accdb  أو  D:\\Units2026\\Units2026.accdb" style="flex:1">
         <button class="btn primary" id="pkPathUse">فتح</button>
       </div>
       <div id="pkBrowse" hidden></div>

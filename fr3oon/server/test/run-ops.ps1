@@ -481,6 +481,42 @@ $script:Config.updateUrl = Join-Path $tmp 'missing.json'
 Assert-Throws { Get-UpdateInfo } 'تعذّر|لا توجد' 'no feed: a clear message'
 $script:Config.updateUrl = ''
 
+Write-Host "`n== an existing حساباتي database"
+$hjson = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'hisabati-sample.json') -Raw -Encoding UTF8
+$hfile = Join-Path $tmp 'hisabati/Units2026.accdb'
+New-Item -ItemType Directory -Force -Path (Split-Path $hfile) | Out-Null
+[IO.File]::WriteAllText($hfile, '{"FR3OON-FAKE-ACCDB":1,"tables":' + $hjson + '}')
+$keepDb = $script:Config.dbPath
+Assert (-not (Test-ShopDatabase $hfile) -and (Test-HisabatiDatabase $hfile)) 'recognised as حساباتي, not Fr3oon'
+Assert (-not (Test-HisabatiDatabase $dbFile)) 'a Fr3oon database is not taken for حساباتي'
+$hi = Get-HisabatiInfo $hfile
+Assert ((@($hi.users) -join ',') -eq 'نور,كاشير1,بلا كلمة' -and $hi.items -eq 2 -and $hi.sales -eq 2) "its users and counts: $(@($hi.users) -join ', ')"
+$before = [IO.File]::ReadAllText($hfile)
+Assert-Throws { Connect-HisabatiDatabase $hfile 'محل حساباتي' 'نور' 'wrong' } 'كلمة المرور غير صحيحة' 'the manager proves the حساباتي password'
+Assert-Throws { Connect-HisabatiDatabase $hfile 'محل حساباتي' 'أحد' '123' } 'غير موجود' 'only a حساباتي user can be the manager'
+Assert ([IO.File]::ReadAllText($hfile) -eq $before) 'a refused link changes nothing'
+$lk = Connect-HisabatiDatabase $hfile 'محل حساباتي' 'نور' '123'
+Assert ((Test-Path -LiteralPath $lk.copy) -and ([IO.File]::ReadAllText($lk.copy) -eq $before)) "a copy taken before linking: $(Split-Path $lk.copy -Leaf)"
+Assert ((Get-DbPath) -eq $lk.path -and (Test-ShopDatabase $hfile)) 'now the database in use, a Fr3oon database too'
+Assert ((@($lk.skipped) -join ',') -eq 'بلا كلمة') 'a user without a password is not brought over'
+Assert ((Test-Login 'نور' '123') -and (Test-Admin 'نور')) 'the manager signs in with the حساباتي password'
+Assert ((Test-Login 'كاشير1' '11') -and -not (Test-Admin 'كاشير1') -and ((Get-PermText 'كاشير1') -eq 'pos,sale_cash,print')) 'others: their password, the default permissions'
+Assert ((Get-Shop).shopName -eq 'محل حساباتي') 'shop name kept'
+$rowsH = { param($t) , @((Get-FakeFileTables $script:Engine $hfile)[$t].rows) }
+Assert ((& $rowsH 'tblUsers').Count -eq 3 -and (& $rowsH 'tblUsers')[0].UserPWD -eq '123') 'حساباتي users untouched'
+Assert ((& $rowsH 'MasterOut').Count -eq 2 -and (& $rowsH 'madaCode').Count -eq 2) 'حساباتي data untouched'
+$r = Invoke-Write 'saveSale' ([pscustomobject]@{ type = 'نقدي'; user = 'نور'; lines = @(@{ item = 'كبة'; unit = 'كيس'; qty = 2; price = 3000 }) })
+$hs = (& $rowsH 'MasterOut') | Where-Object { $_.idOut -eq $r.id }
+Assert ($hs.TOname -eq 'قائمة نقدي' -and $hs.Tagheez -eq $false -and $hs.Mandob -eq 'مباشر') 'a sale saved the way حساباتي does (قائمة نقدي, Tagheez)'
+$ri = Invoke-Write 'saveItem' ([pscustomobject]@{ user = 'نور'; name = 'سمبوسة'; unitL1 = 'كارتون'; unitL2 = 'كيس'; fill = 20; priceL1 = 40000; priceL2 = 2000 })
+Assert (((& $rowsH 'madaCode') | Where-Object { $_.ID -eq $ri.id })['price$'] -eq 40000) 'a new item fills حساباتي''s price$ too'
+$exp = [Text.Encoding]::UTF8.GetString((Export-Data)) | ConvertFrom-Json
+Assert ($exp.tables.MasterOut.rows.Count -eq 3 -and (@($exp.tables.Users.cols) -join ',') -eq 'UserName,Active' -and $null -eq $exp.tables.tblUsers) 'the app reads it (Fr3oon users, never حساباتي passwords)'
+$stH = Invoke-SelfTest
+Assert (-not ($stH | Where-Object { -not $_.ok })) "self-test on the linked حساباتي database: $(@($stH).Count) steps pass"
+Assert-Throws { Connect-HisabatiDatabase $hfile 'x' 'نور' '123' } 'ليس قاعدة بيانات حساباتي' 'linked once'
+Set-Database $keepDb
+
 Write-Host "`n== self-test"
 $snap = @{}
 foreach ($t in $counts.Keys) { $snap[$t] = (Rows $t).Count }

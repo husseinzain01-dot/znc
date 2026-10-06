@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.1.2'
+$Version = '2.2.0'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -424,6 +424,125 @@ function Get-TableNames($db) {
     return , $names
 }
 
+# ---------------------------------------------------------------- an existing حساباتي database
+# Fr3oon's tables are حساباتي's own (same names and columns), so it can work
+# on a حساباتي file directly, alongside حساباتي itself: it adds only its own
+# tables (users with hashed passwords, settings, log, stock counts) and
+# never changes حساباتي's.
+$HisabatiTables = @('madaCode', 'MasterOut', 'subOut', 'MasterIn', 'subIN', 'bayeeCode', 'shiraCode', 'mablakIn', 'mablakOut', 'tblUsers')
+function Test-HisabatiDatabase([string]$path) {
+    $script:DbOverride = $path
+    $script:NoUpgrade = $true
+    try {
+        return [bool](Use-Database -ReadOnly { param($db)
+                $names = Get-TableNames $db
+                if ($names -contains 'Settings') { return $false }
+                return -not @($HisabatiTables | Where-Object { $names -notcontains $_ }).Count
+            })
+    } catch { return $false } finally {
+        Close-Db
+        $script:DbOverride = $null
+        $script:NoUpgrade = $false
+    }
+}
+# What the person linking it sees: its users and how much is in it.
+function Get-HisabatiInfo([string]$path) {
+    $script:DbOverride = $path
+    $script:NoUpgrade = $true
+    try {
+        return Use-Database -ReadOnly { param($db)
+            $users = @((Get-Column $db 'SELECT UserName FROM tblUsers') | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+            @{
+                users = $users; items = (Count $db 'SELECT Count(*) FROM madaCode'); sales = (Count $db 'SELECT Count(*) FROM MasterOut')
+                customers = (Count $db 'SELECT Count(*) FROM bayeeCode'); suppliers = (Count $db 'SELECT Count(*) FROM shiraCode')
+            }
+        }
+    } finally {
+        Close-Db
+        $script:DbOverride = $null
+        $script:NoUpgrade = $false
+    }
+}
+function Read-HisabatiUsers($db) {
+    $out = [ordered]@{}
+    $rs = $db.OpenRecordset('SELECT UserName, UserPWD FROM tblUsers', $dbOpenSnapshot)
+    try {
+        while (-not $rs.EOF) {
+            $n = ([string]$rs.Fields.Item('UserName').Value).Trim()
+            $pw = $rs.Fields.Item('UserPWD').Value
+            if ($n -and -not $out.Contains($n)) { $out[$n] = $(if ($pw -is [DBNull] -or $null -eq $pw) { '' } else { [string]$pw }) }
+            $rs.MoveNext()
+        }
+    } finally { $rs.Close() }
+    return $out
+}
+# Link a حساباتي file: a copy first, then Fr3oon's tables, then its users
+# (with their حساباتي passwords; the one chosen becomes the manager).
+function Connect-HisabatiDatabase([string]$path, [string]$shopName, [string]$admin, [string]$password) {
+    Need (Test-HisabatiDatabase $path) 'هذا الملف ليس قاعدة بيانات حساباتي.'
+    $shop = Text $shopName 60 'اسم المحل'
+    Need ($shop -ne '') 'اسم المحل مطلوب'
+    # a safety copy, outside the daily copies (never pruned)
+    $bk = Get-BackupDir
+    New-Item -ItemType Directory -Force -Path $bk | Out-Null
+    $copy = Join-Path $bk ([IO.Path]::GetFileNameWithoutExtension($path) + '-before-fr3oon-' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '.accdb')
+    $script:DbOverride = $path
+    $script:NoUpgrade = $true
+    try {
+        $users = Use-Database -ReadOnly { param($db) Read-HisabatiUsers $db }
+        $admin = ([string]$admin).Trim()
+        if ($users.Count) {
+            Need ($users.Contains($admin)) "المستخدم غير موجود في حساباتي: $admin"
+            Need ($users[$admin] -ceq $password) 'كلمة المرور غير صحيحة (كلمة مرور هذا المستخدم في حساباتي).'
+        } else {
+            # no users in حساباتي: the manager is made here
+            Need ($admin -ne '') 'اسم المدير مطلوب'
+            Need ($password.Length -ge 4) 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'
+            $users[$admin] = $password
+        }
+        Close-Db
+        Copy-Item -LiteralPath $path -Destination $copy -Force
+        $db = Open-Db $path
+        $names = Get-TableNames $db
+        $missing = @($Schema.Keys | Where-Object { $names -notcontains $_ })
+        $ws = $script:Engine.Workspaces.Item(0)
+        if ($env:LAWHA_FAKEDAO) { $ws.BeginTrans() }
+        foreach ($sql in (Get-SchemaSql $missing)) { $db.Execute($sql, $dbFailOnError) }
+        if ($env:LAWHA_FAKEDAO) { $ws.CommitTrans() }
+        $skipped = New-Object System.Collections.Generic.List[string]
+        Use-Database { param($db)
+            Set-ShopSetting $db 'schema' ([string]$SchemaVersion)
+            Set-ShopSetting $db 'shopName' $shop
+            Set-ShopSetting $db 'created' (Get-Date -Format 'yyyy-MM-dd HH:mm')
+            Set-ShopSetting $db 'source' 'hisabati'
+            foreach ($n in $users.Keys) {
+                if (-not $users[$n]) { $skipped.Add($n); continue }
+                Save-User $db @{ name = $n; password = $users[$n]; isAdmin = ($n -eq $admin); active = $true; import = $true }
+            }
+            Add-Activity $db $admin 'settings' '' "ربط قاعدة بيانات حساباتي: $path`nنسخة قبل الربط: $copy"
+        } | Out-Null
+    } finally {
+        Close-Db
+        $script:DbOverride = $null
+        $script:NoUpgrade = $false
+    }
+    Set-Database $path
+    Write-LawhaLog "linked حساباتي database $path (copy: $copy)"
+    return @{ path = $script:Config.dbPath; copy = $copy; skipped = $skipped.ToArray() }
+}
+
+# Columns only حساباتي's tables have (filled the way حساباتي does).
+$script:ColCache = @{}
+function Test-Column($db, [string]$table, [string]$column) {
+    $key = (Get-DbPath) + '|' + $table
+    if (-not $script:ColCache.ContainsKey($key)) {
+        $cols = @()
+        foreach ($td in $db.TableDefs) { if ([string]$td.Name -eq $table) { $cols = @(foreach ($f in $td.Fields) { [string]$f.Name }) } }
+        $script:ColCache[$key] = $cols
+    }
+    return $script:ColCache[$key] -contains $column
+}
+
 # ---------------------------------------------------------------- shop settings (in the database)
 function Get-ShopSetting($db, [string]$name) {
     $v = Get-Value $db "SELECT Val FROM Settings WHERE Name=$(Q $name)"
@@ -498,7 +617,7 @@ function Save-User($db, $u) {
     # which would read back as "never set" (the defaults)
     if ($null -ne $u.perms) { $t = ConvertTo-PermText $u.perms; $values.Perms = $(if (-not $t) { '-' } else { $t }) }
     if ([string]$u.password) {
-        Need (([string]$u.password).Length -ge 4) 'كلمة المرور يجب أن تكون 4 أحرف على الأقل'
+        if (-not $u.import) { Need (([string]$u.password).Length -ge 4) 'كلمة المرور يجب أن تكون 4 أحرف على الأقل' }
         $values.Salt = New-Salt
         $values.PassHash = Get-PasswordHash ([string]$u.password) $values.Salt
     } else {
@@ -817,7 +936,8 @@ function Op-SaveSale($db, $d) {
         Need ($customer -ne '') 'فاتورة البيع الآجل تتطلّب اسم العميل'
         Need ((Count $db "SELECT Count(*) FROM bayeeCode WHERE bayeeCode=$(Q $customer)") -gt 0) "العميل غير موجود: $customer"
     } elseif (-not $customer) {
-        $customer = 'عميل نقدي'
+        # حساباتي names a cash invoice «قائمة نقدي»
+        $customer = if (Test-Column $db 'MasterOut' 'Tagheez') { 'قائمة نقدي' } else { 'عميل نقدي' }
     }
     $paid = Num $d.paid 'المدفوع'
     Need ($paid -ge 0) 'المبلغ المدفوع غير صحيح'
@@ -833,6 +953,8 @@ function Op-SaveSale($db, $d) {
     } else {
         $values.timeS = Get-Date
         $values.Mandob = 'مباشر'
+        # حساباتي's own field, required there
+        if (Test-Column $db 'MasterOut' 'Tagheez') { $values.Tagheez = $false }
         $id = [int](Add-Row $db 'MasterOut' $values 'idOut')
     }
     Save-Lines $db 'sale' $id $d.lines
@@ -1034,6 +1156,8 @@ function Op-SaveItem($db, $d) {
         UnitL1 = $u1; UnitL2 = $u2; harig = [int](Num $d.harig 'حد الطلب')
         Pr = (Num $d.openL1 'الرصيد الافتتاحي'); Pru = (Num $d.openL2 'الرصيد الافتتاحي')
     }
+    # حساباتي keeps the price twice
+    if (Test-Column $db 'madaCode' 'price$') { $values['price$'] = $price }
     if ($id) {
         $old = [string](Get-Value $db "SELECT madaName FROM madaCode WHERE ID=$id")
         Need ($old -ne '') 'الصنف غير موجود'
@@ -2478,15 +2602,17 @@ function Find-Candidates {
     foreach ($r in $roots) {
         if ($clock.Elapsed.TotalSeconds -gt 8) { break }
         if (-not $r.p -or -not (Test-Path -LiteralPath $r.p)) { continue }
-        $items = Get-ChildItem -LiteralPath $r.p -Filter 'fr3oon*.accdb' -File -Recurse -Depth $r.d -ErrorAction SilentlyContinue
+        $items = Get-ChildItem -LiteralPath $r.p -Filter '*.accdb' -File -Recurse -Depth $r.d -ErrorAction SilentlyContinue
         foreach ($f in $items) {
-            if ($f.FullName -match '\\(Backups|Windows|Program Files[^\\]*|ProgramData|AppData|\$Recycle\.Bin)\\') { continue }
+            if ($f.FullName -match '\\(Backups|backups-lawha|Windows|Program Files[^\\]*|ProgramData|AppData|\$Recycle\.Bin)\\') { continue }
+            if ($f.Name -match '^fr3oon-\d{4}-|-before-fr3oon-') { continue }
             if ($seen.ContainsKey($f.FullName)) { continue }
             $seen[$f.FullName] = $true
             $found.Add(@{ name = $f.Name; path = $f.FullName; size = $f.Length; modified = $f.LastWriteTime.ToString('yyyy-MM-dd HH:mm'); t = $f.LastWriteTime })
         }
     }
-    $sorted = $found | Sort-Object @{ Expression = { $_.name -ne 'fr3oon.accdb' } }, @{ Expression = { $_.t }; Descending = $true } | Select-Object -First 25
+    # Fr3oon's first, then حساباتي's (Units…), newest first
+    $sorted = $found | Sort-Object @{ Expression = { $_.name -notlike 'fr3oon*' } }, @{ Expression = { $_.name -notlike 'Units*' } }, @{ Expression = { $_.t }; Descending = $true } | Select-Object -First 25
     return , @($sorted | ForEach-Object { @{ name = $_.name; path = $_.path; size = $_.size; modified = $_.modified } })
 }
 
@@ -2532,7 +2658,7 @@ function Test-RemoteRequest($req) {
 # What only someone sitting at this computer may do.
 $LocalOnly = @('/api/choose-file', '/api/candidates', '/api/browse', '/api/choose-folder', '/api/shutdown', '/api/open-backups',
     '/api/remote', '/api/remote-access', '/api/fulltest', '/api/fulltest-data', '/api/selftest', '/api/activate', '/api/setup',
-    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install', '/api/new-database', '/api/db-info')
+    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install', '/api/new-database', '/api/db-info', '/api/link-hisabati')
 
 function Get-State($req) {
     $remote = Test-RemoteRequest $req
@@ -2633,8 +2759,19 @@ function Handle($ctx) {
                 }
                 $file = if ($b.path) { [string]$b.path } elseif ($env:LAWHA_FAKEDAO) { '' } else { Choose-File }
                 if (-not $file) { return Send-Json $ctx 200 @{ ok = $false; error = 'لم يُختر ملف' } }
+                Need (Test-DbFile $file) "هذا ليس ملف Access ‏(accdb): $file"
+                # a حساباتي file: linked after the person confirms
+                if (-not (Test-ShopDatabase $file) -and (Test-HisabatiDatabase $file)) {
+                    $full = (Resolve-Path -LiteralPath $file).ProviderPath
+                    return Send-Json $ctx 200 (@{ ok = $true; hisabati = $true; file = [IO.Path]::GetFileName($full); path = $full } + (Get-HisabatiInfo $full))
+                }
                 Set-Database $file
                 return Send-Json $ctx 200 @{ ok = $true; file = [IO.Path]::GetFileName($file); path = $script:Config.dbPath }
+            }
+            '/api/link-hisabati' {
+                $b = Read-Body $req
+                $r = Connect-HisabatiDatabase ([string]$b.path) ([string]$b.shopName) ([string]$b.admin) ([string]$b.password)
+                return Send-Json $ctx 200 (@{ ok = $true } + $r)
             }
             '/api/users' {
                 Need ((Get-DbPath) -ne '') 'لم تُعدّ قاعدة البيانات بعد'
