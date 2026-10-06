@@ -633,6 +633,8 @@ async function signedIn(me) {
   state.view = homeView();
   // shop-wide settings everyone needs (the printed receipt)
   api('/api/settings').then((j) => (state.receipt = j.receipt || {})).catch(() => {});
+  // a manager on this computer hears about a new version by itself
+  if (me.admin && !isRemote()) setTimeout(checkUpdate, 4000);
   screen('<h1>جارٍ تحميل البيانات…</h1><p class="muted">لحظات</p>');
   try {
     await readServer();
@@ -644,6 +646,25 @@ async function signedIn(me) {
       ${isRemote() ? '' : `<button class="btn block" id="btnRechoose" style="margin-top:8px">${icon('file')} فتح قاعدة بيانات أخرى</button>`}`);
     $('#btnRetry').onclick = () => signedIn(me);
     if ($('#btnRechoose')) $('#btnRechoose').onclick = () => openDbScreen();
+  }
+}
+
+async function checkUpdate() {
+  try {
+    const j = await api('/api/update-status');
+    $('#updateNote').hidden = !j.available;
+    if (j.available) {
+      $('#updateNote').innerHTML = `${icon('refresh')}<span><b>يتوفر تحديث</b><small>الإصدار ${esc(j.latest)}</small></span>`;
+      $('#updateNote').onclick = () => {
+        go('settings');
+        setTimeout(() => {
+          $('#set-updates')?.scrollIntoView({ block: 'start' });
+          $('#upCheck')?.click();
+        }, 300);
+      };
+    }
+  } catch {
+    /* checked again at the next sign-in */
   }
 }
 
@@ -1567,6 +1588,15 @@ function init() {
     }
   });
   applyPreset('today', { draw: false });
+
+  // The helper runs while a window is open: say so every few seconds, and
+  // goodbye when the window closes (it then stops by itself).
+  if (location.protocol.startsWith('http')) {
+    const alive = () => fetch('/api/alive', { method: 'POST', cache: 'no-store' }).catch(() => {});
+    alive();
+    setInterval(alive, 5000);
+    addEventListener('pagehide', () => navigator.sendBeacon?.('/api/bye'));
+  }
 
   const auto = store.get('fr3oon-auto') !== '0';
   $('#auto').checked = auto;

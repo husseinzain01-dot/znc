@@ -87,8 +87,8 @@ code { font-family: Consolas, "Courier New", monospace; }
     <h2>3) نشر تحديث</h2>
     <ol>
       <li>غيّر رقم الإصدار في البرنامج وابنِ ملف التثبيت (مثل <code>Fr3oon-Setup-2.0.1.exe</code>).</li>
-      <li>في مستودع <code>fr3oon-updates</code> على GitHub: أنشئ Release باسم <code>v2.0.1</code> وارفع إليه ملف التثبيت.</li>
-      <li>اختر الملف نفسه هنا، ثم نزّل <code>latest.json</code> واستبدل به الملف الموجود في المستودع.</li>
+      <li>اختر ملف التثبيت هنا، ثم نزّل <code>latest.json</code>.</li>
+      <li>ارفع الملفين إلى المجلد <code>fr3oon/updates</code> في مستودع <code>znc</code> على GitHub (Add file ← Upload files)، مستبدلاً <code>latest.json</code> القديم.</li>
     </ol>
     <div class="grid">
       <label>رقم الإصدار <input id="uVersion" dir="ltr" placeholder="2.0.1"></label>
@@ -113,7 +113,6 @@ code { font-family: Consolas, "Courier New", monospace; }
 // Same as $VendorKey in server/server.ps1: the program accepts only what
 // this key pair signs.
 const VENDOR_PUBLIC = { x: 'MUsling1wiVjg7EmUEz2iBXVY6IdPwDlK0exjnfn-NQ', y: 'EcYr6IWTh2FPbj1YcU8jF3EHpY0f_Gm5wxNbSkBIklM' };
-const REPO = 'husseinzain01-dot/fr3oon-updates';
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 const $ = (s) => document.querySelector(s);
@@ -223,7 +222,9 @@ function download(name, text, type) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
-const defaultUrl = (v) => `https://github.com/${REPO}/releases/download/v${v}/Fr3oon-Setup-${v}.exe`;
+// published in the program's repository (fr3oon/updates on its branch)
+const UPDATES_BASE = 'https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/';
+const defaultUrl = (v) => `${UPDATES_BASE}Fr3oon-Setup-${v}.exe`;
 $('#uVersion').oninput = () => {
   const v = $('#uVersion').value.trim();
   if (!$('#uUrl').dataset.edited) $('#uUrl').value = /^\d+\.\d+\.\d+$/.test(v) ? defaultUrl(v) : '';
@@ -255,7 +256,7 @@ $('#uMake').onclick = async () => {
       sig: await sign('FR3OON-UPDATE', `${version}\n${url}\n${sha256}`),
     };
     download('latest.json', JSON.stringify(j, null, 2) + '\n', 'application/json');
-    show($('#uOk'), `✔ نُزّل latest.json للإصدار ${version}. ارفعه إلى المستودع بعد رفع ملف التثبيت إلى الـ Release؛ ستجده الأجهزة عند البحث عن تحديث.`);
+    show($('#uOk'), `✔ نُزّل latest.json للإصدار ${version}. ارفعه مع ملف التثبيت إلى المجلد fr3oon/updates في مستودع znc؛ تجده الأجهزة عند البحث عن تحديث.`);
   } catch (err) {
     show($('#uErr'), err.message);
   } finally {

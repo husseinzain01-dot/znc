@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.0'
+$Version = '2.2.1'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -70,7 +70,13 @@ if ($env:LAWHA_FAKEDAO -or -not (Test-Path 'C:\')) {
     $DefaultBackupDir = Join-Path $DataDir 'backups'
 }
 # Signed list of the latest version (see Get-UpdateInfo).
-$DefaultUpdateUrl = 'https://raw.githubusercontent.com/husseinzain01-dot/fr3oon-updates/main/latest.json'
+# Where updates are published, tried in order: a repository of their own
+# (once it exists), then the program's repository.
+$DefaultUpdateUrls = @(
+    'https://raw.githubusercontent.com/husseinzain01-dot/fr3oon-updates/main/latest.json',
+    'https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/latest.json'
+)
+$DefaultUpdateUrl = $DefaultUpdateUrls[0]
 
 # ---------------------------------------------------------------- permission lists
 $AllPerms = @(
@@ -1685,6 +1691,7 @@ function Set-License([string]$key) {
 # run only when the list is signed and the file's SHA-256 matches, so a
 # changed file or a forged list is refused.
 function Get-UpdateUrl { if ($script:Config.updateUrl) { return $script:Config.updateUrl } return $DefaultUpdateUrl }
+function Get-UpdateUrls { if ($script:Config.updateUrl) { return , @($script:Config.updateUrl) } return , $DefaultUpdateUrls }
 
 function Get-WebText([string]$url, [int]$ms = 8000) {
     if ($env:LAWHA_FAKEUPDATE -and $url -notmatch '^https?://') { return [IO.File]::ReadAllText($url) }
@@ -1700,15 +1707,21 @@ function Get-WebText([string]$url, [int]$ms = 8000) {
     } finally { $rs.Close() }
 }
 
-function Get-UpdateInfo {
-    $url = Get-UpdateUrl
-    try { $j = (Get-WebText ($url + $(if ($url -match '^https?://') { '?t=' + [DateTime]::UtcNow.Ticks } else { '' }))) | ConvertFrom-Json }
-    catch {
-        # nothing published yet: the feed URL answers 404
-        $e = $_.Exception
-        while ($e -and -not ($e -is [Net.WebException])) { $e = $e.InnerException }
-        if ($e -and $e.Response -and [int]$e.Response.StatusCode -eq 404) { throw 'لا توجد تحديثات منشورة بعد.' }
-        throw "تعذّر الاتصال بخادم التحديثات. تحقّق من اتصال الإنترنت. ($($_.Exception.Message))"
+function Get-UpdateInfo([int]$ms = 8000) {
+    $j = $null; $failed = ''
+    foreach ($url in (Get-UpdateUrls)) {
+        try { $j = (Get-WebText ($url + $(if ($url -match '^https?://') { '?t=' + [DateTime]::UtcNow.Ticks } else { '' })) $ms) | ConvertFrom-Json; break }
+        catch {
+            # nothing published there (404): the next place
+            $e = $_.Exception
+            while ($e -and -not ($e -is [Net.WebException])) { $e = $e.InnerException }
+            if ($e -and $e.Response -and [int]$e.Response.StatusCode -eq 404) { continue }
+            if (-not $failed) { $failed = $_.Exception.Message }
+        }
+    }
+    if ($null -eq $j) {
+        if ($failed) { throw "تعذّر الاتصال بخادم التحديثات. تحقّق من اتصال الإنترنت. ($failed)" }
+        throw 'لا توجد تحديثات منشورة بعد.'
     }
     Need ([string]$j.product -eq 'Fr3oon') 'ملف التحديثات غير صالح.'
     Need (Test-VendorSignature 'FR3OON-UPDATE' "$($j.version)`n$($j.url)`n$($j.sha256)" ([string]$j.sig)) 'ملف التحديثات غير موقّع من الناشر، لن يُستخدم.'
@@ -2691,12 +2704,43 @@ function Remove-UserSessions([string]$user) {
 # Requests allowed before the program is activated.
 $NoLicense = @('/api/activate', '/api/remote', '/api/shutdown')
 
+# Started by the launcher, the helper lives as long as a window does: each
+# open page says so every few seconds (/api/alive); a closed one says
+# goodbye (/api/bye). With no page anywhere (this computer or another
+# device) for a while, it stops; the launcher starts a fresh one next time.
+$AutoStop = ($Hidden -and -not $env:LAWHA_FAKEDAO) -or $env:LAWHA_AUTOSTOP -eq '1'
+$script:LastSeen = Get-Date
+$script:SeenPage = $false
+$script:ByeAt = $null
+function Test-NoWindow {
+    if (-not $AutoStop) { return $false }
+    $now = Get-Date
+    if ($script:ByeAt -and $now -gt $script:ByeAt) { return $true }
+    # before the first page: time for the window to open and sign-in
+    $limit = if ($script:SeenPage) { 20 } else { 90 }
+    return ($now - $script:LastSeen).TotalSeconds -gt $limit
+}
+
 function Handle($ctx) {
     $req = $ctx.Request
     if (-not (Test-HostAllowed $req)) {
         return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden host' }
     }
     $path = $req.Url.AbsolutePath
+    # what an open window does (not the launcher's or an installer's checks)
+    if ($req.Headers['X-Lawha'] -eq '1' -or $path -eq '/') { $script:LastSeen = Get-Date }
+    if ($path -eq '/api/alive') {
+        $script:LastSeen = Get-Date
+        $script:SeenPage = $true
+        $script:ByeAt = $null
+        return Send-Json $ctx 200 @{ ok = $true }
+    }
+    # a page closing (sent as a beacon, without the app's header): stop
+    # soon, unless another page is still open and says so
+    if ($path -eq '/api/bye') {
+        if (-not (Test-RemoteRequest $req)) { $script:ByeAt = (Get-Date).AddSeconds(8) }
+        return Send-Json $ctx 200 @{ ok = $true }
+    }
     if ((Test-RemoteRequest $req) -and $LocalOnly -contains $path) {
         return Send-Json $ctx 200 @{ ok = $false; error = 'هذه العملية تُجرى من الجهاز الرئيسي نفسه، لا من جهاز آخر.' }
     }
@@ -3022,6 +3066,22 @@ function Handle($ctx) {
                 Need $s.admin 'التحديث يحتاج صلاحية المدير'
                 return Send-Json $ctx 200 (@{ ok = $true } + (Get-UpdateInfo))
             }
+            # Checked by itself after a manager signs in: at most every 6 hours
+            # (a failure: an hour), so it rarely waits on the internet.
+            '/api/update-status' {
+                if (-not $s.admin -or (Test-RemoteRequest $req)) { return Send-Json $ctx 200 @{ ok = $true; available = $false } }
+                $c = $script:UpdateCache
+                if (-not $c -or (Get-Date) -gt $c.until) {
+                    try {
+                        $i = Get-UpdateInfo 5000
+                        $c = @{ info = @{ available = $i.available; latest = $i.latest; notes = $i.notes; current = $Version }; until = (Get-Date).AddHours(6) }
+                    } catch {
+                        $c = @{ info = @{ available = $false; current = $Version; error = $_.Exception.Message }; until = (Get-Date).AddHours(1) }
+                    }
+                    $script:UpdateCache = $c
+                }
+                return Send-Json $ctx 200 (@{ ok = $true } + $c.info)
+            }
             '/api/update-install' {
                 Need $s.admin 'التحديث يحتاج صلاحية المدير'
                 Wait-Backup 600
@@ -3119,12 +3179,18 @@ $script:RestartListener = $false
 try {
     $listener = Start-Listener
 } catch {
-    # Already running: just open the page.
+    # The port is taken (another copy, or one stuck from before): the
+    # launcher stops that one and starts again. Started by hand: open the page.
+    Write-LawhaLog "port $Port busy, not started: $($_.Exception.Message)"
     if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
-    exit
+    exit 3
 }
 
-Write-LawhaLog "server $Version started on port $Port"
+# The launcher finds this process by it, to stop it if it ever stops answering.
+$PidFile = Join-Path $DataDir 'helper.pid'
+try { Set-Content -LiteralPath $PidFile -Value $PID -Encoding ASCII } catch { }
+
+Write-LawhaLog "server $Version started on port $Port (pid $PID)"
 if (-not $Hidden) {
     Write-Host "  Fr3oon $Version  http://localhost:$Port/" -ForegroundColor Cyan
     Write-Host '  Keep this window open while you use the program. Press Ctrl+C to stop.'
@@ -3133,8 +3199,18 @@ if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" }
 
 try {
     while ($listener.IsListening -and -not $script:Stop) {
+        # also between requests (other devices or checks may keep it busy)
+        if (Test-NoWindow) {
+            Write-LawhaLog 'no window open: stopping'
+            break
+        }
         $async = $listener.BeginGetContext($null, $null)
         while (-not $async.AsyncWaitHandle.WaitOne(1000)) {
+            if (Test-NoWindow) {
+                Write-LawhaLog 'no window open: stopping'
+                $script:Stop = $true
+                break
+            }
             # Let an idle Access instance go after two minutes.
             if ($script:AccessApp -and ((Get-Date) - $script:LastUse).TotalSeconds -gt 120) { Close-Engine }
             # don't hold the data file open while nobody is saving
@@ -3142,7 +3218,9 @@ try {
             # today's backup, on the side
             Start-Backup
         }
-        $ctx = $listener.EndGetContext($async)
+        if ($script:Stop) { break }
+        # a request the browser dropped half-way is no reason to stop
+        try { $ctx = $listener.EndGetContext($async) } catch { Write-LawhaLog "request failed: $($_.Exception.Message)"; continue }
         try {
             Handle $ctx
         } catch {
@@ -3157,6 +3235,9 @@ try {
     }
 } finally {
     Write-LawhaLog 'server stopped'
+    # let today's copy finish rather than leave half a file
+    try { Wait-Backup 120 } catch { }
     Close-Engine
-    $listener.Close()
+    try { $listener.Close() } catch { }
+    try { if ((Get-Content -LiteralPath $PidFile -ErrorAction Stop | Select-Object -First 1) -eq [string]$PID) { Remove-Item -LiteralPath $PidFile -Force } } catch { }
 }

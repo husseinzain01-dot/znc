@@ -524,3 +524,10 @@ table.lines td { padding: 7px 10px; }
 
 .notice.low-alert { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .notice.low-alert .btn { margin-inline-start: auto; }
+
+/* a new version: the manager's notice above their name */
+.update-note { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--side-line)); border-radius: 12px; background: var(--side-active); color: var(--side-strong); cursor: pointer; text-align: start; font: inherit; }
+.update-note .i { color: var(--accent); }
+.update-note span { display: grid; }
+.update-note small { color: var(--side-muted); font-size: 12px; }
+.update-note:hover { border-color: var(--accent); }

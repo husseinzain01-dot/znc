@@ -2,3 +2,4 @@ node_modules/
 release/
 installer/build/
 *.exe
+!updates/*.exe

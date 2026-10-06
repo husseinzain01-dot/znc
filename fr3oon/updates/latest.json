@@ -1,0 +1,10 @@
+{
+  "product": "Fr3oon",
+  "version": "2.2.1",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.1.exe",
+  "sha256": "7ffbaa2251655d9ed2dad1dc08fc56e6518f350df18ee4887589999603bc4243",
+  "size": 572653,
+  "notes": "- البرنامج المساعد يتوقف عند إغلاق نافذة البرنامج، ويبدأ من جديد عند فتحه (لا حاجة لإعادة تشغيل الجهاز).\n- اختصار «إعادة تشغيل Fr3oon» في قائمة ابدأ.\n- التنبيه بالتحديثات الجديدة تلقائياً للمدير.",
+  "date": "2026-10-06",
+  "sig": "Af9WH27xmfaOuiK98j7OORsl5VWAKKbRUeUSAKrtqTjyyBQhkKbbyswQjxOPzE2hYouaSXf7nJ01oRFDfBL6xw"
+}

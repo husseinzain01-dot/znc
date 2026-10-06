@@ -45,6 +45,9 @@ Section "install"
   nsExec::Exec ${STOPHELPER}
   Pop $0
   Sleep 2000
+  ; one that did not answer: by the process it noted
+  nsExec::Exec `${PS} -Command "try { $$p = [int](Get-Content -LiteralPath (Join-Path $$env:APPDATA 'Fr3oon\helper.pid') -ErrorAction Stop | Select-Object -First 1); Stop-Process -Id $$p -Force -ErrorAction Stop } catch { }"`
+  Pop $0
 
   SetOutPath "$INSTDIR"
   File "${OUTDIR}\Fr3oon.exe"
@@ -57,6 +60,7 @@ Section "install"
   CreateShortcut "$DESKTOP\Fr3oon.lnk" "$INSTDIR\Fr3oon.exe" "" "$INSTDIR\app.ico" 0
   CreateDirectory "$SMPROGRAMS\Fr3oon"
   CreateShortcut "$SMPROGRAMS\Fr3oon\Fr3oon.lnk" "$INSTDIR\Fr3oon.exe" "" "$INSTDIR\app.ico" 0
+  CreateShortcut "$SMPROGRAMS\Fr3oon\إعادة تشغيل Fr3oon.lnk" "$INSTDIR\Fr3oon.exe" "-Restart" "$INSTDIR\app.ico" 0
   CreateShortcut "$SMPROGRAMS\Fr3oon\إزالة Fr3oon.lnk" "$INSTDIR\uninstall.exe"
 
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -87,6 +91,7 @@ Section "Uninstall"
   Sleep 1500
   Delete "$DESKTOP\Fr3oon.lnk"
   Delete "$SMPROGRAMS\Fr3oon\Fr3oon.lnk"
+  Delete "$SMPROGRAMS\Fr3oon\إعادة تشغيل Fr3oon.lnk"
   Delete "$SMPROGRAMS\Fr3oon\إزالة Fr3oon.lnk"
   RMDir "$SMPROGRAMS\Fr3oon"
   Delete "$INSTDIR\Fr3oon.exe"
