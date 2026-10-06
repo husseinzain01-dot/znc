@@ -71,8 +71,8 @@ export const PRESETS = [
 ];
 
 const SECTIONS = [
-  ['shop', 'المحل'], ['receipt', 'الإيصال'], ['users', 'المستخدمون'], ['backup', 'النسخ الاحتياطي'], ['updates', 'التحديثات'],
-  ['license', 'الترخيص'], ['devices', 'الأجهزة الأخرى'], ['database', 'قاعدة البيانات'], ['checks', 'الفحص'],
+  ['shop', 'المحل'], ['database', 'قاعدة البيانات'], ['receipt', 'الإيصال'], ['users', 'المستخدمون'], ['backup', 'النسخ الاحتياطي'],
+  ['updates', 'التحديثات'], ['license', 'الترخيص'], ['devices', 'الأجهزة الأخرى'], ['checks', 'الفحص'],
 ];
 
 export function setupSettings(ctx) {
@@ -95,6 +95,18 @@ export function setupSettings(ctx) {
         <h3>المحل</h3>
         <p class="muted">يظهر اسم المحل في أعلى البرنامج وعلى الإيصالات المطبوعة.</p>
         <div class="row"><input id="setShop" maxlength="60" style="flex:1;min-width:220px" class="search"><button class="btn primary" id="setShopSave">حفظ</button></div>
+      </div>
+
+      <div class="card local-only" id="set-database">
+        <h3>قاعدة البيانات</h3>
+        <p class="muted">الملف الذي يحفظ فيه البرنامج كل البيانات. يمكنك فتح قاعدة بيانات أخرى (على هذا الجهاز أو على جهاز آخر في الشبكة)، أو إنشاء قاعدة بيانات جديدة فارغة.</p>
+        <div class="db-info" id="dbInfo"><span class="muted">جارٍ التحميل…</span></div>
+        <div class="row db-actions">
+          <button class="btn primary" id="setChoose">${icon('file')} اختيار قاعدة بيانات</button>
+          <button class="btn" id="setNewDb">${icon('plus')} إنشاء قاعدة بيانات جديدة</button>
+          <button class="btn" id="setOpenDbDir">${icon('file')} فتح مجلدها</button>
+        </div>
+        <p class="muted db-note">عند تغيير قاعدة البيانات يُطلب من جميع المستخدمين تسجيل الدخول من جديد، لأن المستخدمين وكلمات المرور محفوظة داخلها.</p>
       </div>
 
       <div class="card" id="set-receipt">
@@ -184,13 +196,6 @@ export function setupSettings(ctx) {
         <div id="rmStatus"><span class="muted">جارٍ التحميل…</span></div>
       </div>
 
-      <div class="card local-only" id="set-database">
-        <h3>قاعدة البيانات</h3>
-        <p class="muted">الملف الذي يحفظ فيه البرنامج كل البيانات.</p>
-        <p><code id="setPath" dir="ltr">…</code></p>
-        <button class="btn" id="setChoose">${icon('file')} فتح قاعدة بيانات أخرى</button>
-      </div>
-
       <div class="card local-only" id="set-checks">
         <h3>فحص النظام</h3>
         <p class="muted">يجرّب جميع عمليات الحفظ (عميل، بيع، تعديل، قبض، صرف، شراء، صنف، حذف) على قاعدة البيانات داخل معاملة واحدة،
@@ -229,7 +234,7 @@ export function setupSettings(ctx) {
       }
       $('#setAbout').innerHTML = `${APP} — الإصدار <span dir="ltr">${esc(s.version)}</span> — محرّك قاعدة البيانات: ${esc(s.engine || 'يعمل عند أول استخدام')}${s.dataDir ? `<br>الإعدادات والسجل: <code dir="ltr">${esc(s.dataDir)}</code>` : ''}`;
       if (!remote()) {
-        $('#setPath').textContent = s.dbPath || '—';
+        loadDbInfo();
         $('#upCurrent').textContent = s.version;
         $('#licInfo').innerHTML = `مرخّص لـ: <b>${esc(s.licenseName || '—')}</b><br>الصلاحية: <b>${s.licenseExpiry ? 'حتى ' + esc(s.licenseExpiry) : 'دائمة'}</b><br>رمز هذا الجهاز: <code dir="ltr">${esc(s.machine)}</code>`;
         $('#bkDir').value = s.backupDir || '';
@@ -253,6 +258,8 @@ export function setupSettings(ctx) {
     $('#setChoose').onclick = () => {
       if (confirm('سيُطلب من جميع المستخدمين تسجيل الدخول من جديد بعد فتح قاعدة بيانات أخرى. متابعة؟')) openDbScreen();
     };
+    $('#setNewDb').onclick = newDatabase;
+    $('#setOpenDbDir').onclick = () => api('/api/db-info', { method: 'POST', body: { open: true } }).catch((e) => toast(e.message, true));
     $('#bkPick').onclick = async () => {
       try {
         $('#bkDir').value = (await api('/api/choose-folder', { method: 'POST', body: {} })).dir;
@@ -291,6 +298,75 @@ export function setupSettings(ctx) {
     };
     $('#upCheck').onclick = checkUpdate;
     $('#licChange').onclick = changeLicense;
+  }
+
+  // ------------------------------------------------------------ database
+  const fmt = (n) => Math.round(n || 0).toLocaleString('en-US');
+  const fileSize = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+  async function loadDbInfo() {
+    const box = $('#dbInfo');
+    if (!box) return;
+    try {
+      const j = await api('/api/db-info', { method: 'POST', body: {} });
+      const P = state.P;
+      box.innerHTML = `
+        <div class="db-path"><small class="muted">المسار</small><code dir="ltr">${esc(j.path || '—')}</code></div>
+        <div class="db-facts">
+          ${j.size != null ? `<span><small class="muted">الحجم</small><b dir="ltr">${fileSize(j.size)}</b></span>` : ''}
+          ${j.modified ? `<span><small class="muted">آخر حفظ</small><b dir="ltr">${esc(j.modified)}</b></span>` : ''}
+          ${j.created ? `<span><small class="muted">أُنشئت</small><b dir="ltr">${esc(j.created)}</b></span>` : ''}
+          ${P ? `<span><small class="muted">فواتير البيع</small><b class="num">${fmt(P.sales.length)}</b></span><span><small class="muted">الأصناف</small><b class="num">${fmt(P.items.length)}</b></span><span><small class="muted">العملاء</small><b class="num">${fmt(P.customers.length)}</b></span>` : ''}
+        </div>
+        ${/^\\\\/.test(j.path || '') ? '<p class="notice info" style="margin:8px 0 0">قاعدة البيانات على جهاز آخر في الشبكة. الأسرع أن يعمل هذا الجهاز «جهازاً إضافياً» متصلاً بالجهاز الذي يحفظها.</p>' : ''}`;
+      box.dataset.dir = j.folder || j.defaultDir || '';
+    } catch (e) {
+      box.innerHTML = `<p class="notice error">${esc(e.message)}</p>`;
+    }
+  }
+
+  function newDatabase() {
+    openModal(`<h2>إنشاء قاعدة بيانات جديدة</h2>
+      <p class="muted">تُنشأ قاعدة بيانات فارغة وينتقل البرنامج إليها. قاعدة البيانات الحالية تبقى في مكانها، ويمكنك العودة إليها من «اختيار قاعدة بيانات».
+        تكون أنت (<b>${esc(state.user)}</b>) مديرها بكلمة مرورك الحالية.</p>
+      <div class="form-grid">
+        <label class="field">اسم المحل <input id="ndShop" maxlength="60" value="${esc(state.shopName || '')}"></label>
+        <label class="field">اسم الملف <input id="ndName" dir="ltr" maxlength="60" value="fr3oon"></label>
+      </div>
+      <label class="field">المجلد
+        <span class="row path-row"><input id="ndDir" dir="ltr" value="${esc($('#dbInfo')?.dataset.dir || '')}"><button type="button" class="btn" id="ndPick">اختيار…</button></span></label>
+      <label class="field" style="margin-top:10px">كلمة مرورك (للتأكيد) <input id="ndPass" type="password"></label>
+      <p class="notice error" id="ndErr" hidden></p>
+      <div class="form-actions"><button class="btn primary" id="ndGo">إنشاء والانتقال إليها</button><button class="btn" id="ndCancel">إلغاء</button></div>`);
+    $('#ndCancel').onclick = closeModal;
+    $('#ndPick').onclick = async () => {
+      try {
+        $('#ndDir').value = (await api('/api/choose-folder', { method: 'POST', body: {} })).dir;
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+    $('#ndGo').onclick = async (e) => {
+      const err = (m) => {
+        $('#ndErr').textContent = m;
+        $('#ndErr').hidden = !m;
+      };
+      err('');
+      const body = { shopName: $('#ndShop').value.trim(), fileName: $('#ndName').value.trim(), dir: $('#ndDir').value.trim(), password: $('#ndPass').value };
+      if (!body.shopName) return err('اكتب اسم المحل');
+      if (!body.dir) return err('اختر المجلد');
+      if (!confirm(`إنشاء قاعدة بيانات جديدة في:\n${body.dir}\nوالانتقال إليها؟ سيُطلب تسجيل الدخول من جديد.`)) return;
+      e.currentTarget.disabled = true;
+      try {
+        const j = await api('/api/new-database', { method: 'POST', body });
+        closeModal();
+        alert(`أُنشئت قاعدة البيانات الجديدة ✔\n${j.path}\nسجّل الدخول باسمك وكلمة مرورك.`);
+        signedOut();
+      } catch (ex) {
+        err(ex.message);
+        $('#ndGo').disabled = false;
+      }
+    };
+    $('#ndShop').focus();
   }
 
   async function saveShop() {

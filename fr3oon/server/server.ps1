@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.1.1'
+$Version = '2.1.2'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -2532,7 +2532,7 @@ function Test-RemoteRequest($req) {
 # What only someone sitting at this computer may do.
 $LocalOnly = @('/api/choose-file', '/api/candidates', '/api/browse', '/api/choose-folder', '/api/shutdown', '/api/open-backups',
     '/api/remote', '/api/remote-access', '/api/fulltest', '/api/fulltest-data', '/api/selftest', '/api/activate', '/api/setup',
-    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install')
+    '/api/backups', '/api/backup-now', '/api/restore', '/api/update-install', '/api/new-database', '/api/db-info')
 
 function Get-State($req) {
     $remote = Test-RemoteRequest $req
@@ -2763,6 +2763,44 @@ function Handle($ctx) {
                     $r.backupError = $script:BackupError; $r.lastBackup = [string]$script:BackupDay; $r.updateUrl = Get-UpdateUrl
                 }
                 return Send-Json $ctx 200 $r
+            }
+            # The database in use, for Settings: where it is, how big, when saved.
+            '/api/db-info' {
+                Need $s.admin 'تحتاج صلاحية المدير'
+                $b = Read-Body $req
+                $p = Get-DbPath
+                $r = @{ ok = $true; path = $p; defaultDir = $DefaultDbDir }
+                if ($p -and (Test-Path -LiteralPath $p)) {
+                    $fi = Get-Item -LiteralPath $p
+                    $r.size = $fi.Length; $r.modified = $fi.LastWriteTime.ToString('yyyy-MM-dd HH:mm'); $r.folder = $fi.DirectoryName
+                    $r.created = [string](Use-Database -ReadOnly { param($db) Get-ShopSetting $db 'created' })
+                }
+                if ($b.open -and $r.folder -and -not $env:LAWHA_FAKEDAO) { Start-Process explorer.exe "/select,`"$p`"" }
+                return Send-Json $ctx 200 $r
+            }
+            # A new, empty database (another shop, or a fresh start); the
+            # current one stays where it is and can be opened again.
+            '/api/new-database' {
+                Need $s.admin 'إنشاء قاعدة بيانات جديدة يحتاج صلاحية المدير'
+                $b = Read-Body $req
+                Need (Test-Login $s.user ([string]$b.password)) 'كلمة المرور غير صحيحة'
+                $shop = Text ([string]$b.shopName) 60 'اسم المحل'
+                Need ($shop -ne '') 'اسم المحل مطلوب'
+                $dir = ([string]$b.dir).Trim()
+                Need ($dir -ne '') 'اختر مجلد قاعدة البيانات'
+                $name = ([string]$b.fileName).Trim()
+                if (-not $name) { $name = 'fr3oon' }
+                Need ($name -match '^[^\\/:*?"<>|]{1,60}$') 'اسم الملف غير صالح'
+                if ($name -notmatch '\.accdb$') { $name += '.accdb' }
+                $file = Join-Path $dir $name
+                Need (-not (Test-Path -LiteralPath $file)) "يوجد ملف بهذا الاسم في المجلد: $file. اختر اسماً آخر أو افتحه من «اختيار قاعدة بيانات»."
+                Write-Activity $s.user 'settings' '' "إنشاء قاعدة بيانات جديدة والانتقال إليها: $file"
+                Close-Db
+                New-ShopDatabase $file $shop $s.user ([string]$b.password)
+                Set-Database $file
+                Write-LawhaLog "$($s.user)  new database: $file"
+                Start-Backup -Now
+                return Send-Json $ctx 200 @{ ok = $true; path = $script:Config.dbPath }
             }
             '/api/activity' {
                 Need $s.admin 'سجل العمليات يحتاج صلاحية المدير'

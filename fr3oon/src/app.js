@@ -453,6 +453,11 @@ async function loginScreen(error = '', chosen = '') {
   }
   const last = chosen || store.get('fr3oon-last-user');
   const info = isRemote() ? {} : (await detectServer()) || {};
+  // another database may have been opened: its own shop name
+  if (info.shopName != null) {
+    state.shopName = info.shopName;
+    document.title = state.shopName ? `${state.shopName} — ${APP}` : APP;
+  }
   screen(`<h1>${esc(state.shopName || APP)}</h1>
     <p class="muted">سجّل الدخول باسم المستخدم وكلمة المرور</p>
     <form id="loginForm" autocomplete="off">

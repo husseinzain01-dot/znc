@@ -1,0 +1,10 @@
+
+/* settings: the database card */
+.db-info { display: grid; gap: 10px; margin: 10px 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.db-path { display: grid; gap: 4px; }
+.db-path code { word-break: break-all; font-size: 13px; padding: 6px 10px; background: var(--surface); border: 1px solid var(--line); }
+.db-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.db-facts span { display: grid; gap: 2px; }
+.db-facts b { font-size: 15px; }
+.db-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.db-note { font-size: 13px; margin: 10px 0 0; }
