@@ -159,8 +159,17 @@ export function setupSettings(ctx) {
 
       <div class="card local-only" id="set-backup">
         <h3>النسخ الاحتياطي</h3>
-        <p class="muted">تُنسخ قاعدة البيانات تلقائياً كل يوم إلى المجلد المحدّد أدناه (عند تشغيل البرنامج، وبعد منتصف الليل إن بقي يعمل).
+        <p class="muted">تُنسخ قاعدة البيانات مرة واحدة في اليوم إلى المجلد المحدّد أدناه، في الوقت الذي تختاره.
           يُفضّل أن يكون المجلد على قرص آخر أو ذاكرة خارجية أو مجلد متزامن مع السحابة.</p>
+        <div class="row bk-when">
+          <label>موعد النسخ <select id="bkMode">
+            <option value="start">عند أول تشغيل في اليوم</option>
+            <option value="time">يومياً في ساعة محدّدة</option>
+            <option value="off">يدوياً فقط</option>
+          </select></label>
+          <label id="bkTimeWrap">الساعة <input id="bkTime" type="time" dir="ltr" value="14:00"></label>
+        </div>
+        <p class="muted" id="bkModeHint"></p>
         <label class="field">مجلد النسخ الاحتياطي
           <span class="row path-row"><input id="bkDir" dir="ltr"><button class="btn" id="bkPick">اختيار…</button></span></label>
         <div class="row">
@@ -239,6 +248,9 @@ export function setupSettings(ctx) {
         $('#licInfo').innerHTML = `مرخّص لـ: <b>${esc(s.licenseName || '—')}</b><br>الصلاحية: <b>${s.licenseExpiry ? 'حتى ' + esc(s.licenseExpiry) : 'دائمة'}</b><br>رمز هذا الجهاز: <code dir="ltr">${esc(s.machine)}</code>`;
         $('#bkDir').value = s.backupDir || '';
         $('#bkKeep').value = String(s.keepBackups || 30);
+        $('#bkMode').value = s.backupMode || 'start';
+        $('#bkTime').value = s.backupTime || '14:00';
+        bkModeHint();
         bindLocal();
       }
     } catch (e) {
@@ -269,13 +281,21 @@ export function setupSettings(ctx) {
     };
     $('#bkSave').onclick = async () => {
       try {
-        await api('/api/settings', { method: 'POST', body: { backupDir: $('#bkDir').value.trim(), keepBackups: Number($('#bkKeep').value) } });
+        const mode = $('#bkMode').value;
+        const time = $('#bkTime').value;
+        if (mode === 'time' && !/^\d\d:\d\d$/.test(time)) throw new Error('اختر ساعة النسخ الاحتياطي');
+        await api('/api/settings', {
+          method: 'POST',
+          body: { backupDir: $('#bkDir').value.trim(), keepBackups: Number($('#bkKeep').value), backupMode: mode, ...(mode === 'time' ? { backupTime: time } : {}) },
+        });
         toast('حُفظت إعدادات النسخ الاحتياطي ✔');
         loadBackups();
       } catch (e) {
         toast(e.message, true);
       }
     };
+    $('#bkMode').onchange = bkModeHint;
+    $('#bkTime').oninput = bkModeHint;
     $('#bkNow').onclick = async (e) => {
       const b = e.currentTarget;
       b.disabled = true;
@@ -608,11 +628,21 @@ export function setupSettings(ctx) {
   }
 
   // ------------------------------------------------------------ backups
+  function bkModeHint() {
+    const mode = $('#bkMode').value;
+    $('#bkTimeWrap').hidden = mode !== 'time';
+    $('#bkModeHint').textContent = {
+      start: 'تُؤخذ النسخة عند أول فتح للبرنامج في كل يوم.',
+      time: `تُؤخذ النسخة يومياً عند الساعة ${$('#bkTime').value || '—'} إن كان البرنامج مفتوحاً، وإلا فعند أول فتح له بعد هذه الساعة في اليوم نفسه. مناسب إذا كانت قاعدة البيانات على جهاز آخر في الشبكة، لكي لا يُنسخ الملف وقت العمل.`,
+      off: 'لا تُؤخذ نسخة إلا عند الضغط على «نسخ احتياطي الآن» (وقبل تثبيت أي تحديث). انتبه: بدون نسخ منتظمة قد تفقد بياناتك.',
+    }[mode];
+  }
+
   async function loadBackups() {
     try {
       const j = await api('/api/backups');
       $('#bkStatus').innerHTML = `${j.running ? 'يجري النسخ الآن… ' : ''}${j.error ? `<span class="neg">آخر محاولة فشلت: ${esc(j.error)}</span>` : ''}
-        ${j.backups.length ? `آخر نسخة: <b>${esc(j.backups.find((b) => !b.beforeRestore)?.date || j.backups[0].date)}</b> — عدد النسخ: ${j.backups.length}` : 'لا توجد نسخ بعد.'}`;
+        ${j.mode === 'off' ? '<span class="neg">النسخ التلقائي متوقّف.</span> ' : ''}${j.backups.length ? `آخر نسخة: <b>${esc(j.backups.find((b) => !b.beforeRestore)?.date || j.backups[0].date)}</b> — عدد النسخ: ${j.backups.length}` : 'لا توجد نسخ بعد.'}`;
       $('#bkList').innerHTML = j.backups.length
         ? `<details class="bk-list"><summary>النسخ المحفوظة (${j.backups.length})</summary><ul class="steps">${j.backups
           .map((b) => `<li><span>${esc(b.date)}${b.beforeRestore ? ' <small class="muted">(قبل استعادة)</small>' : ''}</span><small>${size(b.size)}</small>

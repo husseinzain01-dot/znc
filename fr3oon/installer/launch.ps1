@@ -79,6 +79,17 @@ function Get-HelperProcesses([string]$server) {
     } catch { Log "process list: $($_.Exception.Message)" }
     return , $ids.ToArray()
 }
+# The helper noted in helper.pid, if that process still runs.
+function Test-HelperAlive {
+    try {
+        $n = 0
+        if ([int]::TryParse(((Get-Content -LiteralPath $PidFile -ErrorAction Stop) | Select-Object -First 1), [ref]$n)) {
+            $p = Get-Process -Id $n -ErrorAction SilentlyContinue
+            return [bool]($p -and $p.ProcessName -like 'powershell*')
+        }
+    } catch { }
+    return $false
+}
 # A helper that no longer answers keeps the port, and a new one cannot
 # start: stop it (no need to restart the computer).
 function Stop-Helpers([string]$server, [string]$why) {
@@ -99,11 +110,13 @@ function Start-Helper([string]$server) {
         '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $server + '"'), '-NoBrowser'
     )
     Log "helper started, pid $($proc.Id)"
-    $deadline = (Get-Date).AddSeconds(40)
+    # a slow computer (antivirus scanning PowerShell) may take a while; as
+    # long as the process lives, it is starting, not stuck
+    $deadline = (Get-Date).AddSeconds(90)
     while (-not (Test-Helper)) {
         if ($proc.HasExited) { return "exited:$($proc.ExitCode)" }
         if ((Get-Date) -gt $deadline) { return 'timeout' }
-        Start-Sleep -Milliseconds 150
+        Start-Sleep -Milliseconds 200
     }
     return 'ok'
 }
@@ -155,6 +168,13 @@ try {
     $server = Join-Path $Here 'server.ps1'
     if (-not (Test-Path -LiteralPath $server)) { Fail "الملف server.ps1 غير موجود في مجلد البرنامج: $Here" }
 
+    # One launcher at a time: a second click waits for the first one (which
+    # starts the helper) instead of starting another and stopping both.
+    $mutex = New-Object Threading.Mutex($false, 'Local\Fr3oonLauncher')
+    $owned = $false
+    try { $owned = $mutex.WaitOne(120000) } catch [Threading.AbandonedMutexException] { $owned = $true }
+    if (-not $owned) { Log 'another launcher still busy after 2 minutes; going on' }
+
     if ($Restart) {
         Stop-Helpers $server 'restart requested'
         try { Remove-Item -LiteralPath $HostFile -Force -ErrorAction SilentlyContinue } catch { }
@@ -166,6 +186,16 @@ try {
     $m = Select-String -LiteralPath $server -Pattern "^\`$Version = '([^']+)'" | Select-Object -First 1
     if ($m) { $want = $m.Matches[0].Groups[1].Value }
     $running = Wait-Helper
+    # On the port and alive, but busy (a long save over the network, a file
+    # dialog): wait for it. Stopping it would lose that work.
+    if (-not $running -and -not $Restart -and (Test-Port) -and (Test-HelperAlive)) {
+        Log 'helper busy, waiting for it'
+        $deadline = (Get-Date).AddSeconds(90)
+        while (-not $running -and (Get-Date) -lt $deadline -and (Test-Port) -and (Test-HelperAlive)) {
+            $running = Get-Helper 10
+        }
+        if ($running) { Log "helper answered ($($clock.ElapsedMilliseconds) ms)" }
+    }
     if ($running -and $want -and [string]$running.version -ne $want) {
         Log "helper $($running.version) running, installed ${want}: restarting it"
         try { Invoke-WebRequest -UseBasicParsing -Method POST -Headers @{ 'X-Lawha' = '1' } -Uri ($Url + 'api/shutdown') -TimeoutSec 3 | Out-Null } catch { }
@@ -190,7 +220,7 @@ try {
             Fail "توقّف البرنامج المساعد فور تشغيله ($r). أعد تشغيل البرنامج من «إعادة تشغيل Fr3oon» في قائمة ابدأ، وإن تكرر فتحقّق من أن برنامج الحماية لم يمنعه."
         }
         if ($r -ne 'ok') {
-            Fail 'لم يستجب البرنامج المساعد خلال 40 ثانية. شغّل «إعادة تشغيل Fr3oon» من قائمة ابدأ.'
+            Fail 'لم يستجب البرنامج المساعد خلال 90 ثانية. شغّل «إعادة تشغيل Fr3oon» من قائمة ابدأ.'
         }
         Log "helper answering ($($clock.ElapsedMilliseconds) ms)"
     } else {

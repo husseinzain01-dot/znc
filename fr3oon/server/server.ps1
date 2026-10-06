@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.2'
+$Version = '2.2.3'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -115,8 +115,13 @@ function ConvertTo-PermText($v) {
 
 # This computer's settings. The shop's own (name, users, permissions) are
 # kept in the database, so every device sees the same.
+# When the daily copy is made: the first time the program runs that day,
+# at a set time of day, or only by hand.
+$BackupModes = @('start', 'time', 'off')
+
 function Read-Config {
-    $c = @{ dbPath = ''; backupDir = ''; keepBackups = 30; allowRemote = $false; remoteUrl = ''; updateUrl = '' }
+    $c = @{ dbPath = ''; backupDir = ''; keepBackups = 30; allowRemote = $false; remoteUrl = ''; updateUrl = ''
+        backupMode = 'start'; backupTime = '14:00'; backupDay = ''; backupFor = ''; shopName = ''; shopFor = '' }
     if (Test-Path $ConfigFile) {
         try {
             $j = Get-Content $ConfigFile -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -126,6 +131,11 @@ function Read-Config {
             if ($j.allowRemote) { $c.allowRemote = $true }
             if ($j.remoteUrl) { $c.remoteUrl = [string]$j.remoteUrl }
             if ($j.updateUrl) { $c.updateUrl = [string]$j.updateUrl }
+            if ([string]$j.backupMode -in $BackupModes) { $c.backupMode = [string]$j.backupMode }
+            if ([string]$j.backupTime -match '^([01]\d|2[0-3]):[0-5]\d$') { $c.backupTime = [string]$j.backupTime }
+            if ($j.backupDay) { $c.backupDay = [string]$j.backupDay }
+            if ($j.backupFor) { $c.backupFor = [string]$j.backupFor }
+            if ($j.shopName) { $c.shopName = [string]$j.shopName; $c.shopFor = [string]$j.shopFor }
         } catch { }
     }
     return $c
@@ -608,6 +618,12 @@ function Get-Shop {
     $c.at = Get-Date
     $c.path = $p
     $script:ShopCache = $c
+    if ($script:Config.shopName -ne $c.shopName -or $script:Config.shopFor -ne $p) {
+        if (-not $script:DbOverride) {
+            $script:Config.shopName = [string]$c.shopName; $script:Config.shopFor = $p
+            try { Save-Config } catch { }
+        }
+    }
     return $c
 }
 
@@ -679,10 +695,44 @@ function Test-Admin([string]$user) {
 
 # ---------------------------------------------------------------- backup
 
+# The day of the last daily copy of this database. It is kept in the
+# settings file: the helper stops with the window, and a fresh one must not
+# copy the whole file again (over a network share that is costly).
 $script:BackupDay = ''
+function Get-BackupDay {
+    if ($script:BackupDay) { return $script:BackupDay }
+    if ($script:Config.backupDay -and $script:Config.backupFor -eq (Get-DbPath)) { return [string]$script:Config.backupDay }
+    return ''
+}
+function Set-BackupDay([string]$day) {
+    $script:BackupDay = $day
+    if (-not $day -or $script:DbOverride) { return }
+    $script:Config.backupDay = $day
+    $script:Config.backupFor = Get-DbPath
+    try { Save-Config } catch { }
+}
+
+# Whether the daily copy is due now (Settings: on the first run of the day,
+# at a set time, or never by itself).
+function Test-BackupDue {
+    if ((Get-BackupDay) -eq (Get-Date -Format 'yyyy-MM-dd')) { return $false }
+    switch ([string]$script:Config.backupMode) {
+        'off' { return $false }
+        'time' { return ((Get-Date -Format 'HH:mm') -ge [string]$script:Config.backupTime) }
+        default { return $true }
+    }
+}
+
 # The daily copy of the database, into the folder chosen at setup (or in
-# Settings), keeping the newest N. It runs on the side, started with the
-# program and again after midnight, so no save waits for it.
+# Settings), keeping the newest N. It runs on the side, so no save waits
+# for it.
+function Get-BackupScheduleText {
+    switch ([string]$script:Config.backupMode) {
+        'off' { return 'يدوياً فقط' }
+        'time' { return "يومياً الساعة $($script:Config.backupTime)" }
+        default { return 'عند أول تشغيل في اليوم' }
+    }
+}
 function Get-BackupDir { if ($script:Config.backupDir) { return $script:Config.backupDir } return $DefaultBackupDir }
 
 $BackupScript = {
@@ -714,7 +764,7 @@ function Update-Backup {
     try {
         $r = $j.ps.EndInvoke($j.h)
         if ($j.ps.Streams.Error.Count) { throw $j.ps.Streams.Error[0].Exception }
-        $script:BackupDay = $j.day
+        Set-BackupDay $j.day
         $script:BackupError = ''
         Write-LawhaLog "backup done: $r"
     } catch {
@@ -732,7 +782,7 @@ function Start-Backup([switch]$Now, [string]$Label = '') {
     $today = Get-Date -Format 'yyyy-MM-dd'
     if ($script:BackupJob -or $script:DbOverride) { return }
     if (-not $Now) {
-        if ($script:BackupDay -eq $today) { return }
+        if (-not (Test-BackupDue)) { return }
         # after a failure, try again in half an hour, not at every save
         if (((Get-Date) - $script:BackupFailedAt).TotalMinutes -lt 30) { return }
     }
@@ -2832,7 +2882,13 @@ function Get-State($req) {
     $lic = Get-License
     $p = Get-DbPath
     $shop = ''
-    if ($p) { try { $shop = (Get-Shop).shopName } catch { } }
+    # the name as last read (kept in the settings file): no need to open
+    # the database just to show it
+    if ($p) {
+        if ($script:ShopCache -and $script:ShopCache.path -eq $p) { $shop = [string]$script:ShopCache.shopName }
+        elseif ($script:Config.shopName -and $script:Config.shopFor -eq $p) { $shop = [string]$script:Config.shopName }
+        else { try { $shop = (Get-Shop).shopName } catch { } }
+    }
     $st = @{
         ok = $true; product = $Product; version = $Version; test = [bool]$env:LAWHA_FAKEDAO
         licensed = [bool]$lic.ok; licenseName = [string]$lic.name; licenseExpiry = [string]$lic.expiry
@@ -2873,7 +2929,9 @@ function Test-NoWindow {
     $now = Get-Date
     if ($script:ByeAt -and $now -gt $script:ByeAt) { return $true }
     # before the first page: time for the window to open and sign-in
-    $limit = if ($script:SeenPage) { 20 } else { 90 }
+    # A minimized window's timers may tick only once a minute; a closed one
+    # says goodbye (/api/bye), so this limit is only for a lost goodbye.
+    $limit = if ($env:LAWHA_AUTOSTOP_SECS) { [int]$env:LAWHA_AUTOSTOP_SECS } elseif ($script:SeenPage) { 150 } else { 120 }
     return ($now - $script:LastSeen).TotalSeconds -gt $limit
 }
 
@@ -2903,7 +2961,10 @@ function Handle($ctx) {
     if ($path -eq '/') {
         return Send $ctx 200 ([IO.File]::ReadAllBytes($AppFile)) 'text/html; charset=utf-8'
     }
-    if ($path -eq '/api/ping' -or $path -eq '/api/state') { return Send-Json $ctx 200 (Get-State $req) }
+    # the launcher's question "are you there?": answered at once, never
+    # waiting on the database (on a network share that can take long)
+    if ($path -eq '/api/ping') { return Send-Json $ctx 200 @{ ok = $true; product = $Product; version = $Version } }
+    if ($path -eq '/api/state') { return Send-Json $ctx 200 (Get-State $req) }
     # Everything else must come from the app itself: a custom header forces a
     # CORS preflight, which this server never approves.
     if ($req.Headers['X-Lawha'] -ne '1') { return Send-Json $ctx 403 @{ ok = $false; error = 'forbidden' } }
@@ -2937,7 +2998,6 @@ function Handle($ctx) {
                 Save-Config
                 $script:ShopCache = $null
                 Write-LawhaLog "new shop database: $file (backups: $bkDir)"
-                Start-Backup -Now
                 return Send-Json $ctx 200 @{ ok = $true; dbPath = $file; backupDir = $bkDir }
             }
             '/api/choose-folder' {
@@ -3073,17 +3133,26 @@ function Handle($ctx) {
                         $script:ShopCache = $null
                         $changed.Add("اسم المحل: $name")
                     }
-                    if (($null -ne $b.backupDir -or $null -ne $b.keepBackups) -and -not $remote) {
+                    if (($null -ne $b.backupDir -or $null -ne $b.keepBackups -or $null -ne $b.backupMode) -and -not $remote) {
                         if ($null -ne $b.backupDir) {
                             $dir = ([string]$b.backupDir).Trim()
                             Need ($dir -ne '') 'اختر مجلد النسخ الاحتياطي'
                             try { New-Item -ItemType Directory -Force -Path $dir | Out-Null } catch { throw "تعذّر إنشاء المجلد: $dir" }
+                            # a new folder gets its first copy; the same one, none
+                            if ($dir -ne (Get-BackupDir)) { $script:BackupDay = ''; $script:Config.backupDay = '' }
                             $script:Config.backupDir = $dir
-                            $script:BackupDay = ''
                         }
                         if ($null -ne $b.keepBackups) { $script:Config.keepBackups = [math]::Max(3, [math]::Min(365, [int]$b.keepBackups)) }
+                        if ($null -ne $b.backupMode) {
+                            Need ([string]$b.backupMode -in $BackupModes) 'طريقة النسخ الاحتياطي غير صحيحة'
+                            $script:Config.backupMode = [string]$b.backupMode
+                        }
+                        if ($null -ne $b.backupTime) {
+                            Need ([string]$b.backupTime -match '^([01]\d|2[0-3]):[0-5]\d$') 'وقت النسخ الاحتياطي غير صحيح'
+                            $script:Config.backupTime = [string]$b.backupTime
+                        }
                         Save-Config
-                        $changed.Add("النسخ الاحتياطي: $(Get-BackupDir) (الاحتفاظ بـ $($script:Config.keepBackups))")
+                        $changed.Add("النسخ الاحتياطي: $(Get-BackupDir) (الاحتفاظ بـ $($script:Config.keepBackups)، $(Get-BackupScheduleText))")
                     }
                     Write-LawhaLog "$($s.user)  settings saved"
                     if ($changed.Count) { Write-Activity $s.user 'settings' '' ($changed -join "`n") }
@@ -3097,7 +3166,8 @@ function Handle($ctx) {
                 if ($s.admin -and -not $remote) {
                     $r.dbPath = Get-DbPath; $r.dataDir = $DataDir; $r.machine = Get-MachineCode
                     $r.backupDir = Get-BackupDir; $r.keepBackups = [int]$script:Config.keepBackups
-                    $r.backupError = $script:BackupError; $r.lastBackup = [string]$script:BackupDay; $r.updateUrl = Get-UpdateUrl
+                    $r.backupError = $script:BackupError; $r.lastBackup = Get-BackupDay; $r.updateUrl = Get-UpdateUrl
+                    $r.backupMode = [string]$script:Config.backupMode; $r.backupTime = [string]$script:Config.backupTime
                 }
                 return Send-Json $ctx 200 $r
             }
@@ -3136,7 +3206,6 @@ function Handle($ctx) {
                 New-ShopDatabase $file $shop $s.user ([string]$b.password)
                 Set-Database $file
                 Write-LawhaLog "$($s.user)  new database: $file"
-                Start-Backup -Now
                 return Send-Json $ctx 200 @{ ok = $true; path = $script:Config.dbPath }
             }
             '/api/activity' {
@@ -3192,7 +3261,8 @@ function Handle($ctx) {
             '/api/backups' {
                 Need $s.admin 'النسخ الاحتياطي يحتاج صلاحية المدير'
                 Update-Backup
-                return Send-Json $ctx 200 @{ ok = $true; dir = (Get-BackupDir); backups = (Get-Backups); running = [bool]$script:BackupJob; error = $script:BackupError; keep = [int]$script:Config.keepBackups }
+                return Send-Json $ctx 200 @{ ok = $true; dir = (Get-BackupDir); backups = (Get-Backups); running = [bool]$script:BackupJob; error = $script:BackupError; keep = [int]$script:Config.keepBackups
+                        mode = [string]$script:Config.backupMode; time = [string]$script:Config.backupTime; lastDay = (Get-BackupDay) }
             }
             '/api/backup-now' {
                 Need $s.admin 'النسخ الاحتياطي يحتاج صلاحية المدير'
@@ -3331,8 +3401,18 @@ function Start-Listener {
 }
 $script:RestartListener = $false
 
+# Just after another copy was stopped, Windows may still hold its address
+# for a moment: try again for a few seconds before giving up.
+$listener = $null
+$listenError = $null
+for ($try = 0; $try -lt 8 -and -not $listener; $try++) {
+    try { $listener = Start-Listener } catch {
+        $listenError = $_
+        if ($try -lt 7) { Start-Sleep -Milliseconds 1000 }
+    }
+}
 try {
-    $listener = Start-Listener
+    if (-not $listener) { throw $listenError }
 } catch {
     # The port is taken (another copy, or one stuck from before): the
     # launcher stops that one and starts again. Started by hand: open the page.
@@ -3380,11 +3460,18 @@ try {
         if ($script:Stop) { break }
         # a request the browser dropped half-way is no reason to stop
         try { $ctx = $listener.EndGetContext($async) } catch { Write-LawhaLog "request failed: $($_.Exception.Message)"; continue }
+        $fromPage = $false
+        try { $fromPage = $ctx.Request.Headers['X-Lawha'] -eq '1' } catch { }
         try {
             Handle $ctx
         } catch {
             try { Send-Json $ctx 500 @{ ok = $false; error = $_.Exception.Message } } catch { }
         }
+        # time spent on a long request (a slow network share, a file dialog)
+        # is no sign of a closed window: the page's own messages queued meanwhile
+        if ($fromPage -and $script:SeenPage -and -not $script:ByeAt) { $script:LastSeen = Get-Date }
+        # after a reload, the new page's first message may have waited behind it
+        if ($script:ByeAt -and $script:ByeAt -lt (Get-Date).AddSeconds(3)) { $script:ByeAt = (Get-Date).AddSeconds(3) }
         if ($script:RestartListener) {
             $script:RestartListener = $false
             try { $listener.Close() } catch { }

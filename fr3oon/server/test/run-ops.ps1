@@ -1,4 +1,4 @@
-# Runs the helper's work against a new Fr3oon database on the test engine
+﻿# Runs the helper's work against a new Fr3oon database on the test engine
 # (FakeDao): the license, creating the database, users and passwords, every
 # write operation (the rows each one leaves behind, the validation errors,
 # the rollback on failure, the cashier/manager rules), the data for other
@@ -465,6 +465,40 @@ for ($i = 0; $i -lt 4; $i++) { Start-Sleep -Milliseconds 1100; Start-Backup -Now
 $b = Get-Backups
 Assert (@($b | Where-Object { -not $_.beforeRestore }).Count -eq 3) 'only the last 3 daily copies kept'
 Assert (@($b | Where-Object { $_.beforeRestore }).Count -eq 2) 'copies made before a restore are kept'
+
+Write-Host "`n== backup schedule"
+$todayStr = Get-Date -Format 'yyyy-MM-dd'
+Assert ((Get-BackupDay) -eq $todayStr) "today's copy noted: $(Get-BackupDay)"
+$saved = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+Assert ($saved.backupDay -eq $todayStr -and $saved.backupFor -eq $dbFile) 'and kept in the settings file'
+# a fresh helper (the window was closed and opened again) must not copy again
+$script:BackupDay = ''
+$script:Config = Read-Config
+Assert (-not (Test-BackupDue)) 'a new helper the same day: no second copy'
+$n0 = @(Get-Backups).Count
+Start-Backup; Wait-Backup 60; Update-Backup
+Assert (@(Get-Backups).Count -eq $n0) 'Start-Backup on a new helper copies nothing'
+# the next day
+$script:BackupDay = ''; $script:Config.backupDay = '2000-01-01'
+$script:Config.backupMode = 'start'
+Assert (Test-BackupDue) 'first run of a new day: due'
+$script:Config.backupMode = 'off'
+Assert (-not (Test-BackupDue)) 'by hand only: never due by itself'
+$script:Config.backupMode = 'time'
+$script:Config.backupTime = '23:59'
+$late = (Get-Date -Format 'HH:mm') -ge '23:59'
+Assert ($late -or -not (Test-BackupDue)) 'at a set time: not due before it'
+$script:Config.backupTime = '00:00'
+Assert (Test-BackupDue) 'at a set time: due after it'
+Start-Backup; Wait-Backup 60; Update-Backup
+Assert ((Get-BackupDay) -eq $todayStr) 'the timed copy made'
+Assert (-not (Test-BackupDue)) 'and only once that day'
+# another database: its own first copy
+$script:BackupDay = ''; $script:Config.backupFor = 'C:\other.accdb'
+Assert (Test-BackupDue) 'another database file: its copy is due'
+$script:Config.backupFor = $dbFile; $script:Config.backupDay = $todayStr
+$script:Config.backupMode = 'start'; $script:Config.backupTime = '14:00'
+Save-Config
 
 Write-Host "`n== online updates"
 $feed = Join-Path $tmp 'latest.json'

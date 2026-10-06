@@ -98,6 +98,8 @@ function New-FakeEngine([string]$jsonPath) {
     $ws | Add-Member ScriptMethod OpenDatabase {
         param($path, $exclusive, $readOnly)
         if (-not (Test-Path -LiteralPath $path)) { throw "FakeDao: file not found $path" }
+        # a database on a slow network share
+        if ($env:LAWHA_FAKESLOW) { Start-Sleep -Milliseconds ([int]$env:LAWHA_FAKESLOW) }
         # one set of tables per file. A fake database file (JSON) is read
         # from disk, again when the file changed (a restored backup); any
         # other file (a real .accdb in the older tests) starts as the data
