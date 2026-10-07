@@ -1,10 +1,10 @@
 {
   "product": "Fr3oon",
-  "version": "2.2.7",
-  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.7.exe",
-  "sha256": "2a9315fe74a100e37c91ee00c9dc08ee238d6eac2f6468689719016f5302151d",
-  "size": 582279,
-  "notes": "تصميم جديد (الشكل فقط، دون أي تغيير في العمل):\n- مظهر زجاجي ناعم بخلفية متدرجة، في الوضعين الفاتح والداكن.\n- بطاقات الأرقام متساوية الحجم في كل الصفوف، وأحجام موحّدة للأزرار والحقول.\n- فاتورة البيع السريع أضيق وأكثر ترتيباً، تعرض أسطراً أكثر دون تمرير.\n- تكبير الفاتورة وتصغيرها: اسحب حافتها الداخلية، ويتذكّر البرنامج الحجم؛ نقرتان على الحافة للحجم الأصلي.\n- يعود التصميم عادياً تلقائياً عند الطباعة أو على الأجهزة الضعيفة.",
+  "version": "2.2.8",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.8.exe",
+  "sha256": "027ab44168d9f8034d4cf7415306b864ae53d9ad82d0d6ada8259ed963de2498",
+  "size": 582314,
+  "notes": "- إصلاح القوائم المنسدلة: خيارات مثل «جملة / مفرد» في العملاء، والوحدة، ونوع السند، والمستخدم كانت تختفي عند فتح القائمة؛ صارت ظاهرة بخلفية واضحة في الوضعين الفاتح والداكن.",
   "date": "2026-10-07",
-  "sig": "PGVggjW759F4gy7ZzKNa3dgHTZA_66HZRNqfdoF8QD_LmIn3jfd6w71lN1OF9iXBjetZ2-cSQ5_pcioCkJ4Bqg"
+  "sig": "jjOYn4B-EVYoasR2uKFjQr3AMRI5E1tIZWD0U5yq1sLF_ozRm1fB1H2YJjOJqYZvxxbLoUqX9kxfa06rU-mCXA"
 }
