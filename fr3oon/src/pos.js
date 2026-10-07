@@ -140,6 +140,7 @@ export function setupPos(ctx) {
       </section>
       <aside class="pos-cart">
         <div class="card cart-card">
+          <div class="pos-resize" id="posResize" title="اسحب لتكبير الفاتورة أو تصغيرها، ونقرتان للحجم الأصلي"></div>
           <div class="cart-head">
             <div class="seg" id="posType"${allowed.length > 1 ? '' : ' hidden'}>${allowed
               .map((t) => `<button data-t="${t}" class="${t === cart.type ? 'on' : ''}">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`)
@@ -288,7 +289,37 @@ export function setupPos(ctx) {
     if (t === C.CREDIT) $('#posCustomer').focus();
   }
 
+  // The invoice's width: drag its inner edge (wider towards the items),
+  // remembered in this browser; a double click goes back to the default.
+  function bindResize() {
+    const h = $('#posResize'), grid = $('.pos'), cartEl = $('.pos-cart');
+    if (!h || !grid || !cartEl) return;
+    const KEY = 'fr3oon-cartw';
+    const set = (w) => grid.style.setProperty('--cartw', w + 'px');
+    const saved = Number(store.get(KEY));
+    if (saved >= 300 && saved <= 900) set(saved);
+    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
+    h.onpointerdown = (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      const x0 = e.clientX, w0 = cartEl.getBoundingClientRect().width;
+      const max = Math.min(820, grid.getBoundingClientRect().width * 0.7);
+      h.classList.add('drag');
+      h.onpointermove = (m) => set(Math.round(Math.max(330, Math.min(max, w0 + (rtl ? 1 : -1) * (m.clientX - x0)))));
+      h.onpointerup = h.onpointercancel = () => {
+        h.classList.remove('drag');
+        h.onpointermove = h.onpointerup = h.onpointercancel = null;
+        store.set(KEY, String(Math.round(cartEl.getBoundingClientRect().width)));
+      };
+    };
+    h.ondblclick = () => {
+      grid.style.removeProperty('--cartw');
+      store.set(KEY, '');
+    };
+  }
+
   function bind() {
+    bindResize();
     const s = $('#posSearch');
     s.oninput = () => {
       search = s.value;

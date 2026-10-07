@@ -1,0 +1,167 @@
+/* Fr3oon design layer (from the SQL edition's handover): liquid glass,
+   balanced sizes and a compact invoice panel. Design only. Loaded last (zz-) so it wins;
+   it re-skins with the existing tokens and switches itself off for
+   reduced transparency, forced colours, old browsers and print. */
+/* ================= Liquid Glass layer =================
+   Everything below only re-skins surfaces with the existing tokens: no layout or size changes.
+   Off switches: prefers-reduced-transparency, forced-colors, browsers without backdrop-filter, print. */
+:root {
+  --lg-blur: 22px; --lg-sat: 170%;
+  --lg-tint: rgba(255, 255, 255, .58);       /* panels */
+  --lg-tint-2: rgba(255, 255, 255, .42);     /* inputs, chips, buttons */
+  --lg-tint-3: rgba(255, 255, 255, .78);     /* modal, popovers */
+  --lg-edge: rgba(255, 255, 255, .72);       /* specular top edge */
+  --lg-border: rgba(255, 255, 255, .55);
+  --lg-line: rgba(30, 36, 60, .10);
+  --lg-shadow: 0 1px 1px rgba(255, 255, 255, .6) inset, 0 -1px 1px rgba(30, 36, 60, .04) inset, 0 10px 30px -14px rgba(40, 44, 90, .28), 0 2px 6px -2px rgba(40, 44, 90, .10);
+  --lg-shadow-hover: 0 1px 1px rgba(255, 255, 255, .7) inset, 0 16px 38px -14px rgba(40, 44, 90, .34), 0 3px 8px -2px rgba(40, 44, 90, .12);
+  --lg-bg: radial-gradient(60rem 40rem at 85% -10%, rgba(139, 124, 255, .34), transparent 60%),
+           radial-gradient(52rem 38rem at 5% 8%, rgba(70, 190, 230, .26), transparent 58%),
+           radial-gradient(46rem 36rem at 55% 108%, rgba(255, 150, 190, .22), transparent 60%),
+           linear-gradient(180deg, #eef0fb, #e8ecf7);
+  --radius-glass: 18px;
+}
+:root[data-theme="dark"] {
+  --lg-tint: rgba(28, 31, 44, .52);
+  --lg-tint-2: rgba(255, 255, 255, .06);
+  --lg-tint-3: rgba(26, 29, 42, .78);
+  --lg-edge: rgba(255, 255, 255, .20);
+  --lg-border: rgba(255, 255, 255, .10);
+  --lg-line: rgba(255, 255, 255, .08);
+  --lg-shadow: 0 1px 1px rgba(255, 255, 255, .10) inset, 0 -1px 1px rgba(0, 0, 0, .25) inset, 0 14px 36px -16px rgba(0, 0, 0, .75), 0 2px 8px -2px rgba(0, 0, 0, .45);
+  --lg-shadow-hover: 0 1px 1px rgba(255, 255, 255, .14) inset, 0 20px 44px -16px rgba(0, 0, 0, .85), 0 3px 10px -2px rgba(0, 0, 0, .5);
+  --lg-bg: radial-gradient(60rem 40rem at 85% -10%, rgba(120, 100, 255, .30), transparent 60%),
+           radial-gradient(52rem 38rem at 5% 8%, rgba(30, 150, 200, .22), transparent 58%),
+           radial-gradient(46rem 36rem at 55% 108%, rgba(200, 80, 150, .16), transparent 60%),
+           linear-gradient(180deg, #0d0f17, #11131c);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  body { background: var(--lg-bg); background-attachment: fixed; }
+  .side, .card, .kpi, .table-wrap, .modal-box, .notice, .toast, .who, .theme-switch, .page-head .btn, .pos-search input {
+    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+    backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-sat));
+  }
+  /* panels */
+  .side { background: var(--lg-tint); border-inline-end: 1px solid var(--lg-border); box-shadow: 1px 0 0 var(--lg-edge) inset, 0 0 40px -20px rgba(40, 44, 90, .35); }
+  .card, .kpi, .table-wrap {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--lg-tint) 100%, transparent), color-mix(in srgb, var(--lg-tint) 82%, transparent));
+    border: 1px solid var(--lg-border); border-radius: var(--radius-glass); box-shadow: var(--lg-shadow);
+  }
+  .card .card, .card .table-wrap, .table-wrap .card, .modal-box .card, .modal-box .table-wrap, .kpi .card {
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--lg-tint-2); box-shadow: none; border-color: var(--lg-line);
+  }
+  .kpi { transition: transform .22s cubic-bezier(.2, .8, .2, 1), box-shadow .22s; }
+  .kpi:hover { transform: translateY(-2px); box-shadow: var(--lg-shadow-hover); border-color: var(--lg-border); }
+  .kpi.accent { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 20%, transparent), var(--lg-tint) 70%); border-color: color-mix(in srgb, var(--accent) 35%, var(--lg-border)); }
+  .kpi .k-ico { box-shadow: 0 1px 0 var(--lg-edge) inset, 0 6px 14px -8px color-mix(in srgb, var(--accent) 60%, transparent); backdrop-filter: none; }
+  /* tables: keep rows readable, glass only on the frame */
+  .table-wrap thead th { background: color-mix(in srgb, var(--lg-tint-3) 92%, transparent); backdrop-filter: blur(12px); }
+  .table-wrap tbody tr:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  table td, table th { border-color: var(--lg-line); }
+  /* nav */
+  .nav button { border-radius: 12px; transition: background .18s, color .18s, transform .18s; }
+  .nav button:hover { background: var(--lg-tint-2); }
+  .nav button.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 20%, var(--lg-tint-2)), color-mix(in srgb, var(--accent) 12%, var(--lg-tint-2))); box-shadow: 0 1px 0 var(--lg-edge) inset, 0 8px 18px -12px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .nav button.on::before { display: none; }
+  .who { background: var(--lg-tint-2); border: 1px solid var(--lg-line); }
+  .theme-switch { background: var(--lg-tint-2); border: 1px solid var(--lg-line); }
+  .theme-switch button.on { background: var(--lg-tint-3); box-shadow: 0 1px 0 var(--lg-edge) inset, var(--shadow); }
+  /* buttons & chips */
+  .btn { background: var(--lg-tint-2); border: 1px solid var(--lg-border); box-shadow: 0 1px 0 var(--lg-edge) inset, 0 4px 12px -8px rgba(40, 44, 90, .35); transition: transform .16s, box-shadow .2s, background .2s; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .btn:hover { background: var(--lg-tint); box-shadow: 0 1px 0 var(--lg-edge) inset, 0 8px 18px -10px rgba(40, 44, 90, .45); transform: translateY(-1px); }
+  .btn:active { transform: translateY(0) scale(.985); }
+  .btn.primary { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent)); border-color: color-mix(in srgb, var(--accent) 70%, #000 10%); color: #fff; box-shadow: 0 1px 0 rgba(255, 255, 255, .35) inset, 0 10px 22px -10px color-mix(in srgb, var(--accent) 80%, transparent); }
+  .btn.primary:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 85%, #fff), var(--accent-2)); }
+  .btn.ghost { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
+  .btn.ghost:hover { background: var(--lg-tint-2); }
+  .btn.danger { background: var(--lg-tint-2); }
+  .chip { background: var(--lg-tint-2); border: 1px solid var(--lg-border); box-shadow: 0 1px 0 var(--lg-edge) inset; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: background .18s, box-shadow .18s, transform .16s; }
+  .chip:hover { background: var(--lg-tint); transform: translateY(-1px); }
+  .chip.on { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 26%, var(--lg-tint-2)), color-mix(in srgb, var(--accent) 14%, var(--lg-tint-2))); box-shadow: 0 1px 0 var(--lg-edge) inset, 0 8px 16px -10px color-mix(in srgb, var(--accent) 70%, transparent); }
+  /* inputs: recessed glass */
+  .field input, .field select, .field textarea, .add-line input, table.lines input, table.lines select, .pos input, .pos select, .act-dates input, .ac-bar select, .ac-bar input {
+    background: var(--lg-tint-2); border: 1px solid var(--lg-line); border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(30, 36, 60, .08) inset; transition: border-color .18s, box-shadow .18s, background .18s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus, .pos input:focus, .ac-bar select:focus, .ac-bar input:focus {
+    background: var(--lg-tint-3); border-color: color-mix(in srgb, var(--accent) 60%, var(--lg-line)); box-shadow: 0 1px 2px rgba(30, 36, 60, .06) inset, var(--ring);
+  }
+  /* dialogs */
+  .modal { background: radial-gradient(60rem 40rem at 50% 0%, rgba(120, 110, 255, .18), transparent 60%), rgba(12, 14, 28, .38); -webkit-backdrop-filter: blur(14px) saturate(120%); backdrop-filter: blur(14px) saturate(120%); }
+  .modal-box { background: var(--lg-tint-3); border: 1px solid var(--lg-border); border-radius: 26px; box-shadow: 0 1px 1px var(--lg-edge) inset, 0 40px 90px -30px rgba(10, 12, 40, .6), 0 6px 20px -6px rgba(10, 12, 40, .25); animation: lgPop .26s cubic-bezier(.2, .9, .25, 1.1); }
+  .close { background: var(--lg-tint-2); border: 1px solid var(--lg-line); }
+  .close:hover { background: var(--lg-tint); }
+  /* status */
+  .notice { border-radius: 14px; border: 1px solid var(--lg-border); box-shadow: 0 1px 0 var(--lg-edge) inset; }
+  .pill { border: 1px solid color-mix(in srgb, currentColor 22%, transparent); box-shadow: 0 1px 0 var(--lg-edge) inset; }
+  /* accounts / statements */
+  .ac-grp td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .ac-j { box-shadow: var(--lg-shadow); }
+  /* scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 25%, transparent) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 22%, transparent); border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 38%, transparent); background-clip: content-box; border: 2px solid transparent; }
+}
+@keyframes lgPop { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+/* sign-in / setup screens (always dark tokens) */
+.screen { background: radial-gradient(50rem 34rem at 80% 0%, rgba(120, 100, 255, .35), transparent 60%), radial-gradient(44rem 30rem at 0% 100%, rgba(30, 160, 210, .25), transparent 60%), #0b0d15; }
+.screen-card { background: rgba(26, 29, 44, .55); border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 1px 1px rgba(255, 255, 255, .12) inset, 0 40px 90px -30px rgba(0, 0, 0, .8); -webkit-backdrop-filter: blur(26px) saturate(160%); backdrop-filter: blur(26px) saturate(160%); }
+.screen-card .field input, .screen-card .field select { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); }
+/* accessibility & fallbacks */
+@media (prefers-reduced-motion: reduce) { .modal-box { animation: none; } .kpi, .btn, .chip, .nav button { transition: none; } .kpi:hover, .btn:hover, .chip:hover { transform: none; } }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  body { background: var(--bg); }
+  .side, .card, .kpi, .table-wrap, .modal-box, .notice, .btn, .chip { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: var(--surface); }
+  .modal { backdrop-filter: none; background: rgba(6, 8, 20, .7); }
+}
+@media print { body { background: #fff !important; } .side, .card, .kpi, .table-wrap, .modal-box { backdrop-filter: none !important; box-shadow: none !important; background: #fff !important; } }
+
+/* ---- balanced sizing: equal tracks, equal heights, one rhythm (16px) ---- */
+.grid.kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 16px; }
+.grid.kpis > .kpi { min-height: 156px; align-content: start; }
+.grid { gap: 16px; align-items: stretch; }
+.grid > .card { min-width: 0; }
+.page-head { padding-block: 22px 8px; }
+.btn { min-height: 40px; }
+.btn.small { min-height: 32px; }
+.chip { min-height: 34px; display: inline-flex; align-items: center; }
+.field input, .field select, .field textarea { min-height: 42px; }
+.table-wrap th, .table-wrap td { padding-block: 10px; }
+
+/* the quick-sale invoice: compact header and footer, small buttons, room for the lines */
+@media (min-width: 1101px) { .pos { grid-template-columns: minmax(0, 1fr) var(--cartw, clamp(395px, 32%, 460px)); } }
+/* the handle on the invoice's inner edge: drag to make it wider or narrower */
+.pos-resize { position: absolute; z-index: 3; top: 0; bottom: 0; inset-inline-start: 0; width: 12px; cursor: col-resize; touch-action: none; display: none; }
+@media (min-width: 861px) { .pos-resize { display: block; } }
+.pos-resize::after { content: ""; position: absolute; top: 50%; inset-inline-start: 4px; width: 4px; height: 46px; margin-top: -23px; border-radius: 4px; background: var(--line-strong); opacity: .55; transition: opacity .15s, background .15s; }
+.pos-resize:hover::after, .pos-resize.drag::after { opacity: 1; background: var(--accent); }
+body:has(.pos-resize.drag) { user-select: none; cursor: col-resize; }
+.pos .cart-head { padding: 8px 10px 6px; gap: 8px; }
+.pos .cart-head .seg button { font-size: 14px; padding: 5px 8px; }
+.pos .cart-who { padding: 0 10px 6px; }
+.pos .cart-who input { min-height: 36px; }
+.pos .cart-count { padding: 4px 12px; font-size: 12px; }
+.pos .cart-lines { padding: 8px; gap: 6px; }
+.pos .cart-lines .cart-line { padding: 8px 10px; gap: 4px 10px; border-radius: 10px; }
+.pos .cart-lines .name { font-size: 14.5px; }
+.pos .cart-lines .line-total { font-size: 15px; }
+.pos .cart-lines .stepper button { width: 34px; height: 34px; font-size: 18px; }
+.pos .cart-lines .stepper input { width: 60px; font-size: 15px !important; }
+.pos .cart-lines input.price { width: 96px; padding: 6px 8px; font-size: 14.5px; }
+.pos .cart-lines select { padding: 5px 7px; font-size: 13px; min-width: 84px; }
+.pos .cart-foot { padding: 8px 10px 10px; gap: 6px; }
+.pos .cart-total b { font-size: 22px; }
+.pos #posPaid, .pos #posNote { min-height: 36px; }
+.pos .cart-actions { flex-wrap: nowrap; gap: 6px; }
+.pos .cart-actions .btn.big { padding: 6px 12px; font-size: 14px; min-height: 38px; border-radius: 11px; flex: 1 1 0; }
+.pos .cart-actions #posSave { flex: 1.3 1 0; }
+.pos .cart-actions .btn.icon-only { flex: none; width: 40px; }
+.pos .cart-actions .kbd { display: none; }
+/* below 1101 px the invoice stays beside the items (down to 861 px), narrower */
+@media (min-width: 861px) and (max-width: 1100px) { .pos { grid-template-columns: minmax(0, 1fr) var(--cartw, clamp(320px, 42%, 460px)); } }
+/* a short invoice (up to 3 lines) may stay a little larger */
+.pos .cart-lines.d-lg .cart-line { padding: 12px 12px; gap: 8px 12px; }
+.pos .cart-lines.d-lg .name { font-size: 16px; }
+.pos .cart-lines.d-lg .line-total { font-size: 17px; }
+.pos .cart-lines.d-lg .stepper button { width: 38px; height: 38px; }
