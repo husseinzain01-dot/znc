@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.4'
+$Version = '2.2.5'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.

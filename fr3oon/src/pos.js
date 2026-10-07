@@ -184,6 +184,16 @@ export function setupPos(ctx) {
     persist();
   }
 
+  // the line just added, in view within the cart only: never moves the page
+  function showLine(i) {
+    const box = $('#posLines');
+    const el = box?.querySelector(`.cart-line[data-i="${i}"]`);
+    if (!el || box.scrollHeight <= box.clientHeight) return;
+    const top = el.offsetTop - box.offsetTop;
+    if (top < box.scrollTop) box.scrollTop = top - 8;
+    else if (top + el.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top + el.offsetHeight - box.clientHeight + 8;
+  }
+
   function add(it) {
     const unit = it.unitL2 || it.unitL1;
     const same = cart.lines.findIndex((l) => l.item === it.name && l.unit === unit);
@@ -191,7 +201,7 @@ export function setupPos(ctx) {
     else cart.lines.push({ item: it.name, unit, qty: 1, price: priceFor(it, unit) });
     drawLines();
     const i = same >= 0 ? same : cart.lines.length - 1;
-    $(`#posLines .cart-line[data-i="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+    showLine(i);
   }
 
   function enterSearch() {
@@ -304,8 +314,9 @@ export function setupPos(ctx) {
       const b = e.target.closest('[data-item]');
       if (!b) return;
       add(itemBy(b.dataset.item));
-      // back to the search box, so the next scan or Enter doesn't click this button again
-      $('#posSearch').focus();
+      // back to the search box, so the next scan or Enter doesn't click this
+      // button again; the page stays where it is (the list may be scrolled far down)
+      $('#posSearch').focus({ preventScroll: true });
     };
     $('#posType').onclick = (e) => e.target.dataset.t && setType(e.target.dataset.t);
     $('#posCustomer').oninput = (e) => {

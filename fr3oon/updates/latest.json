@@ -1,10 +1,10 @@
 {
   "product": "Fr3oon",
-  "version": "2.2.4",
-  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.4.exe",
-  "sha256": "0e48480d12abeb7a8d78472d14a3bbea2ef2ec61693cfb58fadb849ef6e3e2d6",
-  "size": 578011,
-  "notes": "- فواصل الآلاف في خانات الأسعار والمبالغ أثناء الكتابة (1,500,000) في البيع السريع والفواتير والسندات والأصناف والعملاء.\n- تقبل الخانات الأرقام العربية (٠١٢٣) وتحوّلها تلقائياً.",
+  "version": "2.2.5",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.5.exe",
+  "sha256": "03f171d279d58c69997e79723f38a16b438944d533fc1388e548172fda45ae18",
+  "size": 578274,
+  "notes": "- البيع السريع: اختيار صنف من القائمة لا يُرجع الصفحة إلى أعلاها، فتبقى في مكانك من القائمة.\n- فاتورة البيع السريع أصغر قليلاً وأخفّ على الشاشة.\n- القائمة الجانبية ثابتة دائماً، وتبقى ظاهرة على شاشات اللابتوب (لا تختفي خلف زر القائمة).\n- على الشاشات الصغيرة تبقى الفاتورة بجانب الأصناف بدل أن تنزل تحتها.",
   "date": "2026-10-07",
-  "sig": "XGyx49wyz0VzWaPEIDknvMRmcb3MdMnXXINcYJZOxHB4aC94KOz-491jZf6dGMSIldbicLe-uAF2falbm9Ov2g"
+  "sig": "dQVohVgZlaBRE6-lwTLKdEnFFhXg-8U09RQJC8iQXysvp79Qr7GWtecXfop90LjCb9bG71okMujtmZ6FoSJDqg"
 }
