@@ -125,7 +125,7 @@ export function setupLabels(ctx) {
       <td class="lb-name"><b>${esc(it.name)}</b>${it.cls ? `<small>${esc(it.cls)}</small>` : ''}</td>
       <td class="lb-code">${hasCode(it) ? `<span class="num">${esc(it.code)}</span>` : '<span class="pill warn">بلا باركود</span>'}</td>
       <td class="lb-price">${money(price)} <small class="muted">/ ${esc(unit)}</small></td>
-      <td class="lb-copies"><input class="lb-n" data-id="${it.id}" inputmode="numeric" autocomplete="off" value="${copiesOf(it)}" aria-label="عدد النسخ"${cfg.fromStock ? ' disabled title="عدد النسخ = الرصيد الحالي"' : ''}></td>
+      <td class="lb-copies"><input class="lb-n" data-id="${it.id}" inputmode="numeric" data-plain autocomplete="off" value="${copiesOf(it)}" aria-label="عدد النسخ"${cfg.fromStock ? ' disabled title="عدد النسخ = الرصيد الحالي"' : ''}></td>
     </tr>`;
   }
 
@@ -172,7 +172,7 @@ export function setupLabels(ctx) {
           <div class="lb-sizes">${SIZES.map((x) => `<button type="button" class="chip${x.id === cfg.size ? ' on' : ''}" data-size="${x.id}">${sizeLabel(x, true)}</button>`).join('')}</div>
         </div>
         ${s.roll ? '' : `<label class="lb-group lb-start"><span class="lb-cap">ابدأ من الملصق رقم</span>
-          <input id="lbStart" inputmode="numeric" value="${cfg.start}" title="لورقة استُعمل جزء منها"> <small class="muted">من ${s.cols * s.rows} في الورقة</small></label>`}
+          <input id="lbStart" inputmode="numeric" data-plain value="${cfg.start}" title="لورقة استُعمل جزء منها"> <small class="muted">من ${s.cols * s.rows} في الورقة</small></label>`}
         <div class="lb-group"><span class="lb-cap">يظهر على الملصق</span>
           <div class="lb-checks">${chk('shop', 'اسم المحل')}${chk('name', 'اسم الصنف')}${chk('price', 'السعر')}${chk('digits', 'أرقام الباركود')}</div>
         </div>

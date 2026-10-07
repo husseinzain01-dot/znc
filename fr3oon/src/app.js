@@ -17,6 +17,7 @@ import { icon, LOGO } from './icons.js';
 import { databasePicker } from './picker.js';
 import { installScanner } from './scanner.js';
 import { readerFromTables } from './fulltest.js';
+import { setupNumberSeparators } from './numsep.js';
 
 const APP = 'Fr3oon';
 const LOCAL_URL = 'http://localhost:8770/';
@@ -1538,6 +1539,7 @@ function applyTheme(choice = store.get('fr3oon-theme') || 'auto') {
 }
 
 function init() {
+  setupNumberSeparators();
   $('#themeSwitch').innerHTML = THEMES.map(([id, ic, label]) => `<button type="button" data-theme="${id}" title="المظهر: ${label}" aria-label="المظهر: ${label}">${icon(ic)}</button>`).join('');
   $('#themeSwitch').onclick = (e) => {
     const b = e.target.closest('button[data-theme]');

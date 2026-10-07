@@ -4,6 +4,7 @@
 
 import * as C from './calc.js';
 import { printReceipt } from './receipt.js';
+import { groupDigits } from './numsep.js';
 
 export function setupForms(ctx) {
   const { $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, can } = ctx;
@@ -93,7 +94,7 @@ export function setupForms(ctx) {
         ${field('النوع', `<div class="seg" id="fType">${typeList.map((t) => `<button type="button" data-t="${t}">${t === C.CREDIT ? 'آجل' : 'نقدي'}</button>`).join('')}</div>`)}
         ${field(sale ? 'العميل' : 'المورد', `<input id="fWho" list="dlPeople" value="${esc(who)}" autocomplete="off" placeholder="${sale ? 'للبيع الآجل يجب اختيار عميل' : 'اختر المورد'}">`)}
         ${field('التاريخ', `<input id="fDate" type="date" value="${inv?.date || localDay()}">`)}
-        ${sale ? field('المدفوع', `<input id="fPaid" inputmode="numeric" value="${inv?.paid || ''}" placeholder="للآجل إن دُفع مبلغ الآن">`) : field('رقم فاتورة المورد', `<input id="fNo" inputmode="numeric" value="${esc(inv?.no || '')}">`)}
+        ${sale ? field('المدفوع', `<input id="fPaid" inputmode="numeric" value="${inv?.paid || ''}" placeholder="للآجل إن دُفع مبلغ الآن">`) : field('رقم فاتورة المورد', `<input id="fNo" inputmode="numeric" data-plain value="${esc(inv?.no || '')}">`)}
         ${field('ملاحظة', `<input id="fNote" value="${esc(inv?.note || '')}">`, true)}
       </div>
       <p class="muted" id="fWhoInfo"></p>
@@ -360,7 +361,7 @@ export function setupForms(ctx) {
     // Fill the small-unit price from the big one when it is still empty.
     const autoSmall = (from, to) => () => {
       const fill = numVal('iFill');
-      if (fill > 0 && !numVal(to)) $('#' + to).value = Math.round(numVal(from) / fill);
+      if (fill > 0 && !numVal(to)) $('#' + to).value = groupDigits(Math.round(numVal(from) / fill));
     };
     $('#iP1').onchange = autoSmall('iP1', 'iP2');
     $('#iB1').onchange = autoSmall('iB1', 'iB2');

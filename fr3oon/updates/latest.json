@@ -1,10 +1,10 @@
 {
   "product": "Fr3oon",
-  "version": "2.2.3",
-  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.3.exe",
-  "sha256": "e174178475ce17970364f3f19474907e0499b64a98836124b37a3f0368cdab3c",
-  "size": 577533,
-  "notes": "- النسخ الاحتياطي حسب موعد تختاره: عند أول تشغيل في اليوم، أو يومياً في ساعة محدّدة، أو يدوياً فقط (الإعدادات ← النسخ الاحتياطي).\n- لا تتكرر النسخة الاحتياطية عند كل فتح للبرنامج: نسخة واحدة في اليوم فقط، فيقلّ استهلاك الشبكة كثيراً.\n- إصلاح توقّف البرنامج بعد تسجيل الدخول أو اختيار قاعدة البيانات حين تكون على جهاز آخر في الشبكة.\n- البرنامج يفتح دون انتظار قاعدة البيانات، ولا يُغلق البرنامج المساعد وهو مشغول.\n- الضغط على الأيقونة مرتين لا يسبّب رسالة فشل.",
-  "date": "2026-10-06",
-  "sig": "-c4iU0afX3zTEx9uoLaKIE7j2_sf2PlSLwxcRhrQh8NSujJhMCaw8ZuXv1adP0Uh291nNukin34WiGOw0gVR5Q"
+  "version": "2.2.4",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.4.exe",
+  "sha256": "0e48480d12abeb7a8d78472d14a3bbea2ef2ec61693cfb58fadb849ef6e3e2d6",
+  "size": 578011,
+  "notes": "- فواصل الآلاف في خانات الأسعار والمبالغ أثناء الكتابة (1,500,000) في البيع السريع والفواتير والسندات والأصناف والعملاء.\n- تقبل الخانات الأرقام العربية (٠١٢٣) وتحوّلها تلقائياً.",
+  "date": "2026-10-07",
+  "sig": "XGyx49wyz0VzWaPEIDknvMRmcb3MdMnXXINcYJZOxHB4aC94KOz-491jZf6dGMSIldbicLe-uAF2falbm9Ov2g"
 }
