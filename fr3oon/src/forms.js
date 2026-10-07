@@ -4,7 +4,7 @@
 
 import * as C from './calc.js';
 import { printReceipt } from './receipt.js';
-import { groupDigits } from './numsep.js';
+import { groupDigits, toQty } from './numsep.js';
 
 export function setupForms(ctx) {
   const { $, $$, esc, fmt, localDay, openModal, closeModal, write, state, toast, can } = ctx;
@@ -106,7 +106,7 @@ export function setupForms(ctx) {
         <th>الصنف</th><th>الوحدة</th><th>الكمية</th><th>السعر</th><th>المبلغ</th><th></th>
       </tr></thead><tbody id="fLines"></tbody>
       <tfoot><tr><td colspan="4">المجموع</td><td id="fTotal" class="num"></td><td></td></tr></tfoot></table></div>
-      ${sale ? '' : `<label class="check" style="margin-top:10px"><input type="checkbox" id="fUpd" checked> حدّث سعر الشراء في بطاقات الأصناف من هذه الفاتورة</label>`}
+      ${sale ? '' : `<label class="check" style="margin-top:10px"><input type="checkbox" id="fUpd"${inv ? '' : ' checked'}> حدّث سعر الشراء في بطاقات الأصناف من هذه الفاتورة${inv ? ' <small class="muted">(فاتورة قديمة: لا يُنصح به إن وُجدت مشتريات أحدث)</small>' : ''}</label>`}
       ${errorBox}
       <div class="form-actions">
         <button class="btn primary" id="fSave">حفظ</button>
@@ -189,7 +189,7 @@ export function setupForms(ctx) {
       const i = e.target.dataset.i;
       if (i == null) return;
       const l = lines[+i];
-      if (e.target.dataset.f === 'qty') l.qty = Number(e.target.value) || 0;
+      if (e.target.dataset.f === 'qty') l.qty = toQty(e.target.value);
       if (e.target.dataset.f === 'price') l.price = Number(e.target.value.replace(/,/g, '')) || 0;
       $(`[data-total="${i}"]`).textContent = fmt(l.qty * l.price);
       drawTotal();

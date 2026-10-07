@@ -2,6 +2,8 @@
 // one-key saving. The cart is kept per user in this browser, so a refresh or
 // a closed window doesn't lose a half-entered sale.
 
+import { toQty } from './numsep.js';
+
 export function setupPos(ctx) {
   const { $, $$, esc, fmt, localDay, state, write, toast, forms, icon, onAfter, C, store, invoiceModal, can } = ctx;
   const P = () => state.P;
@@ -342,7 +344,7 @@ export function setupPos(ctx) {
       const row = e.target.closest('.cart-line');
       if (!row) return;
       const l = cart.lines[+row.dataset.i];
-      if (e.target.dataset.f === 'qty') l.qty = Number(e.target.value) || 0;
+      if (e.target.dataset.f === 'qty') l.qty = toQty(e.target.value);
       if (e.target.dataset.f === 'price' && can('edit_price')) l.price = Number(e.target.value.replace(/,/g, '')) || 0;
       row.querySelector('.line-total').textContent = fmt(l.qty * l.price);
       $('#posTotal').textContent = fmt(total());
@@ -375,6 +377,12 @@ export function setupPos(ctx) {
     const recent = (open) => {
       $('#posRecentPop').hidden = !open;
       $('#posRecentBtn').setAttribute('aria-expanded', String(open));
+    };
+    // a click anywhere else closes it (it lies over the cart's buttons)
+    document.onpointerdown = (e) => {
+      const pop = $('#posRecentPop');
+      if (!pop || pop.hidden || e.target.closest('#posRecentPop, #posRecentBtn')) return;
+      recent(false);
     };
     $('#posRecentBtn').onclick = () => recent($('#posRecentPop').hidden);
     $('#posRecentClose').onclick = () => recent(false);

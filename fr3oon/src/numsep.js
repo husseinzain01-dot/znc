@@ -17,6 +17,18 @@ export function groupDigits(text) {
   return (neg ? '-' : '') + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + frac;
 }
 
+// A quantity as typed: Arabic digits and a decimal comma (٫ or ,) allowed.
+// Nothing or nonsense → 0.
+export function toQty(text) {
+  const s = String(text ?? '')
+    .trim()
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[٫,،]/g, '.')
+    .replace(/\s/g, '');
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 function format(el) {
   const old = el.value;
   const next = groupDigits(old);

@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.5'
+$Version = '2.2.6'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -968,7 +968,9 @@ function Next-VoucherNo($db, [string]$table) {
 # Each takes ($db, $d): $d is the JSON payload; $d.user is set by the server
 # from the signed-in session, never taken from the browser.
 
-function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
+# $keepCost: on an edited sale, the buy prices its lines had ("item|unit"),
+# so fixing an old invoice keeps the profit it made then.
+function Save-Lines($db, [string]$kind, [int]$masterId, $lines, $keepCost = @{}) {
     $lines = @($lines | Where-Object { $null -ne $_ })
     Need ($lines.Count -gt 0) 'الفاتورة لا تحتوي على أصناف'
     foreach ($l in $lines) {
@@ -982,10 +984,11 @@ function Save-Lines($db, [string]$kind, [int]$masterId, $lines) {
         Need ($price -ge 0) "السعر غير صحيح ($name)"
         $small = ($unit -eq $it.UnitL2 -and $it.UnitL1 -ne $it.UnitL2)
         if ($kind -eq 'sale') {
+            $cost = $keepCost["$name|$unit"]
             Add-Row $db 'subOut' @{
                 idOut = $masterId; madaNameOut = $name; QuntOut = $qty; Price = $price
                 IDcode = $it.IDcode; unit = $unit
-                BpriceL1 = $it.BpriceL1; BpriceL2 = $it.BpriceL2
+                BpriceL1 = $(if ($cost) { $cost[0] } else { $it.BpriceL1 }); BpriceL2 = $(if ($cost) { $cost[1] } else { $it.BpriceL2 })
                 UnitFactor = $(if ($small) { 1 } else { 0 }); note = (Text $l.note 255 'الملاحظة')
             } '' | Out-Null
         } else {
@@ -1012,13 +1015,26 @@ function Op-SaveSale($db, $d) {
     }
     $paid = Num $d.paid 'المدفوع'
     Need ($paid -ge 0) 'المبلغ المدفوع غير صحيح'
+    # more than the invoice would take the customer below what he owes
+    $total = 0.0
+    foreach ($l in @($d.lines | Where-Object { $null -ne $_ })) { $total += (Num $l.qty 'الكمية') * (Num $l.price 'السعر') }
+    Need ($type -ne 'اجل' -or $paid -le $total) "المدفوع ($([math]::Round($paid).ToString('N0'))) أكبر من مجموع الفاتورة ($([math]::Round($total).ToString('N0'))). سجّل الزيادة بسند قبض."
     $values = @{
         TOname = $customer; OutDate = (Day $d.date); OutType = $type
         Paid = [int]$(if ($type -eq 'اجل') { $paid } else { 0 }); strUserName = (Text $d.user 45 'اسم المستخدم')
         note = (Text $d.note 255 'الملاحظة')
     }
+    $keepCost = @{}
     if ($d.id) {
         $id = [int]$d.id
+        $rs = $db.OpenRecordset("SELECT madaNameOut, unit, BpriceL1, BpriceL2 FROM subOut WHERE idOut=$id", $dbOpenSnapshot)
+        try {
+            while (-not $rs.EOF) {
+                $k = [string]$rs.Fields.Item('madaNameOut').Value + '|' + [string]$rs.Fields.Item('unit').Value
+                if (-not $keepCost.ContainsKey($k)) { $keepCost[$k] = @((Dbl $rs.Fields.Item('BpriceL1').Value), (Dbl $rs.Fields.Item('BpriceL2').Value)) }
+                $rs.MoveNext()
+            }
+        } finally { $rs.Close() }
         Edit-Row $db 'MasterOut' 'idOut' $id $values
         $db.Execute("DELETE FROM subOut WHERE idOut=$id", $dbFailOnError)
     } else {
@@ -1028,7 +1044,7 @@ function Op-SaveSale($db, $d) {
         if (Test-Column $db 'MasterOut' 'Tagheez') { $values.Tagheez = $false }
         $id = [int](Add-Row $db 'MasterOut' $values 'idOut')
     }
-    Save-Lines $db 'sale' $id $d.lines
+    Save-Lines $db 'sale' $id $d.lines $keepCost
     return @{ id = $id }
 }
 
@@ -1044,6 +1060,8 @@ function Update-BuyPrices($db, $lines) {
     foreach ($l in @($lines)) {
         $it = Get-MadaItem $db $l.item
         $price = Num $l.price 'السعر'
+        # a free (bonus) line is no buy price
+        if ($price -le 0) { continue }
         $fill = if ($it.Fill) { [double]$it.Fill } else { 0.0 }
         $name = Q $l.item
         if ($l.unit -eq $it.UnitL1) {
@@ -1232,12 +1250,42 @@ function Op-SaveItem($db, $d) {
     if ($id) {
         $old = [string](Get-Value $db "SELECT madaName FROM madaCode WHERE ID=$id")
         Need ($old -ne '') 'الصنف غير موجود'
+        $o1 = [string](Get-Value $db "SELECT UnitL1 FROM madaCode WHERE ID=$id")
+        $o2 = [string](Get-Value $db "SELECT UnitL2 FROM madaCode WHERE ID=$id")
+        if (-not $o2) { $o2 = $o1 }
+        Rename-ItemUnits $db $old $o1 $o2 $u1 $u2
         Edit-Row $db 'madaCode' 'ID' $id $values
         Rename-Links $db 'item' $old $name
     } else {
         $id = [int](Add-Row $db 'madaCode' $values 'ID')
     }
     return @{ id = $id }
+}
+
+# A unit renamed on the item card: the invoices already made in it follow,
+# or they would no longer count in its stock and profit. A swap of the two
+# names (or one taking the other's) cannot be told apart in the old lines:
+# refused while the item has movements.
+function Rename-ItemUnits($db, [string]$name, [string]$o1, [string]$o2, [string]$u1, [string]$u2) {
+    $map = [ordered]@{}
+    if ($o1 -ne $o2) {
+        if ($o1 -ne $u1) { $map[$o1] = $u1 }
+        if ($o2 -ne $u2) { $map[$o2] = $u2 }
+    } elseif ($o1 -ne $u1 -and $o1 -ne $u2) {
+        # one unit before: its lines were whole units, now the big one
+        $map[$o1] = $u1
+    }
+    if (-not $map.Count) { return }
+    $q = Q $name
+    $used = (Count $db "SELECT Count(*) FROM subOut WHERE madaNameOut=$q") + (Count $db "SELECT Count(*) FROM subIN WHERE madaNameIn=$q")
+    if (-not $used) { return }
+    foreach ($k in @($map.Keys)) {
+        Need (@($o1, $o2) -notcontains $map[$k]) "لا يمكن تبديل أسماء وحدات صنف عليه حركات ($name). اختر اسماً جديداً غير مستعمل في هذا الصنف."
+    }
+    foreach ($k in @($map.Keys)) {
+        $db.Execute("UPDATE subOut SET unit=$(Q $map[$k]) WHERE madaNameOut=$q AND unit=$(Q $k)", $dbFailOnError)
+        $db.Execute("UPDATE subIN SET unit=$(Q $map[$k]) WHERE madaNameIn=$q AND unit=$(Q $k)", $dbFailOnError)
+    }
 }
 
 function Delete-Named($db, [string]$kind, [string]$table, [string]$idField, [string]$nameField, $d) {

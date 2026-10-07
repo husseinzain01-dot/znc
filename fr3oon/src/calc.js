@@ -15,6 +15,7 @@ export const SETTLE = 'تسديد';
 
 export const inRange = (d, from, to) => !!d && (!from || d >= from) && (!to || d <= to);
 const userMatch = (u, user) => !user || u === user;
+export const isDrawing = (cls) => /سحب/.test(cls || '');
 export const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
 
 function groupSum(arr, keyFn, valFn) {
@@ -270,7 +271,8 @@ export function profit(P, filter = {}) {
   }
   const items = [...m.values()].map((e) => ({ ...e, profit: e.revenue - e.cost, margin: e.revenue ? (e.revenue - e.cost) / e.revenue : 0 }));
   items.sort((a, b) => b.profit - a.profit);
-  const expenses = P.payments.filter((x) => x.cls !== SETTLE && inRange(x.date, filter.from, filter.to));
+  // the owner taking money out (سحب شخصي) leaves the cash box, but is no cost of the shop
+  const expenses = P.payments.filter((x) => x.cls !== SETTLE && !isDrawing(x.cls) && inRange(x.date, filter.from, filter.to) && userMatch(x.user, filter.user));
   const gross = sum(items, (e) => e.profit);
   const expenseTotal = sum(expenses, (x) => x.amount);
   return {

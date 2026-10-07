@@ -1,5 +1,5 @@
 // Thousands separators in the amount boxes.
-import { groupDigits as g } from '../src/numsep.js';
+import { groupDigits as g, toQty } from '../src/numsep.js';
 let bad = 0;
 const ok = (c, m) => { console.log(c ? '  ok ' : '  BAD', m); if (!c) bad++; };
 const cases = [
@@ -9,5 +9,7 @@ const cases = [
 for (const [i, o] of cases) ok(g(i) === o, `${JSON.stringify(i)} -> ${JSON.stringify(g(i))}`);
 // what the forms read back: the commas dropped, the same number
 for (const n of [0, 7, 1500000, 92500000, -25000]) ok(Number(g(String(n)).replace(/,/g, '')) === n, `${n} reads back the same`);
+// quantities: Arabic digits and a decimal comma
+for (const [i, o] of [['3', 3], ['٣', 3], ['1٫5', 1.5], ['1,5', 1.5], ['٢،٥', 2.5], ['', 0], ['abc', 0], ['-2', 0], [' 4 ', 4]]) ok(toQty(i) === o, `qty ${JSON.stringify(i)} -> ${toQty(i)}`);
 if (bad) { console.log(`${bad} FAILED`); process.exit(1); }
 console.log('ALL PASSED');

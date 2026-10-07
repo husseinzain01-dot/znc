@@ -70,6 +70,24 @@ export function setupStockCount(ctx) {
   const pieceCost = (it) =>
     it.unitL2 && it.unitL1 !== it.unitL2 && it.fill > 0 ? (it.buyL2 > 0 ? it.buyL2 : it.buyL1 / it.fill) : it.buyL1;
   const stockOf = (it) => state.stockByName?.get(it.name)?.totalPcs ?? 0;
+  // The stock when the item was counted: the stock now, with what was sold
+  // (or bought) after that moment put back. Selling while counting is then
+  // no false shortage.
+  const nowStamp = () => new Date().toLocaleString('sv-SE').slice(0, 19);
+  function pieces(it, l) {
+    const lvl = l.unit === it.unitL1 ? 1 : l.unit === it.unitL2 ? 2 : 0;
+    if (it.fill > 0) return lvl === 1 ? l.qty * it.fill : lvl === 2 ? l.qty : 0;
+    return lvl === 1 ? l.qty : 0;
+  }
+  function stockAt(it, at) {
+    let n = stockOf(it);
+    if (!at) return n;
+    const after = (r) => (r.time || r.date + ' 23:59:59') > at;
+    for (const s of P().sales) if (after(s)) for (const l of s.lines) if (l.item === it.name) n += pieces(it, l);
+    for (const p of P().purchases) if (after(p)) for (const l of p.lines) if (l.item === it.name) n -= pieces(it, l);
+    return n;
+  }
+  const expOf = (it) => stockAt(it, draft?.q[it.name]?.at);
 
   // «3 كرتونة + 4 قطعة» from a quantity in small units
   function qtyParts(it, pcs) {
@@ -110,7 +128,7 @@ export function setupStockCount(ctx) {
       const { counted: c } = entry(it);
       if (c == null) continue;
       counted++;
-      const d = c - stockOf(it);
+      const d = c - expOf(it);
       if (d) diff++;
       if (d > 0) plus += d * pieceCost(it);
       if (d < 0) minus -= d * pieceCost(it);
@@ -220,7 +238,7 @@ export function setupStockCount(ctx) {
       ${draft ? '<p class="muted sc-small">لبدء جرد جديد، تابع الجرد غير المحفوظ واحفظه، أو تجاهله.</p>' : '<p class="muted sc-small">عُدّ الأصناف على الرفوف، ثم احفظ الجرد: يُصحَّح رصيد كل صنف معدود إلى الكمية التي عددتها، ويبقى تقرير بالزيادة والنقص.</p>'}
     </div>
     ${section('الجردات السابقة', table(counts, [
-      { key: 'id', label: 'رقم', num: true },
+      { key: 'id', label: 'رقم', num: true, plain: true },
       { key: 'date', label: 'التاريخ' },
       { key: 'tm', label: 'الوقت', get: (r) => (r.time || '').slice(11, 16) },
       { key: 'user', label: 'المستخدم' },
@@ -275,7 +293,7 @@ export function setupStockCount(ctx) {
         const { counted } = entry(it);
         if (filter === 'done') return counted != null;
         if (filter === 'todo') return counted == null;
-        return counted != null && counted !== stockOf(it);
+        return counted != null && counted !== expOf(it);
       });
   }
 
@@ -283,17 +301,17 @@ export function setupStockCount(ctx) {
     const { counted, bad } = entry(it);
     if (bad) return 'sc-err';
     if (counted == null) return '';
-    return counted === stockOf(it) ? 'sc-ok' : 'sc-off';
+    return counted === expOf(it) ? 'sc-ok' : 'sc-off';
   }
   function diffCell(it) {
     const { counted } = entry(it);
     if (counted == null) return '<span class="muted">—</span>';
-    return diffHtml(it, counted - stockOf(it));
+    return diffHtml(it, counted - expOf(it));
   }
   function valCell(it) {
     const { counted } = entry(it);
     if (counted == null) return '';
-    const d = counted - stockOf(it);
+    const d = counted - expOf(it);
     return d ? money(d * pieceCost(it)) : '';
   }
 
@@ -307,7 +325,7 @@ export function setupStockCount(ctx) {
       <td class="sc-name"><b>${esc(name)}</b><small class="sc-sub">${it.code ? `<span class="num">${esc(it.code)}</span> · ` : ''}${esc(it.cls || 'بلا فئة')}</small></td>
       <td class="sc-code"><span class="num">${esc(it.code || '—')}</span></td>
       <td class="sc-cls">${esc(it.cls || '—')}</td>
-      <td class="sc-exp"><small class="sc-lbl">المتوقع: </small>${qtyHtml(it, stockOf(it))}</td>
+      <td class="sc-exp"><small class="sc-lbl">المتوقع: </small>${qtyHtml(it, expOf(it))}</td>
       <td class="sc-in">${isTwo(it) ? inp('b', bigU(it)) + inp('s', smallU(it)) : inp('s', smallU(it))}</td>
       <td class="sc-diff">${diffCell(it)}</td>
       <td class="sc-val">${valCell(it)}</td>
@@ -433,6 +451,7 @@ export function setupStockCount(ctx) {
     if (scanMode === 'add') {
       const e = (draft.q[it.name] ||= {});
       e.s = String(Math.round(((parseQty(e.s) || 0) + 1) * 1000) / 1000);
+      e.at = nowStamp();
     }
     persist();
     if (filter !== 'all' && !visibleNames().some((r) => r.n === n)) filter = 'all';
@@ -521,7 +540,7 @@ export function setupStockCount(ctx) {
       const { counted, bad: b } = entry(it);
       if (b) bad++;
       if (counted == null) continue;
-      const expected = stockOf(it);
+      const expected = expOf(it);
       const cost = pieceCost(it);
       lines.push({ it, item: name, expected, counted, diff: counted - expected, value: (counted - expected) * cost });
     }
@@ -532,7 +551,7 @@ export function setupStockCount(ctx) {
     const minus = -diffs.filter((l) => l.diff < 0).reduce((a, l) => a + l.value, 0);
     const left = draft.items.length - lines.length;
     openModal(`<h2>مراجعة الجرد قبل الحفظ</h2>
-      <p class="muted">أُعيدت قراءة الأرصدة الآن، فالمتوقع يشمل آخر المبيعات والمشتريات. ${esc(scopeLabel(draft.scope))}.</p>
+      <p class="muted">أُعيدت قراءة الأرصدة الآن. المتوقع لكل صنف هو رصيده لحظة عدّه، فما بيع أو اشتُري بعد العدّ لا يُحسب فرقاً. ${esc(scopeLabel(draft.scope))}.</p>
       <div class="grid kpis sc-sum">
         ${tile('stockcount', 'أصناف معدودة', `<span class="num">${lines.length}</span>`, `من أصل ${draft.items.length}`)}
         ${tile('checks', 'أصناف بفرق', `<span class="num">${diffs.length}</span>`)}
@@ -754,6 +773,7 @@ export function setupStockCount(ctx) {
       const name = draft.items[n];
       const q = (draft.q[name] ||= {});
       q[f] = e.target.value;
+      q.at = nowStamp();
       if (!q.b && !q.s) delete draft.q[name];
       persist();
       drawRow(n);

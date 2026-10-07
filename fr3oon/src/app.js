@@ -756,6 +756,8 @@ function tableInner(id) {
               if (c.html) return `<td>${c.html(r)}</td>`;
               const v = cellValue(c, r);
               if (c.money) return `<td>${money(v)}</td>`;
+              // an invoice number: no thousands separator (1004, not 1,004)
+              if (c.num && c.plain) return `<td><span class="num">${esc(v)}</span></td>`;
               if (c.num) return `<td><span class="num">${fmt(v)}</span></td>`;
               return `<td>${esc(v)}</td>`;
             })
@@ -1035,7 +1037,7 @@ function viewHome() {
     ${kpi('آجل', s.credit)}
     ${kpi('إجمالي الربح', pr.gross, `الصافي بعد المصاريف: ${fmt(pr.net)}`)}
     ${kpi('صافي الصندوق', box.net, `الوارد ${fmt(box.totalIn)} — الصادر ${fmt(box.totalOut)}`)}
-    ${kpi('تسديدات العملاء', box.receipts)}
+    ${kpi('المقبوضات', box.receipts, `منها تسديدات العملاء: ${fmt(C.sum(box.receiptList.filter((r) => r.cls === C.SETTLE), (r) => r.amount))}`)}
   </div>
   <div class="grid kpis" style="margin-top:14px">
     ${kpi('ديون على العملاء (الكل)', owed, 'المجموع حتى الآن')}
@@ -1102,7 +1104,7 @@ function viewSales() {
       ${kpi('المجموع', s.total, `${s.count} فاتورة`)}${kpi('نقدي', s.cash)}${kpi('آجل', s.credit)}
     </div>
     ${section('الفواتير', table(rows, [
-      { key: 'id', label: 'رقم', num: true },
+      { key: 'id', label: 'رقم', num: true, plain: true },
       { key: 'date', label: 'التاريخ' },
       { key: 'tm', label: 'الوقت', get: (r) => r.time.slice(11, 16) },
       { key: 'type', label: 'النوع' },
@@ -1236,7 +1238,7 @@ function viewCash() {
   const rows = [
     line('مبيعات نقدية', b.cashSales, 1),
     line('المدفوع مع الفواتير', b.paidWithInvoices, 1),
-    line('تسديدات العملاء', b.receipts, 1),
+    line('المقبوضات (تسديدات العملاء وغيرها)', b.receipts, 1),
     line('مشتريات نقدية', b.cashPurchases, -1),
     line('المدفوعات (تسديد للموردين ومصاريف)', b.payments, -1),
   ];
@@ -1288,7 +1290,7 @@ function viewPurchases() {
       ${kpi('آجل', sum(list.filter((p) => p.type === C.CREDIT)))}
     </div>
     ${section('فواتير الشراء', table(list.map((p) => ({ ...p, n: p.lines.length })), [
-      { key: 'id', label: 'رقم', num: true },
+      { key: 'id', label: 'رقم', num: true, plain: true },
       { key: 'no', label: 'رقم فاتورة المورد' },
       { key: 'date', label: 'التاريخ' },
       { key: 'type', label: 'النوع' },

@@ -353,6 +353,36 @@ Assert-Throws { W 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '1' }, 
 Assert ((Get-Activity '' '' 1)[0].action -eq 'setItemCodes') 'codes logged'
 Set-Perms 'كاشير1' 'pos,sale_cash,print'
 
+Write-Host "`n== prices and costs kept right"
+$hv = W 'saveItem' @{ name = 'زيت فحص'; unitL1 = 'كرتونة'; unitL2 = 'قنينة'; fill = 12; priceL1 = 30000; priceL2 = 2750; buyL1 = 24000; buyL2 = 2000 }
+function Lines([string]$t, [string]$k, $id) { return , @((Rows $t) | Where-Object { $_[$k] -eq $id }) }
+W 'savePurchase' @{ type = 'اجل'; supplier = 'شركة الدواجن'; date = $today; updatePrices = $true
+    lines = @(@{ item = 'زيت فحص'; unit = 'كرتونة'; qty = 2; price = 25200 }, @{ item = 'زيت فحص'; unit = 'كرتونة'; qty = 1; price = 0 }) } | Out-Null
+$oil = Row 'madaCode' 'madaName' 'زيت فحص'
+Assert ($oil.BpriceL1 -eq 25200 -and $oil.BpriceL2 -eq 2100) "a free (bonus) line does not make the buy price 0 ($($oil.BpriceL1))"
+$sale = W 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = 'زيت فحص'; unit = 'قنينة'; qty = 2; price = 2750 }) }
+$cost0 = (Lines 'subOut' 'idOut' $sale.id)[0].BpriceL2
+W 'savePurchase' @{ type = 'اجل'; supplier = 'شركة الدواجن'; date = $today; updatePrices = $true; lines = @(@{ item = 'زيت فحص'; unit = 'كرتونة'; qty = 1; price = 30000 }) } | Out-Null
+W 'saveSale' @{ id = $sale.id; type = 'نقدي'; date = $today; note = 'تصحيح'; lines = @(@{ item = 'زيت فحص'; unit = 'قنينة'; qty = 3; price = 2750 }) } | Out-Null
+$l1 = (Lines 'subOut' 'idOut' $sale.id)[0]
+Assert ($cost0 -eq 2100 -and $l1.BpriceL2 -eq 2100 -and $l1.QuntOut -eq 3) "an edited sale keeps the cost it was sold at (2100, not today's 2500)"
+$sale2 = W 'saveSale' @{ type = 'نقدي'; date = $today; lines = @(@{ item = 'زيت فحص'; unit = 'قنينة'; qty = 1; price = 2750 }) }
+Assert ((Lines 'subOut' 'idOut' $sale2.id)[0].BpriceL2 -eq 2500) 'a new sale takes today''s cost'
+Assert-Throws { W 'saveSale' @{ type = 'اجل'; customer = 'أبو علي'; date = $today; paid = 6000; lines = @(@{ item = 'زيت فحص'; unit = 'قنينة'; qty = 2; price = 2750 }) } } 'أكبر من مجموع' 'paid more than a credit invoice refused'
+W 'saveSale' @{ type = 'اجل'; customer = 'أبو علي'; date = $today; paid = 5500; lines = @(@{ item = 'زيت فحص'; unit = 'قنينة'; qty = 2; price = 2750 }) } | Out-Null
+Assert $true 'paid equal to the invoice accepted'
+# a unit renamed on the card: the invoices follow it
+$card = @{ id = $hv.id; name = 'زيت فحص'; unitL1 = 'صندوق'; unitL2 = 'قنينة'; fill = 12; priceL1 = 30000; priceL2 = 2750; buyL1 = 30000; buyL2 = 2500 }
+W 'saveItem' $card | Out-Null
+$inU = @((Rows 'subIN') | Where-Object { $_.madaNameIn -eq 'زيت فحص' } | ForEach-Object { $_.unit } | Sort-Object -Unique)
+$outU = @((Rows 'subOut') | Where-Object { $_.madaNameOut -eq 'زيت فحص' } | ForEach-Object { $_.unit } | Sort-Object -Unique)
+Assert (($inU -join ',') -eq 'صندوق' -and ($outU -join ',') -eq 'قنينة') "purchases follow the renamed big unit ($($inU -join ',')), sales by the small one untouched"
+$card.unitL1 = 'قنينة'; $card.unitL2 = 'صندوق'
+Assert-Throws { W 'saveItem' $card } 'تبديل' 'swapping the unit names of an item with movements refused'
+$card.unitL1 = 'كرتونة'; $card.unitL2 = 'قنينة'
+W 'saveItem' $card | Out-Null
+Assert (@((Rows 'subIN') | Where-Object { $_.madaNameIn -eq 'زيت فحص' -and $_.unit -eq 'كرتونة' }).Count -eq 3) 'and back again'
+
 Write-Host "`n== an older database is upgraded when opened"
 $old = Join-Path $tmp 'old/fr3oon.accdb'
 New-Item -ItemType Directory -Force -Path (Split-Path $old) | Out-Null

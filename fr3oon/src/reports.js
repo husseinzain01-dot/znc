@@ -133,7 +133,7 @@ export function setupReports(ctx) {
     const cur = rows.at(-1), prev = rows.at(-2);
     const best = [...rows].sort((a, b) => b.sales - a.sales)[0];
     const thisMonth = today.slice(0, 7);
-    return `<p class="muted rep-note">آخر 12 شهراً حتى اليوم، ولا تتأثر بفلتر الفترة أعلاه. المصاريف هي سندات الصرف عدا «تسديد» للموردين، والصافي = إجمالي الربح − المصاريف. التغيّر مقارنة بالشهر الذي قبله.</p>
+    return `<p class="muted rep-note">آخر 12 شهراً حتى اليوم، ولا تتأثر بفلتر الفترة أعلاه. المصاريف هي سندات الصرف عدا «تسديد» للموردين و«سحب شخصي»، والصافي = إجمالي الربح − المصاريف. التغيّر مقارنة بالشهر الذي قبله.</p>
       <div class="grid kpis">
         ${kpi('مبيعات هذا الشهر', money(cur.sales), `${delta(cur.change)} <span>عن الشهر السابق (${fmt(prev.sales)})</span>`, 'sales', true)}
         ${kpi('صافي هذا الشهر', money(cur.net), `${delta(cur.netChange)} <span>عن الشهر السابق (${fmt(prev.net)})</span>`, 'profit')}
