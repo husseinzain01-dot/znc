@@ -1213,7 +1213,7 @@ function viewStock() {
       <div class="card kpi"><div class="label">أصناف رصيدها سالب</div><div class="value num">${st.filter((x) => x.status === 'سالب').length}</div><div class="hint">الكمية المبيعة أكثر من المشتراة — تحقّق من فواتير الشراء</div></div>
       <div class="card kpi"><div class="label">أصناف قليلة الرصيد</div><div class="value num">${st.filter((x) => x.status === 'قليل').length}</div></div>
     </div>
-    <p class="muted">يُحسب الرصيد هكذا: الرصيد الافتتاحي + المشتريات − المبيعات، وتُحوَّل القطع الزائدة إلى كراتين.
+    <p class="muted">يُحسب الرصيد هكذا: الرصيد الافتتاحي + المشتريات − المبيعات، وتُحوَّل القطع الزائدة إلى كراتين بعامل التحويل (التعبئة) في بطاقة كل صنف.
       الفئات: ${classes.map(esc).join('، ')}</p>
     ${section('رصيد الأصناف', table(st, [
       { key: 'code', label: 'الرمز' },
@@ -1221,7 +1221,7 @@ function viewStock() {
       { key: 'name', label: 'الصنف' },
       { key: 'k', label: 'الرصيد (وحدة كبيرة)', html: (r) => `<span class="num">${fmt(r.k)}</span> ${esc(r.unitL1)}` , get: (r) => r.k },
       { key: 's', label: 'الرصيد (وحدة صغيرة)', html: (r) => `<span class="num">${fmt(r.s)}</span> ${esc(r.unitL2)}`, get: (r) => r.s },
-      { key: 'fill', label: 'التعبئة', num: true },
+      { key: 'fill', label: 'عامل التحويل', html: (r) => (r.unitL2 && r.unitL2 !== r.unitL1 ? `1 ${esc(r.unitL1)} = <span class="num">${fmt(r.fill)}</span> ${esc(r.unitL2)}` : '<span class="muted">وحدة واحدة</span>'), get: (r) => r.fill },
       { key: 'priceL1', label: 'سعر البيع (كبيرة)', money: true },
       { key: 'priceL2', label: 'سعر البيع (صغيرة)', money: true },
       { key: 'buyL1', label: 'سعر الشراء (كبيرة)', money: true },

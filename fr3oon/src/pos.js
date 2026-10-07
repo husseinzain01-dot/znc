@@ -90,7 +90,7 @@ export function setupPos(ctx) {
         const it = itemBy(l.item);
         const units = it ? unitsOf(it, l.unit) : [l.unit];
         return `<div class="cart-line" data-i="${i}">
-          <span class="name"><small class="ln num">${i + 1}</small>${esc(l.item)}</span>
+          <span class="name"><small class="ln num">${i + 1}</small>${esc(l.item)}${it && it.fill > 1 && l.unit === it.unitL1 && it.unitL2 && it.unitL2 !== it.unitL1 ? ` <small class="muted conv">(= <span class="num">${fmt(l.qty * it.fill)}</span> ${esc(it.unitL2)})</small>` : ''}</span>
           <span class="line-total num">${fmt(l.qty * l.price)}</span>
           <div class="row">
             ${units.length > 1 ? `<select data-f="unit">${units.map((u) => `<option${u === l.unit ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select>` : `<small class="muted">${esc(l.unit)}</small>`}
@@ -378,6 +378,8 @@ export function setupPos(ctx) {
       if (e.target.dataset.f === 'qty') l.qty = toQty(e.target.value);
       if (e.target.dataset.f === 'price' && can('edit_price')) l.price = Number(e.target.value.replace(/,/g, '')) || 0;
       row.querySelector('.line-total').textContent = fmt(l.qty * l.price);
+      const conv = row.querySelector('.conv .num');
+      if (conv) conv.textContent = fmt(l.qty * (itemBy(l.item)?.fill || 0));
       $('#posTotal').textContent = fmt(total());
       $('#posCount').innerHTML = countHtml();
       persist();

@@ -353,6 +353,7 @@ Assert-Throws { W 'setItemCodes' @{ codes = @(@{ id = $noCode.id; code = '1' }, 
 Assert ((Get-Activity '' '' 1)[0].action -eq 'setItemCodes') 'codes logged'
 Set-Perms 'كاشير1' 'pos,sale_cash,print'
 
+Assert-Throws { W 'saveItem' @{ name = 'بلا تحويل'; unitL1 = 'كرتونة'; unitL2 = 'قطعة'; fill = 0; priceL1 = 1 } } 'عامل التحويل' 'two units without a conversion factor refused'
 Write-Host "`n== prices and costs kept right"
 $hv = W 'saveItem' @{ name = 'زيت فحص'; unitL1 = 'كرتونة'; unitL2 = 'قنينة'; fill = 12; priceL1 = 30000; priceL2 = 2750; buyL1 = 24000; buyL2 = 2000 }
 function Lines([string]$t, [string]$k, $id) { return , @((Rows $t) | Where-Object { $_[$k] -eq $id }) }

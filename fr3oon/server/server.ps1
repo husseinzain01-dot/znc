@@ -20,7 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '2.2.8'
+$Version = '2.2.9'
 $Product = 'Fr3oon'
 $Here = $PSScriptRoot
 # The launcher runs this without a window; then there is no console to print to.
@@ -1234,6 +1234,8 @@ function Op-SaveItem($db, $d) {
     $u2 = Text $d.unitL2 10 'الوحدة الصغيرة'
     Need ($u1 -ne '') 'اكتب الوحدة الكبيرة'
     if (-not $u2) { $u2 = $u1 }
+    # two units need their conversion, or selling by the small one counts nothing
+    Need ($u1 -eq $u2 -or (Num $d.fill 'التعبئة') -gt 0) "اكتب عامل التحويل: كم $u2 في $u1"
     $id = if ($d.id) { [int]$d.id } else { 0 }
     Need ((Count $db "SELECT Count(*) FROM madaCode WHERE madaName=$(Q $name) AND ID<>$id") -eq 0) "يوجد صنف آخر بنفس الاسم: $name"
     if ($code) { Need ((Count $db "SELECT Count(*) FROM madaCode WHERE IDcode=$(Q $code) AND ID<>$id") -eq 0) "يوجد صنف آخر بنفس الرمز: $code" }

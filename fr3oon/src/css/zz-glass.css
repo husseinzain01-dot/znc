@@ -171,3 +171,6 @@ body:has(.pos-resize.drag) { user-select: none; cursor: col-resize; }
 select option, select optgroup { background-color: var(--surface); color: var(--text); }
 select option:checked { background-color: var(--accent-soft); color: var(--text); }
 select option:disabled { color: var(--muted); }
+/* conversion hints: «1 كرتونة = 12 قطعة» on the item card, «(= 24 قطعة)» on a cart line */
+.conv-hint { margin: -4px 2px 2px; font-size: 13px; grid-column: 1 / -1; }
+.cart-line .conv { font-weight: 500; font-size: 12px; white-space: nowrap; }

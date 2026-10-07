@@ -1,10 +1,10 @@
 {
   "product": "Fr3oon",
-  "version": "2.2.8",
-  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.8.exe",
-  "sha256": "027ab44168d9f8034d4cf7415306b864ae53d9ad82d0d6ada8259ed963de2498",
-  "size": 582314,
-  "notes": "- إصلاح القوائم المنسدلة: خيارات مثل «جملة / مفرد» في العملاء، والوحدة، ونوع السند، والمستخدم كانت تختفي عند فتح القائمة؛ صارت ظاهرة بخلفية واضحة في الوضعين الفاتح والداكن.",
+  "version": "2.2.9",
+  "url": "https://raw.githubusercontent.com/husseinzain01-dot/znc/refs/heads/claude/new-session-moypbl/fr3oon/updates/Fr3oon-Setup-2.2.9.exe",
+  "sha256": "dc2053ff3b4e04f2f1ea8a1a7974896b83b5b012bd91fea5179d52b7513debfe",
+  "size": 582793,
+  "notes": "عامل التحويل بين الكارتون والقطعة أوضح:\n- في بطاقة الصنف: «عامل التحويل (التعبئة)» مع سطر يبيّن التحويل مثل «1 شليف = 24 قطعة»، ولا يُحفظ صنف له وحدتان دون عامل تحويل.\n- في المخزون والأسعار: عمود «عامل التحويل» لكل صنف.\n- في البيع السريع: سطر البيع بالكارتون يبيّن ما يعادله بالقطع، مثل «(= 20 كيس)».",
   "date": "2026-10-07",
-  "sig": "jjOYn4B-EVYoasR2uKFjQr3AMRI5E1tIZWD0U5yq1sLF_ozRm1fB1H2YJjOJqYZvxxbLoUqX9kxfa06rU-mCXA"
+  "sig": "hGjeDk26LOZFzObwE-CpZ049aN760cKmK4BbfaV81JOjwJ7oVP5iQkS-RKvgEOkfDXqK6zcxKt-vQdaLCtYPgQ"
 }

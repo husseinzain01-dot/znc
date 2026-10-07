@@ -342,7 +342,8 @@ export function setupForms(ctx) {
         ${field('الفئة', `<input id="iCls" list="dlCls" value="${esc(it?.cls || '')}">`)}
         ${field('الوحدة الكبيرة', `<input id="iU1" list="dlUnits" maxlength="10" value="${esc(it?.unitL1 || 'كرتونة')}">`)}
         ${field('الوحدة الصغيرة', `<input id="iU2" list="dlUnits" maxlength="10" value="${esc(it?.unitL2 || 'قطعة')}">`)}
-        ${n('iFill', 'عدد الصغيرة في الكبيرة (التعبئة)', it?.fill ?? 1)}
+        ${n('iFill', 'عامل التحويل (التعبئة): كم وحدة صغيرة في الكبيرة', it ? it.fill : '')}
+        <p class="muted conv-hint" id="iFillHint"></p>
         ${n('iP1', 'سعر البيع (كبيرة)', it?.priceL1)}
         ${n('iP2', 'سعر البيع (صغيرة)', it?.priceL2)}
         ${n('iB1', 'سعر الشراء (كبيرة)', it?.buyL1)}
@@ -358,6 +359,19 @@ export function setupForms(ctx) {
         ${it ? '<button class="btn danger" id="iDel">حذف</button>' : ''}
         <button class="btn" id="iCancel">إلغاء</button>
       </div>`);
+    // The conversion spelled out: «1 كرتونة = 12 قطعة», and a warning when
+    // two units have no factor (selling by the small one would not count).
+    const convHint = () => {
+      const u1 = val('iU1'), u2 = val('iU2') || u1, f = numVal('iFill');
+      const two = u2 !== u1;
+      $('#iFillHint').innerHTML = !two
+        ? 'للصنف وحدة واحدة، فلا حاجة للتحويل.'
+        : f > 0
+          ? `1 ${esc(u1)} = <b class="num">${fmt(f)}</b> ${esc(u2)}`
+          : '<span class="neg">اكتب عامل التحويل: بدونه لا يُنقص البيع بالوحدة الصغيرة من الرصيد.</span>';
+    };
+    ['iU1', 'iU2', 'iFill'].forEach((id) => $('#' + id).addEventListener('input', convHint));
+    convHint();
     // Fill the small-unit price from the big one when it is still empty.
     const autoSmall = (from, to) => () => {
       const fill = numVal('iFill');
@@ -374,7 +388,13 @@ export function setupForms(ctx) {
         fill: numVal('iFill'), priceL1: numVal('iP1'), priceL2: numVal('iP2'), buyL1: numVal('iB1'), buyL2: numVal('iB2'),
         harig: numVal('iHarig'), openL1: numVal('iO1'), openL2: numVal('iO2'),
       };
-      const err = !data.name ? 'اكتب اسم الصنف' : !data.unitL1 ? 'اكتب الوحدة الكبيرة' : '';
+      const err = !data.name
+        ? 'اكتب اسم الصنف'
+        : !data.unitL1
+          ? 'اكتب الوحدة الكبيرة'
+          : data.unitL2 && data.unitL2 !== data.unitL1 && !(data.fill > 0)
+            ? `اكتب عامل التحويل: كم ${data.unitL2} في ${data.unitL1}`
+            : '';
       if (err) {
         $('#formError').textContent = err;
         $('#formError').hidden = false;
