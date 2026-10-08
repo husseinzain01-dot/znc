@@ -1,0 +1,9 @@
+{
+  "name": "purchase-requests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "نظام طلبات الشراء وسلسلة الموافقات — يعمل محلياً على SQL Server",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "mssql": "^11.0.1" }
+}
