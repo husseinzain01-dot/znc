@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سنا</title>
+<style>/*STYLES*/</style>
+</head>
+<body>
+<canvas id="stage" aria-hidden="true"></canvas>
+
+<header class="corner">
+  <div id="clock" class="clock" dir="ltr"></div>
+  <div id="date" class="date"></div>
+  <div id="weather" class="weather"></div>
+</header>
+
+<aside id="log" class="log" aria-live="polite"></aside>
+
+<footer class="bar">
+  <div id="interim" class="interim"></div>
+  <button id="orbBtn" class="status" type="button" aria-label="تشغيل الميكروفون أو إيقافه">
+    <span class="dot"></span><span id="status" data-state="idle" hidden></span><span id="statusText"></span>
+  </button>
+  <form id="typed" class="typed" hidden><input id="typedText" autocomplete="off" placeholder="اكتب أمراً واضغط Enter، مثل: افتحي شكلك"></form>
+</footer>
+
+<button id="start" class="start" type="button">
+  <span class="start-ring"></span>
+  <b>سنا</b>
+  <small>اضغط في أي مكان لتبدأ</small>
+</button>
+
+<script>/*SCRIPT*/</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "sana",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سنا — مساعد صوتي عراقي بشكل ضوئي على الشاشة",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/commands.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "three": "^0.170.0"
+  }
+}
