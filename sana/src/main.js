@@ -1,7 +1,7 @@
 // Sana: the screen, the ears and the voice put together.
 import { createScene } from './scene.js';
 import { createVoice } from './voice.js';
-import { understand, timeText, dateText, weatherText, NAME } from './commands.js';
+import { understand, timeText, dateText, weatherText, weatherWords, NAME } from './commands.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -21,6 +21,8 @@ function tick() {
   const d = new Date();
   $('#clock').textContent = AR_DIGITS(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
   $('#date').textContent = dateText(d).replace('اليوم ', '');
+  const h = d.getHours();
+  $('#greet').textContent = h < 5 ? 'تصبح على خير' : h < 12 ? 'صباح الخير' : h < 18 ? 'مساء الخير' : 'مساء النور';
 }
 tick();
 setInterval(tick, 5000);
@@ -35,9 +37,10 @@ async function getWeather(city) {
 async function cornerWeather() {
   try {
     const w = await getWeather({ name: 'بغداد', lat: 33.31, lon: 44.36 });
-    $('#weather').textContent = `بغداد ${Math.round(w.temperature)}° — ${weatherText('بغداد', w).split('،')[0].replace('الجو ببغداد هسه ', '')}`;
+    $('#temp').textContent = `${Math.round(w.temperature)}°C`;
+    $('#sky').textContent = `بغداد · ${weatherWords(w.code)}`;
   } catch {
-    $('#weather').textContent = '';
+    $('#temp').textContent = '';
   }
 }
 cornerWeather();
@@ -55,8 +58,8 @@ function setStatus(state, extra = '') {
   const el = $('#status');
   el.dataset.state = state;
   const words = {
-    idle: 'الميكروفون مطفي — اضغط على الدائرة أو مسافة للتشغيل',
-    listening: 'أسمعك…',
+    idle: 'اضغط للتشغيل',
+    listening: 'مباشر · اضغط للإيقاف',
     speaking: 'تحچي…',
     nosr: 'هذا المتصفح ما يدعم السماع. افتحني من أيقونة سنا (يشتغل على Edge)',
     denied: 'الميكروفون مقفول. اسمحله من القفل جنب العنوان، أو من إعدادات الويندوز ← الخصوصية ← الميكروفون',
@@ -70,10 +73,12 @@ const voice = createVoice({
   onHeard: (text) => { $('#interim').textContent = ''; handle(text); },
   onInterim: (text) => { $('#interim').textContent = text; },
   onState: (s) => setStatus(s),
-  onSpeakLevel: (v) => scene.setSpeak(v),
-  onMicLevel: (v) => scene.setMic(v),
+  onSpeakLevel: (v) => { scene.setSpeak(v); level(v); },
+  onMicLevel: (v) => { scene.setMic(v); if (!voice?.speaking) level(v); },
   onError: (e) => setStatus(e === 'mic-denied' ? 'denied' : e),
 });
+
+function level(v) { $('#level').style.width = `${Math.round(Math.min(1, v) * 100)}%`; }
 
 async function reply(text) {
   addLine('sana', text);
@@ -136,6 +141,10 @@ async function begin() {
     await voice.openMic();
     voice.start();
   }
+  voice.voicesReady().then(() => {
+    $('#voiceChip').textContent = voice.voiceName ? `الصوت: ${voice.voiceName.replace(/^Microsoft\s+/, '').replace(/\s+Online.*?-\s*/, ' · ')}` : 'لا يوجد صوت عربي';
+  });
+  $('#earChip').textContent = voice.supported ? `السماع: ${voice.lang}` : 'السماع غير مدعوم';
   const first = !store.get('sana-met');
   store.set('sana-met', '1');
   await reply(first ? `هلا بيك، اني ${NAME}. گول «افتحي شكلك» وتشوفني، أو «شتگدرين تسوين».` : 'هلا، أسمعك.');

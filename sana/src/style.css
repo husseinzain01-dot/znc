@@ -4,32 +4,43 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #01030f; col
   font: 15px/1.5 "Segoe UI", "IBM Plex Sans Arabic", Tahoma, system-ui, sans-serif; }
 #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
-/* the corner (top left, as on a dashboard) */
-.corner { position: fixed; top: 22px; left: 28px; text-align: left; pointer-events: none; text-shadow: 0 0 18px rgba(90, 110, 255, .55); }
-.clock { font-size: 44px; font-weight: 300; letter-spacing: .02em; line-height: 1; }
-.date { margin-top: 6px; color: var(--dim); font-size: 14px; direction: rtl; text-align: left; }
-.weather { color: var(--dim); font-size: 14px; direction: rtl; text-align: left; }
+/* a thin line along the top: her voice or yours */
+.topline { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: rgba(120, 140, 255, .12); pointer-events: none; }
+.topline i { display: block; height: 100%; width: 0; margin-inline: auto; background: linear-gradient(90deg, transparent, #b8c4ff, transparent); transition: width .08s linear; }
 
-/* the conversation, faint, on the right */
-.log { position: fixed; top: 22px; right: 28px; width: min(360px, 34vw); display: grid; gap: 8px; pointer-events: none; }
-.log p { margin: 0; font-size: 14px; color: var(--dim); opacity: .55; animation: in .35s ease-out; }
+/* the corner, as on the video's dashboard: time and temperature, date, greeting */
+.corner { position: fixed; top: 20px; left: 26px; direction: ltr; text-align: left; pointer-events: none; text-shadow: 0 0 16px rgba(90, 110, 255, .5); }
+.row1 { display: flex; align-items: baseline; gap: 14px; }
+.clock { font-size: 40px; font-weight: 300; letter-spacing: .02em; line-height: 1; }
+.temp { font-size: 20px; color: #9fb0ff; font-weight: 400; }
+.row2 { margin-top: 6px; display: flex; gap: 12px; color: var(--dim); font-size: 12.5px; letter-spacing: .02em; direction: rtl; justify-content: flex-end; }
+.greet { margin-top: 10px; font-size: 13px; color: var(--ink); direction: rtl; text-align: left; opacity: .85; }
+.chips { margin-top: 10px; display: flex; gap: 8px; direction: rtl; justify-content: flex-end; }
+.chip { font-size: 11px; color: var(--dim); padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); background: rgba(10, 16, 60, .35); display: inline-flex; align-items: center; gap: 6px; }
+.chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6c7cff; }
+
+/* «مباشر» at the top centre: the mic on or off */
+.live { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--line); background: rgba(10, 16, 60, .45); color: var(--dim); font: inherit; font-size: 12px; letter-spacing: .02em;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.live:hover { color: var(--ink); border-color: rgba(160, 175, 255, .5); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #556; }
+.live:has(#status[data-state="listening"]) { color: #dfe5ff; }
+.live:has(#status[data-state="listening"]) .dot { background: #8fa0ff; animation: ping 1.6s infinite; }
+.live:has(#status[data-state="speaking"]) .dot { background: #fff; box-shadow: 0 0 12px #9fb0ff; }
+.live:has(#status[data-state="denied"]) .dot, .live:has(#status[data-state="nosr"]) .dot, .live:has(#status[data-state="network"]) .dot { background: #e07; }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(140, 160, 255, .65); } 100% { box-shadow: 0 0 0 12px rgba(140, 160, 255, 0); } }
+
+/* the conversation, faint, top right; what is being heard, right of centre */
+.log { position: fixed; top: 20px; right: 26px; width: min(340px, 30vw); display: grid; gap: 8px; pointer-events: none; }
+.log p { margin: 0; font-size: 13px; color: var(--dim); opacity: .5; animation: in .35s ease-out; }
 .log p:nth-last-child(-n+2) { opacity: 1; }
 .log p.sana { color: #b9c5ff; }
 .log b { color: var(--glow); font-weight: 600; margin-inline-end: 6px; }
 @keyframes in { from { opacity: 0; transform: translateY(-6px); } }
+.interim { position: fixed; top: 46%; right: 5vw; max-width: 28vw; font-size: 17px; color: #9ff0ff; text-shadow: 0 0 14px rgba(100, 220, 255, .7); pointer-events: none; }
 
-/* the bar at the bottom */
-.bar { position: fixed; left: 0; right: 0; bottom: 22px; display: grid; justify-items: center; gap: 10px; pointer-events: none; }
-.interim { min-height: 22px; font-size: 18px; color: var(--ink); text-shadow: 0 0 14px rgba(120, 140, 255, .8); }
-.status { pointer-events: auto; display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 99px; cursor: pointer;
-  border: 1px solid var(--line); background: rgba(10, 16, 60, .45); color: var(--dim); font: inherit; font-size: 13px;
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
-.status:hover { color: var(--ink); border-color: rgba(160, 175, 255, .5); }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: #475; box-shadow: 0 0 0 0 rgba(120, 140, 255, .6); }
-.status:has(#status[data-state="listening"]) .dot { background: #8fa0ff; animation: ping 1.6s infinite; }
-.status:has(#status[data-state="speaking"]) .dot { background: #fff; box-shadow: 0 0 12px #9fb0ff; }
-.status:has(#status[data-state="denied"]) .dot, .status:has(#status[data-state="nosr"]) .dot, .status:has(#status[data-state="network"]) .dot { background: #e07; }
-@keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(140, 160, 255, .65); } 100% { box-shadow: 0 0 0 12px rgba(140, 160, 255, 0); } }
+.bar { position: fixed; left: 0; right: 0; bottom: 22px; display: grid; justify-items: center; pointer-events: none; }
 .typed { pointer-events: auto; width: min(520px, 90vw); }
 .typed input { width: 100%; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(10, 16, 60, .55); color: var(--ink); font: inherit; outline: none; }
 .typed input:focus { border-color: rgba(170, 185, 255, .7); box-shadow: 0 0 0 3px rgba(120, 140, 255, .2); }
@@ -42,5 +53,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #01030f; col
 .start-ring { width: 14px; height: 14px; border-radius: 50%; background: #c8d2ff; box-shadow: 0 0 30px 10px rgba(110, 130, 255, .55); animation: ping 2s infinite; margin-bottom: 8px; }
 .start[hidden] { display: none; }
 
-@media (max-width: 700px) { .log { display: none; } .clock { font-size: 34px; } }
+@media (max-width: 700px) { .log, .interim { display: none; } .clock { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { .log p, .start-ring, .dot { animation: none !important; } }

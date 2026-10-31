@@ -63,57 +63,79 @@ export function strokes(rand = rng(11)) {
     if (both) out.push({ pts: mirror(pts), kind, bright, density });
   };
 
-  // hair: strands between the face-framing line and the outer silhouette,
-  // from the parting down past the shoulders
-  const inner = [[-0.02, 0.99], [-0.13, 0.96], [-0.24, 0.87], [-0.29, 0.7], [-0.31, 0.48], [-0.3, 0.22], [-0.33, -0.05], [-0.38, -0.32]];
-  const outer = [[-0.03, 1.06], [-0.22, 1.03], [-0.37, 0.93], [-0.46, 0.72], [-0.49, 0.42], [-0.53, 0.06], [-0.58, -0.2], [-0.64, -0.44]];
-  const strands = 64;
+  // hair: bright strands between the face-framing line and the outer
+  // silhouette, from the parting down past the shoulders (as in the video:
+  // a mane of light around a dark face)
+  const inner = [[-0.02, 0.99], [-0.13, 0.96], [-0.23, 0.88], [-0.28, 0.72], [-0.3, 0.5], [-0.29, 0.25], [-0.32, -0.02], [-0.37, -0.3]];
+  const outer = [[-0.03, 1.07], [-0.23, 1.04], [-0.38, 0.93], [-0.47, 0.72], [-0.5, 0.42], [-0.54, 0.06], [-0.59, -0.2], [-0.65, -0.44]];
+  const strands = 110;
   for (let s = 0; s < strands; s++) {
-    const f = Math.pow(s / (strands - 1), 0.85);
+    const f = Math.pow(s / (strands - 1), 0.8);
     const base = lerpPts(inner, outer, f);
-    // each strand starts a little further from the parting and ends at its own length
-    base[0] = [base[0][0] - 0.01 - rand() * 0.05, base[0][1] - rand() * 0.015];
-    const end = 0.55 + rand() * 0.45;
+    base[0] = [base[0][0] - 0.005 - rand() * 0.05, base[0][1] - rand() * 0.012];
+    const end = 0.5 + rand() * 0.5;
     const keep = Math.max(3, Math.round(base.length * end));
-    const pts = base.slice(0, keep).map(([x, y], i) => [x + (rand() - 0.5) * 0.03 * i * 0.4, y + (rand() - 0.5) * 0.02]);
-    // the tip trails off part of the way to the next point
+    const pts = base.slice(0, keep).map(([x, y], i) => [x + (rand() - 0.5) * 0.028 * i * 0.4, y + (rand() - 0.5) * 0.018]);
     if (keep < base.length) { const nx = base[keep]; const t = rand() * 0.8; pts.push([pts[keep - 1][0] + (nx[0] - pts[keep - 1][0]) * t, pts[keep - 1][1] + (nx[1] - pts[keep - 1][1]) * t]); }
-    const bright = 0.45 + (1 - Math.abs(f - 0.5) * 1.4) * 0.35 + rand() * 0.15;
-    add(pts, HAIR, bright, 30 + rand() * 18);
+    // the strands near the face and on top shine most
+    const bright = 0.55 + (1 - f) * 0.45 + rand() * 0.25;
+    add(pts, HAIR, bright, 16 + rand() * 10);
   }
-  // the two brightest edges of the hair
-  add(inner, HAIR, 1.0, 90);
-  add(outer, HAIR, 0.85, 70);
+  add(inner, HAIR, 1.6, 70);
+  add(outer, HAIR, 1.0, 50);
 
-  // face outline, forehead to chin
-  add([[-0.21, 0.86], [-0.25, 0.72], [-0.255, 0.56], [-0.235, 0.41], [-0.18, 0.28], [-0.09, 0.195], [0, 0.175]], FACE, 1.0, 264);
-  // features, faint: brows, eyes, nose, mouth
-  add([[-0.175, 0.645], [-0.11, 0.665], [-0.045, 0.648]], FEATURE, 0.55, 216);
-  add([[-0.16, 0.585], [-0.11, 0.603], [-0.06, 0.585]], FEATURE, 0.75, 264);
-  add([[-0.15, 0.578], [-0.11, 0.568], [-0.07, 0.579]], FEATURE, 0.4, 192);
-  add([[0, 0.6], [0.004, 0.5], [0, 0.415]], FEATURE, 0.6, 288, false);
-  add([[-0.028, 0.395], [0, 0.383], [0.028, 0.395]], FEATURE, 0.5, 288, false);
-  add([[-0.07, 0.305], [-0.03, 0.315], [0, 0.31], [0.03, 0.315], [0.07, 0.305]], MOUTH, 0.75, 312, false);
-  add([[-0.06, 0.298], [-0.03, 0.282], [0, 0.278], [0.03, 0.282], [0.06, 0.298]], MOUTH, 0.6, 312, false);
+  // the face: a bright edge, dark inside, a line of light down the middle
+  add(FACE_EDGE, FACE, 1.25, 200);
+  add([[0, 0.76], [0.002, 0.6], [0, 0.42]], FEATURE, 1.1, 260, false);
+  add([[-0.012, 0.7], [-0.01, 0.55], [-0.006, 0.44]], FEATURE, 0.55, 160);
 
-  // neck, shoulders and arms
-  add([[-0.1, 0.24], [-0.105, 0.12], [-0.12, -0.02]], BODY, 0.8, 192);
-  add([[-0.12, -0.02], [-0.3, -0.1], [-0.55, -0.16], [-0.72, -0.27], [-0.8, -0.46], [-0.84, -0.76], [-0.86, -1.08]], BODY, 0.95, 204);
-  add([[-0.035, -0.12], [-0.2, -0.1], [-0.38, -0.145]], BODY, 0.6, 168);
-  // the suit of light: V lines meeting at the centre, the sides of the body
-  add([[-0.62, -0.26], [-0.36, -0.46], [-0.13, -0.7], [0, -0.86]], SUIT, 0.8, 180);
-  add([[-0.46, -0.21], [-0.26, -0.36], [-0.09, -0.5], [0, -0.56]], SUIT, 0.65, 168);
-  add([[-0.6, -0.55], [-0.4, -0.72], [-0.2, -0.92], [-0.1, -1.08]], SUIT, 0.55, 144);
-  add([[-0.64, -0.55], [-0.6, -0.82], [-0.57, -1.08]], SUIT, 0.6, 144);
-  add([[0, -0.16], [0, -0.6], [0, -1.08]], SUIT, 0.35, 120, false);
+  // neck, collarbones, shoulders, the breastbone
+  add([[-0.1, 0.22], [-0.105, 0.1], [-0.13, -0.03]], BODY, 1.0, 170);
+  add([[-0.13, -0.03], [-0.3, -0.1], [-0.55, -0.16], [-0.72, -0.27], [-0.8, -0.46], [-0.84, -0.76], [-0.86, -1.08]], BODY, 1.0, 170);
+  add([[-0.03, -0.13], [-0.14, -0.1], [-0.27, -0.11], [-0.4, -0.16]], BODY, 0.85, 160);
+  add([[0, -0.15], [0, -0.45], [0, -0.75]], BODY, 0.55, 120, false);
+  // the suit of light, faint
+  add([[-0.62, -0.28], [-0.36, -0.47], [-0.14, -0.7], [0, -0.86]], SUIT, 0.5, 120);
+  add([[-0.42, -0.42], [-0.3, -0.6], [-0.16, -0.66], [-0.05, -0.62]], SUIT, 0.4, 100);
+  add([[-0.64, -0.55], [-0.6, -0.82], [-0.57, -1.08]], SUIT, 0.45, 100);
   return out;
 }
 
+// The face's edge, forehead to chin (one side); also the dark mask's outline.
+export const FACE_EDGE = [[-0.21, 0.87], [-0.25, 0.72], [-0.255, 0.56], [-0.235, 0.41], [-0.18, 0.28], [-0.09, 0.195], [0, 0.175]];
+export function faceOutline() {
+  const left = spline(FACE_EDGE, 40);
+  const right = mirror(left).reverse();
+  return [...left, ...right.slice(1), [0.2, 0.95], [0, 1.0], [-0.2, 0.95]];
+}
+
 // Depth: the head and the body are rounded, the hair sits behind the face.
-function depth(x, y, kind) {
+export function depth(x, y, kind) {
   if (kind === HAIR) return -0.06 + 0.16 * Math.sqrt(Math.max(0, 1 - (x / 0.62) ** 2));
   if (y > 0.15) return 0.24 * Math.sqrt(Math.max(0, 1 - (x / 0.3) ** 2));
   return 0.32 * Math.sqrt(Math.max(0, 1 - (x / 0.95) ** 2));
+}
+
+// The same strokes as continuous lines of light (pairs of points for
+// THREE.LineSegments): what the figure is made of once it has formed.
+export function buildLines() {
+  const all = strokes(rng(11));
+  const pos = [], bright = [], kind = [], seed = [];
+  const rand = rng(9);
+  for (const st of all) {
+    const n = Math.max(4, Math.round(pathLength(st.pts) * 90));
+    const pts = spline(st.pts, n);
+    const sd = rand();
+    for (let i = 0; i < pts.length - 1; i++) {
+      for (const [x, y] of [pts[i], pts[i + 1]]) {
+        pos.push(x, y + 0.02, depth(x, y, st.kind));
+        bright.push(st.bright);
+        kind.push(st.kind);
+        seed.push(sd);
+      }
+    }
+  }
+  return { position: new Float32Array(pos), bright: new Float32Array(bright), kind: new Float32Array(kind), seed: new Float32Array(seed) };
 }
 
 export const RINGS = 6;
@@ -133,10 +155,10 @@ export function build(opts = {}) {
     }
   }
   // a faint glow inside the face and a soft halo of stray dust
-  for (let i = 0; i < 900; i++) {
+  for (let i = 0; i < 300; i++) {
     const a = rand() * Math.PI * 2, r = Math.sqrt(rand());
-    const x = Math.cos(a) * r * 0.2, y = 0.5 + Math.sin(a) * r * 0.3;
-    fig.push({ x, y, z: 0.22, kind: FEATURE, bright: 0.12 + rand() * 0.12 });
+    const x = Math.cos(a) * r * 0.18, y = 0.5 + Math.sin(a) * r * 0.28;
+    fig.push({ x, y, z: 0.22, kind: FEATURE, bright: 0.06 + rand() * 0.06 });
   }
   for (let i = 0; i < 700; i++) {
     const x = (rand() - 0.5) * 1.9, y = -1.1 + rand() * 2.3;

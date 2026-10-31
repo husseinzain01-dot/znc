@@ -3,7 +3,7 @@
 # window: the page says "still here" every few seconds and "bye" on closing.
 param([int]$Port = 8780, [switch]$NoAutoStop)
 $ErrorActionPreference = 'Stop'
-$Version = '1.0.0'
+$Version = '1.1.0'
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DataDir = if ($env:APPDATA) { Join-Path $env:APPDATA 'Sana' } else { Join-Path $HOME '.sana' }
 New-Item -ItemType Directory -Force -Path $DataDir | Out-Null

@@ -9,19 +9,23 @@
 <body>
 <canvas id="stage" aria-hidden="true"></canvas>
 
+<div class="topline"><i id="level"></i></div>
+
 <header class="corner">
-  <div id="clock" class="clock" dir="ltr"></div>
-  <div id="date" class="date"></div>
-  <div id="weather" class="weather"></div>
+  <div class="row1"><span id="clock" class="clock" dir="ltr"></span><span id="temp" class="temp" dir="ltr"></span></div>
+  <div class="row2"><span id="date"></span><span id="sky"></span></div>
+  <div id="greet" class="greet"></div>
+  <div class="chips"><span class="chip" id="voiceChip">الصوت: …</span><span class="chip" id="earChip">السماع: عربي</span></div>
 </header>
 
+<button id="orbBtn" class="live" type="button" aria-label="تشغيل الميكروفون أو إيقافه">
+  <span class="dot"></span><span id="status" data-state="idle" hidden></span><span id="statusText"></span>
+</button>
+
 <aside id="log" class="log" aria-live="polite"></aside>
+<div id="interim" class="interim"></div>
 
 <footer class="bar">
-  <div id="interim" class="interim"></div>
-  <button id="orbBtn" class="status" type="button" aria-label="تشغيل الميكروفون أو إيقافه">
-    <span class="dot"></span><span id="status" data-state="idle" hidden></span><span id="statusText"></span>
-  </button>
   <form id="typed" class="typed" hidden><input id="typedText" autocomplete="off" placeholder="اكتب أمراً واضغط Enter، مثل: افتحي شكلك"></form>
 </footer>
 

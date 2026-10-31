@@ -119,7 +119,21 @@ export function createVoice({ onHeard, onInterim, onState, onSpeakLevel, onMicLe
     }, 50);
   }
 
-  function say(text) {
+  // Edge loads its voices a moment after the page: wait for them (up to 3 s)
+  // rather than stay silent
+  function voicesReady() {
+    if (!synth) return Promise.resolve(null);
+    if (voice || chooseVoice()) return Promise.resolve(voice);
+    return new Promise((res) => {
+      const t0 = Date.now();
+      const iv = setInterval(() => {
+        if (chooseVoice() || Date.now() - t0 > 3000) { clearInterval(iv); res(voice); }
+      }, 150);
+    });
+  }
+
+  async function say(text) {
+    if (text) await voicesReady();
     return new Promise((resolve) => {
       if (!text) return resolve();
       speaking = true;
@@ -164,7 +178,7 @@ export function createVoice({ onHeard, onInterim, onState, onSpeakLevel, onMicLe
 
   return {
     supported: !!SR,
-    start, stop, openMic, say, hush,
+    start, stop, openMic, say, hush, voicesReady,
     get listening() { return wanted; },
     get speaking() { return speaking; },
     get voiceName() { return voice ? `${voice.name} (${voice.lang})` : ''; },
